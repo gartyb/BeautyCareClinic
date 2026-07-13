@@ -5,10 +5,13 @@ import {
   completedTreatmentsForSeries,
   previousAppointment,
   nextAppointment,
+  openOrders,
+  paymentsForOrder,
 } from './selectors';
 import { CustomerOrder } from '../../types/Order';
 import { TreatmentSeries } from '../../types/TreatmentSeries';
 import { Appointment } from '../../types/Appointment';
+import { Payment } from '../../types/Payment';
 
 // ─── outstandingBalance ───────────────────────────────────────────────────────
 
@@ -257,5 +260,85 @@ describe('nextAppointment', () => {
   it('returns null when only future appointment is cancelled', () => {
     const appts = [makeAppt('a1', FUTURE_DATE_1, 'Cancelled')];
     expect(nextAppointment(appts)).toBeNull();
+  });
+});
+
+// ─── openOrders ───────────────────────────────────────────────────────────────
+
+function makeOrder(overrides: Partial<CustomerOrder> = {}): CustomerOrder {
+  return {
+    id: 'o1', customerId: 'c1', totalPrice: '1000.00',
+    amountPaid: '0.00', remainingBalance: '1000.00',
+    maxPaymentCount: 3, paymentCount: 0,
+    orderItems: [], createdDate: '2026-01-01', createdByUserId: 'u1',
+    ...overrides,
+  };
+}
+
+describe('openOrders', () => {
+  it('returns empty array for no orders', () => {
+    expect(openOrders([])).toHaveLength(0);
+  });
+
+  it('includes order with remaining balance and payment slots left', () => {
+    const order = makeOrder({ remainingBalance: '500.00', paymentCount: 1, maxPaymentCount: 3 });
+    expect(openOrders([order])).toHaveLength(1);
+  });
+
+  it('excludes fully-paid order (remainingBalance = 0) even if payment slots remain', () => {
+    // A fully-paid order should not appear in openOrders regardless of paymentCount
+    const order = makeOrder({ remainingBalance: '0.00', amountPaid: '1000.00', paymentCount: 1, maxPaymentCount: 3 });
+    expect(openOrders([order])).toHaveLength(0);
+  });
+
+  it('excludes order that has reached maxPaymentCount even if balance remains', () => {
+    const order = makeOrder({ remainingBalance: '200.00', paymentCount: 3, maxPaymentCount: 3 });
+    expect(openOrders([order])).toHaveLength(0);
+  });
+
+  it('excludes fully-paid order that has also reached maxPaymentCount', () => {
+    const order = makeOrder({ remainingBalance: '0.00', amountPaid: '1000.00', paymentCount: 3, maxPaymentCount: 3 });
+    expect(openOrders([order])).toHaveLength(0);
+  });
+
+  it('returns only the open orders from a mixed list', () => {
+    const open = makeOrder({ id: 'open', remainingBalance: '400.00', paymentCount: 1, maxPaymentCount: 3 });
+    const fullyPaid = makeOrder({ id: 'paid', remainingBalance: '0.00', amountPaid: '1000.00', paymentCount: 2, maxPaymentCount: 3 });
+    const maxed = makeOrder({ id: 'maxed', remainingBalance: '200.00', paymentCount: 3, maxPaymentCount: 3 });
+    const result = openOrders([open, fullyPaid, maxed]);
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe('open');
+  });
+});
+
+// ─── paymentsForOrder ─────────────────────────────────────────────────────────
+
+function makePayment(id: string, orderId: string): Payment {
+  return {
+    id, customerOrderId: orderId, amount: '100.00',
+    method: 'Cash', paymentDate: '2026-01-01',
+    createdDate: '2026-01-01T10:00:00Z', createdByUserId: 'u1',
+  };
+}
+
+describe('paymentsForOrder', () => {
+  it('returns empty array when no payments match', () => {
+    const payments = [makePayment('p1', 'order-other')];
+    expect(paymentsForOrder(payments, 'order-1')).toHaveLength(0);
+  });
+
+  it('returns only payments for the specified order', () => {
+    const payments = [
+      makePayment('p1', 'order-1'),
+      makePayment('p2', 'order-2'),
+      makePayment('p3', 'order-1'),
+    ];
+    const result = paymentsForOrder(payments, 'order-1');
+    expect(result).toHaveLength(2);
+    expect(result.map(p => p.id)).toEqual(expect.arrayContaining(['p1', 'p3']));
+  });
+
+  it('returns empty array for empty payments list', () => {
+    expect(paymentsForOrder([], 'order-1')).toHaveLength(0);
   });
 });

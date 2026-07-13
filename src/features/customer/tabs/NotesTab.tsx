@@ -1,14 +1,10 @@
 import { useState } from 'react';
-import { X } from 'lucide-react';
 import { useCustomer } from '../../../contexts/CustomerContext';
+import { Modal } from '../../../components/shared/Modal';
 import { therapists } from '../../../data/therapists';
 import { treatmentTypes } from '../../../data/treatmentTypes';
 import { Note } from '../../../types/Note';
-
-function formatDate(isoDate: string): string {
-  const date = new Date(isoDate);
-  return date.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' });
-}
+import { formatDate } from '../../../utils/date';
 
 function truncate(text: string, max: number): string {
   if (text.length <= max) return text;
@@ -27,45 +23,30 @@ function NoteModal({ note, onClose }: NoteModalProps) {
     : null;
 
   return (
-    <div
-      className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <div
-        className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6"
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between mb-4">
-          <button onClick={onClose} className="p-1 text-clinic-muted hover:text-clinic-text rounded-lg">
-            <X size={20} />
-          </button>
-          <h2 className="text-lg font-bold text-clinic-text">הערה</h2>
-        </div>
-
-        <div className="flex flex-col gap-3 text-sm">
-          {author && (
-            <div className="flex justify-between">
-              <span className="text-clinic-text">{author.firstName} {author.lastName}</span>
-              <span className="text-clinic-muted">מחברת</span>
-            </div>
-          )}
+    <Modal open={true} onClose={onClose} title="הערה">
+      <div className="flex flex-col gap-3 text-sm">
+        {author && (
           <div className="flex justify-between">
-            <span className="text-clinic-text">{formatDate(note.createdDate)}</span>
-            <span className="text-clinic-muted">תאריך</span>
+            <span className="text-clinic-text">{author.firstName} {author.lastName}</span>
+            <span className="text-clinic-muted">מחברת</span>
           </div>
-          {treatmentType && (
-            <div className="flex justify-between">
-              <span className="text-clinic-text">{treatmentType.name}</span>
-              <span className="text-clinic-muted">סוג טיפול</span>
-            </div>
-          )}
-          <div className="mt-2">
-            <p className="text-clinic-muted text-xs mb-1">תוכן ההערה</p>
-            <p className="text-clinic-text bg-clinic-blush rounded-lg p-3 leading-relaxed">{note.text}</p>
+        )}
+        <div className="flex justify-between">
+          <span className="text-clinic-text">{formatDate(note.createdDate)}</span>
+          <span className="text-clinic-muted">תאריך</span>
+        </div>
+        {treatmentType && (
+          <div className="flex justify-between">
+            <span className="text-clinic-text">{treatmentType.name}</span>
+            <span className="text-clinic-muted">סוג טיפול</span>
           </div>
+        )}
+        <div className="mt-2">
+          <p className="text-clinic-muted text-xs mb-1">תוכן ההערה</p>
+          <p className="text-clinic-text bg-clinic-blush rounded-lg p-3 leading-relaxed">{note.text}</p>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }
 

@@ -8,6 +8,7 @@ import { SearchScreen } from './features/search/SearchScreen';
 import { CustomerCard } from './features/customer/CustomerCard';
 
 export function App() {
+  // WARNING: never default to a privileged role in production — replace with real auth (CR-006)
   const [currentUser, setCurrentUser] = useState<User>(therapists[0]!);
 
   return (
@@ -19,7 +20,7 @@ export function App() {
           <Routes>
             <Route path="/" element={<Navigate to="/search" replace />} />
             <Route path="/search" element={<SearchScreen />} />
-            <Route path="/customers/:id" element={<CustomerCard />} />
+            <Route path="/customers/:id" element={<CustomerCard currentUser={currentUser} />} />
           </Routes>
         </main>
       </div>

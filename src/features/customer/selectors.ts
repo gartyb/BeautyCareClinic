@@ -59,3 +59,11 @@ export function remainingUnits(series: TreatmentSeries[]): number {
     return sum + Math.floor(((s.totalMinutes ?? 0) - (s.usedMinutes ?? 0)) / perTreatment);
   }, 0);
 }
+
+export function openOrders(orders: CustomerOrder[]): CustomerOrder[] {
+  return orders.filter(o => parseFloat(o.remainingBalance) > 0 && o.paymentCount < o.maxPaymentCount);
+}
+
+export function paymentsForOrder(payments: Payment[], orderId: string): Payment[] {
+  return payments.filter(p => p.customerOrderId === orderId);
+}

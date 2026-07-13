@@ -1,11 +1,7 @@
 import { useCustomer } from '../../../contexts/CustomerContext';
 import { therapists } from '../../../data/therapists';
 import { Payment } from '../../../types/Payment';
-
-function formatDate(isoDate: string): string {
-  const date = new Date(isoDate);
-  return date.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' });
-}
+import { formatDate } from '../../../utils/date';
 
 const methodLabels: Record<Payment['method'], string> = {
   Cash: 'מזומן',

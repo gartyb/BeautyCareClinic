@@ -18,7 +18,7 @@
 - Source: Security review — Phase 001 (F-02)
 - Related phase: Phase 2 (Backend + Auth)
 - Description: Role-based visibility is UI-only (sidebar hide). No route-level guard exists. When Phase 2 adds authentication, a `<RoleGuard role="Manager">` wrapper must gate manager-only routes in `App.tsx`. Also add a comment in `Sidebar.tsx` that client-side role checks are UX-only and never security.
-- Status: Open
+- Status: Closed — Phase 002 (`RoleGuard` component created; UX-only comment added to Sidebar.tsx)
 
 ### CR-003 — Modal accessibility (focus trap, Escape key, ARIA)
 
@@ -27,7 +27,7 @@
 - Source: Code review — Phase 001 (P3.11)
 - Related phase: Phase 2
 - Description: Custom div-based modals in `TreatmentHistoryTab` and `NotesTab` lack `role="dialog"`, `aria-modal`, `aria-labelledby`, focus trapping, and Escape key dismissal. Replace with Radix Dialog when proper shadcn/ui integration is done.
-- Status: Open
+- Status: Closed — Phase 002 (all modals migrated to shared Radix Dialog wrapper)
 
 ### CR-004 — Image URL allowlist + CSP headers
 
@@ -45,7 +45,7 @@
 - Source: Security review — Phase 001 (F-04)
 - Related phase: Phase 2
 - Description: `createCustomer` and future service stubs throw raw `Error` with internal identifiers. Establish a `DomainError` type or `Result<T, E>` pattern before Phase 2 service layer is implemented to prevent internal details leaking to user-facing toasts or logs.
-- Status: Open
+- Status: Closed — Phase 002 (`DomainError extends Error { code: string }` in `src/domain/errors.ts`)
 
 ### CR-006 — Default user pattern for Phase 2 auth
 
@@ -54,7 +54,7 @@
 - Source: Security review — Phase 001 (F-08)
 - Related phase: Phase 2
 - Description: `App.tsx` bootstraps `useState<User>(therapists[0]!)` defaulting to Manager. Replace with `null` + loading skeleton when Phase 2 adds real authentication. Add a code comment now warning against defaulting to a privileged role.
-- Status: Open
+- Status: Closed — Phase 002 (warning comment added to `App.tsx`)
 
 ### CR-007 — Smart default tab in Customer Card
 
@@ -63,7 +63,7 @@
 - Source: Code review — Phase 001 (P3.14)
 - Related phase: Phase 2
 - Description: Customer Card always defaults to "Active Series" tab. If a customer has no active series, the therapist lands on an empty state. Consider a smart `defaultValue` that falls through to "Treatment History" or "Notes" when no active series exist.
-- Status: Open
+- Status: Closed — Phase 002 (smart defaultTab: falls through to "Treatment History" when no active series)
 
 ## Planned
 
