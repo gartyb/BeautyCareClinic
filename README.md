@@ -1,1 +1,0 @@
-# BeautyCareClinit - Project
