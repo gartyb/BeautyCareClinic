@@ -1,0 +1,44 @@
+2026-07-13 Phase 001 — Foundation + Customer View
+  Status: Implementation complete, awaiting user validation
+  Branch: feature/phase-001-customer-view
+  Build: PASS (npm run build — 0 errors)
+  Tests: 43 PASS, 0 FAIL
+    - src/features/customer/selectors.test.ts: 27 tests
+    - src/data/customersService.test.ts: 10 tests
+    - src/features/search/SearchScreen.test.tsx: 6 tests
+
+2026-07-13 Review Fixes — Security, correctness, and quality fixes
+  Branch: feature/phase-001-customer-view
+  Build: PASS (npm run build — 0 errors, 0 type errors)
+  Tests: 45 PASS, 0 FAIL (+2 new tests)
+    - src/features/customer/selectors.test.ts: 29 tests
+    - src/data/customersService.test.ts: 10 tests
+    - src/features/search/SearchScreen.test.tsx: 6 tests
+  Fixes applied:
+    FIX-1: vitest bumped from ^2.1.8 to ^3.2.6 (CVE GHSA-5xrq-8626-4rwp resolved, 0 vulnerabilities)
+    FIX-2: tailwind.config.js — added zIndex.60 to theme.extend (z-60 now valid)
+    FIX-3: CustomerCard.tsx — added isLoading state to prevent "not found" flash on direct URL load
+    FIX-4: selectors.ts previousAppointment — filter changed to status === 'Completed'
+    FIX-5: SearchResults.tsx — removed inline getLastAppointment, imported previousAppointment from selectors
+    FIX-6: docs/adr/ADR-001 — updated completedTreatmentsForSeries signature to single-arg form
+    FIX-7: selectors.test.ts — added test for past Scheduled exclusion; added floating point sum test
+           selectors.ts outstandingBalance — rounds result to 2 decimal places
+    FIX-8: package.json — removed @radix-ui/react-dialog and tailwind-merge (unused)
+           npm install: 0 vulnerabilities, 348 packages
+    FIX-9: TimerPanel.tsx — wired useActiveTimer context; displays elapsedSeconds as MM:SS or H:MM:SS
+           and status label (פעיל/מושהה/לא פעיל); buttons call context no-ops
+    FIX-10: SearchScreen.tsx — added maxLength={100} to search input
+            customersService.ts — early return [] when query.length > 100
+    FIX-11: Mock data comment added to all 8 data files
+            therapists.ts — email domain changed from @beautyclinic.co.il to @example.co.il
+  Files created:
+    src/types/{User,Customer,TreatmentSeries,PackageType,Order,Payment,Treatment,Appointment,Note,TreatmentType,index}.ts
+    src/data/{treatmentTypes,packageTypes,therapists,customers,series,orders,payments,treatments,appointments,notes,customersService}.ts
+    src/contexts/{CustomerContext,ActiveTimerContext}.tsx
+    src/features/customer/{selectors,CustomerCard,CustomerCardHeader,SummaryRow,QuickActionButtons,TimerPanel}.tsx
+    src/features/customer/tabs/{ActiveSeriesTab,TreatmentHistoryTab,OrdersTab,PaymentsTab,NotesTab}.tsx
+    src/features/search/{SearchScreen,SearchResults}.tsx
+    src/components/shared/{Header,Sidebar,Badge,ProgressBar}.tsx
+    src/App.tsx, src/main.tsx, src/index.css, src/vite-env.d.ts
+    package.json, tsconfig.json, tsconfig.app.json, tsconfig.node.json
+    vite.config.ts, vitest.config.ts, tailwind.config.js, postcss.config.js, index.html
