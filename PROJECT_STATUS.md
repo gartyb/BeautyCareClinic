@@ -2,15 +2,15 @@
 
 ## Current State
 
-- Current phase: 002 — New Order + Record Payment
-- Phase status: Completed
-- Current branch: feature/phase-002-new-order-payment
+- Current phase: 003 — Treatment Recording
+- Phase status: Approved — Pending Commit
+- Current branch: feature/phase-003-treatment-recording
 - Latest approved version: v0.2.0
 - Latest approved tag: v0.2.0
 
 ## Current Activity
 
-Phase 002 הושלמה ואושרה ע"י המשתמש.
+Phase 003 ממתינה לאימות משתמש.
 
 ## Completed Phases
 
