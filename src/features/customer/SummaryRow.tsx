@@ -8,12 +8,7 @@ import {
   remainingUnits,
   activeSeries,
 } from './selectors';
-
-function formatDate(isoDateTime: string): string {
-  return new Date(isoDateTime).toLocaleDateString('he-IL', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-  });
-}
+import { formatDate } from '../../utils/date';
 
 interface KpiCardProps {
   icon: ReactNode;

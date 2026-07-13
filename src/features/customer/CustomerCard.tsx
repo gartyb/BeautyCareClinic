@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as Tabs from '@radix-ui/react-tabs';
 import { useCustomer } from '../../contexts/CustomerContext';
+import { activeSeries } from './selectors';
 import { CustomerCardHeader } from './CustomerCardHeader';
 import { SummaryRow } from './SummaryRow';
 import { QuickActionButtons } from './QuickActionButtons';
@@ -10,6 +11,11 @@ import { TreatmentHistoryTab } from './tabs/TreatmentHistoryTab';
 import { OrdersTab } from './tabs/OrdersTab';
 import { NotesTab } from './tabs/NotesTab';
 import { TimerPanel } from './TimerPanel';
+import type { User } from '../../types/User';
+
+interface CustomerCardProps {
+  currentUser: User;
+}
 
 const tabItems = [
   { value: 'series', label: 'סדרות פעילות' },
@@ -18,12 +24,15 @@ const tabItems = [
   { value: 'notes', label: 'הערות' },
 ];
 
-export function CustomerCard() {
+export function CustomerCard({ currentUser }: CustomerCardProps) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { setActiveCustomer, activeCustomer } = useCustomer();
+  const { setActiveCustomer, activeCustomer, treatmentSeries } = useCustomer();
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('series');
+
+  // CR-007: smart default tab — show active series tab if there are active series, else history
+  const defaultTab = activeSeries(treatmentSeries).length > 0 ? 'series' : 'history';
+  const [activeTab, setActiveTab] = useState(defaultTab);
 
   useEffect(() => {
     if (id) {
@@ -31,6 +40,11 @@ export function CustomerCard() {
     }
     setIsLoading(false);
   }, [id, setActiveCustomer]);
+
+  // Update active tab when customer changes and default tab may differ
+  useEffect(() => {
+    setActiveTab(activeSeries(treatmentSeries).length > 0 ? 'series' : 'history');
+  }, [activeCustomer, treatmentSeries]);
 
   if (isLoading) {
     return (
@@ -60,10 +74,10 @@ export function CustomerCard() {
     <div className="flex-1 bg-clinic-bg flex flex-col overflow-hidden">
       <CustomerCardHeader />
       <SummaryRow />
-      <QuickActionButtons />
+      <QuickActionButtons currentUser={currentUser} customerId={id ?? ''} />
 
       <div className="flex-1 overflow-hidden flex flex-col">
-        <Tabs.Root defaultValue="series" value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
+        <Tabs.Root defaultValue={defaultTab} value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
           <Tabs.List dir="rtl" className="flex border-b border-clinic-border bg-white px-6 gap-1">
             {tabItems.map(tab => (
               <Tabs.Trigger
@@ -84,7 +98,7 @@ export function CustomerCard() {
               <TreatmentHistoryTab />
             </Tabs.Content>
             <Tabs.Content value="orders">
-              <OrdersTab />
+              <OrdersTab currentUser={currentUser} />
             </Tabs.Content>
 
             <Tabs.Content value="notes">

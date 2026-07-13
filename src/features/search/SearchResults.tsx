@@ -4,6 +4,7 @@ import { treatmentSeries } from '../../data/series';
 import { appointments } from '../../data/appointments';
 import { orders } from '../../data/orders';
 import { activeSeries, outstandingBalance, nextAppointment } from '../customer/selectors';
+import { formatDate } from '../../utils/date';
 
 interface Props {
   results: CustomerSummary[];
@@ -12,12 +13,6 @@ interface Props {
 
 function initials(firstName: string, lastName: string): string {
   return (firstName[0] ?? '') + (lastName[0] ?? '');
-}
-
-function formatDate(isoDateTime: string): string {
-  return new Date(isoDateTime).toLocaleDateString('he-IL', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-  });
 }
 
 export function SearchResults({ results, query }: Props) {

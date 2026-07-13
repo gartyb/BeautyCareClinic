@@ -1,17 +1,13 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, X } from 'lucide-react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useCustomer } from '../../../contexts/CustomerContext';
+import { Modal } from '../../../components/shared/Modal';
 import { packageTypes } from '../../../data/packageTypes';
 import { treatmentTypes } from '../../../data/treatmentTypes';
 import { therapists } from '../../../data/therapists';
 import { Treatment, TreatmentPhoto } from '../../../types/Treatment';
 import { OrderItem } from '../../../types/Order';
-
-function formatDate(isoDate: string): string {
-  return new Date(isoDate).toLocaleDateString('he-IL', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-  });
-}
+import { formatDate } from '../../../utils/date';
 
 function truncate(text: string, max: number): string {
   return text.length <= max ? text : text.slice(0, max) + '...';
@@ -19,83 +15,71 @@ function truncate(text: string, max: number): string {
 
 // ─── Treatment detail modal ───────────────────────────────────────────────────
 
-interface ModalProps {
+interface TreatmentModalProps {
   treatment: Treatment;
   onClose: () => void;
 }
 
-function TreatmentModal({ treatment, onClose }: ModalProps) {
+function TreatmentModal({ treatment, onClose }: TreatmentModalProps) {
   const [selectedPhoto, setSelectedPhoto] = useState<TreatmentPhoto | null>(null);
   const typeName =
     treatmentTypes.find(t => t.id === treatment.treatmentTypeId)?.name ?? treatment.treatmentTypeId;
   const therapist = therapists.find(t => t.id === treatment.therapistId);
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div
-        className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[80vh] overflow-y-auto p-6"
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between mb-4">
-          <button onClick={onClose} className="p-1 text-clinic-muted hover:text-clinic-text rounded-lg">
-            <X size={20} />
-          </button>
-          <h2 className="text-lg font-bold text-clinic-text">פרטי טיפול</h2>
+    <Modal open={true} onClose={onClose} title="פרטי טיפול">
+      <div className="flex flex-col gap-3 text-sm">
+        <div className="flex justify-between">
+          <span className="text-clinic-text font-medium">{typeName}</span>
+          <span className="text-clinic-muted">סוג טיפול</span>
         </div>
-
-        <div className="flex flex-col gap-3 text-sm">
-          <div className="flex justify-between">
-            <span className="text-clinic-text font-medium">{typeName}</span>
-            <span className="text-clinic-muted">סוג טיפול</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-clinic-text">{formatDate(treatment.treatmentDate)}</span>
-            <span className="text-clinic-muted">תאריך</span>
-          </div>
-          {therapist && (
-            <div className="flex justify-between">
-              <span className="text-clinic-text">{therapist.firstName} {therapist.lastName}</span>
-              <span className="text-clinic-muted">מטפלת</span>
-            </div>
-          )}
-          {treatment.durationMinutes != null && treatment.durationMinutes > 0 && (
-            <div className="flex justify-between">
-              <span className="text-clinic-text">{treatment.durationMinutes} דקות</span>
-              <span className="text-clinic-muted">משך</span>
-            </div>
-          )}
-          {treatment.notes && (
-            <div className="mt-2">
-              <p className="text-clinic-muted text-xs mb-1">הערות</p>
-              <p className="text-clinic-text bg-clinic-blush rounded-lg p-3">{treatment.notes}</p>
-            </div>
-          )}
+        <div className="flex justify-between">
+          <span className="text-clinic-text">{formatDate(treatment.treatmentDate)}</span>
+          <span className="text-clinic-muted">תאריך</span>
         </div>
-
-        {treatment.treatmentPhotos.length > 0 && (
-          <div className="mt-4">
-            <p className="text-clinic-muted text-xs mb-2">תמונות</p>
-            <div className="grid grid-cols-3 gap-2">
-              {treatment.treatmentPhotos.map((photo: TreatmentPhoto) => (
-                <button
-                  key={photo.id}
-                  onClick={() => setSelectedPhoto(photo)}
-                  className="rounded-lg overflow-hidden aspect-square"
-                >
-                  <img src={photo.photoUrl} alt="תמונת טיפול" className="w-full h-full object-cover hover:opacity-90 transition-opacity" />
-                </button>
-              ))}
-            </div>
+        {therapist && (
+          <div className="flex justify-between">
+            <span className="text-clinic-text">{therapist.firstName} {therapist.lastName}</span>
+            <span className="text-clinic-muted">מטפלת</span>
           </div>
         )}
-
-        {selectedPhoto && (
-          <div className="fixed inset-0 bg-black/80 z-60 flex items-center justify-center p-4" onClick={() => setSelectedPhoto(null)}>
-            <img src={selectedPhoto.photoUrl} alt="תמונה מוגדלת" className="max-w-full max-h-full rounded-xl" />
+        {treatment.durationMinutes != null && treatment.durationMinutes > 0 && (
+          <div className="flex justify-between">
+            <span className="text-clinic-text">{treatment.durationMinutes} דקות</span>
+            <span className="text-clinic-muted">משך</span>
+          </div>
+        )}
+        {treatment.notes && (
+          <div className="mt-2">
+            <p className="text-clinic-muted text-xs mb-1">הערות</p>
+            <p className="text-clinic-text bg-clinic-blush rounded-lg p-3">{treatment.notes}</p>
           </div>
         )}
       </div>
-    </div>
+
+      {treatment.treatmentPhotos.length > 0 && (
+        <div className="mt-4">
+          <p className="text-clinic-muted text-xs mb-2">תמונות</p>
+          <div className="grid grid-cols-3 gap-2">
+            {treatment.treatmentPhotos.map((photo: TreatmentPhoto) => (
+              <button
+                key={photo.id}
+                onClick={() => setSelectedPhoto(photo)}
+                className="rounded-lg overflow-hidden aspect-square"
+              >
+                <img src={photo.photoUrl} alt="תמונת טיפול" className="w-full h-full object-cover hover:opacity-90 transition-opacity" />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {selectedPhoto && (
+        <div className="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4" onClick={() => setSelectedPhoto(null)}>
+          <img src={selectedPhoto.photoUrl} alt="תמונה מוגדלת" className="max-w-full max-h-full rounded-xl" />
+        </div>
+      )}
+    </Modal>
   );
 }
 
@@ -109,6 +93,7 @@ interface PackageRowProps {
 
 function PackageRow({ item, orderDate, seriesTreatments }: PackageRowProps) {
   const [expanded, setExpanded] = useState(true);
+  const [selectedTreatment, setSelectedTreatment] = useState<Treatment | null>(null);
   const pkg = packageTypes.find(p => p.id === item.packageTypeId);
   const treatmentType = pkg ? treatmentTypes.find(t => t.id === pkg.treatmentTypeId) : null;
   const hasTreatments = seriesTreatments.length > 0;
@@ -146,7 +131,11 @@ function PackageRow({ item, orderDate, seriesTreatments }: PackageRowProps) {
           {seriesTreatments.map((t, idx) => {
             const therapist = therapists.find(th => th.id === t.therapistId);
             return (
-              <li key={t.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-clinic-blush transition-colors">
+              <li
+                key={t.id}
+                className="flex items-center gap-3 px-4 py-2.5 hover:bg-clinic-blush transition-colors cursor-pointer"
+                onClick={() => setSelectedTreatment(t)}
+              >
                 <span className="text-xs text-clinic-muted w-5 text-center flex-shrink-0">{idx + 1}</span>
                 <div className="flex flex-col items-start gap-0.5">
                   <span className="text-sm font-medium text-clinic-text">{formatDate(t.treatmentDate)}</span>
@@ -164,6 +153,10 @@ function PackageRow({ item, orderDate, seriesTreatments }: PackageRowProps) {
             );
           })}
         </ul>
+      )}
+
+      {selectedTreatment && (
+        <TreatmentModal treatment={selectedTreatment} onClose={() => setSelectedTreatment(null)} />
       )}
     </div>
   );
@@ -204,7 +197,6 @@ export function TreatmentHistoryTab() {
           />
         );
       })}
-
     </div>
   );
 }

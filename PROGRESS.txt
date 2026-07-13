@@ -42,3 +42,66 @@
     src/App.tsx, src/main.tsx, src/index.css, src/vite-env.d.ts
     package.json, tsconfig.json, tsconfig.app.json, tsconfig.node.json
     vite.config.ts, vitest.config.ts, tailwind.config.js, postcss.config.js, index.html
+
+2026-07-13 Phase 002 Review Fixes — Correctness, validation, and security fixes
+  Branch: feature/phase-001-customer-view
+  Build: PASS (npm run build — 0 TypeScript errors)
+  Tests: 88 PASS, 0 FAIL (+10 new tests, all prior 78 green)
+    - src/features/customer/selectors.test.ts: 38 tests (+9: openOrders x6, paymentsForOrder x3)
+    - src/features/payment/paymentService.test.ts: 14 tests (+1: OVERPAYMENT throw replaces clamp)
+    - src/features/order/orderService.test.ts: 15 tests (unchanged)
+    - src/domain/errors.test.ts: 5 tests (unchanged)
+    - src/data/customersService.test.ts: 10 tests (unchanged)
+    - src/features/search/SearchScreen.test.tsx: 6 tests (unchanged)
+  Fixes applied:
+    FIX-1: CustomerContext.tsx — addPayment uses allOrdersRef to pre-compute updated order
+           before any setState; DomainError now propagates to caller with no orphan payment
+    FIX-2: selectors.ts openOrders — changed || to && (fully-paid orders no longer shown as open)
+    FIX-3: NewOrderModal.tsx — added guard: if (selected.size === 0) return in handleSave
+    FIX-4: NewOrderModal.tsx — maxOverride input: added max={24}, parseInt clamp in onChange,
+           effectiveMax range guard in handleSave
+    FIX-5: RecordPaymentModal.tsx — replaced loose isNaN check with AMOUNT_REGEX /^\d{1,7}(\.\d{1,2})?$/
+           overpayment check uses toCents() for float-safe comparison
+    FIX-6: paymentService.ts applyPaymentToOrder — throws DomainError('OVERPAYMENT') instead of clamping
+           paymentService.test.ts — updated overpayment test to assert DomainError thrown (2 tests)
+    FIX-7: RecordPaymentModal.tsx — removed stale initialOrderId variable; handleClose resets to
+           preselectedOrderId ?? ''; auto-selection moved to useEffect reacting to available
+    FIX-8: domain/money.ts toCents — throws DomainError('INVALID_AMOUNT') for NaN input
+    FIX-9: OrdersTab.tsx — replaced inline payments.filter with paymentsForOrder() selector
+    FIX-10: OrdersTab.tsx — replaced order.id.replace('order-','#') with #{sorted.length - index}
+            (UUID-friendly numeric label, newest order = highest number)
+    FIX-11: Modal.tsx — removed redundant onClick={onClose} from Dialog.Close button
+    FIX-12: RecordPaymentModal.tsx — added date validation: rejects empty date and future dates
+    FIX-13: NewOrderModal.tsx — added UX-only comment for server-side re-validation (CR-002)
+  selectors.test.ts — added import for openOrders, paymentsForOrder, Payment type;
+    added test blocks for openOrders (6 tests) and paymentsForOrder (3 tests)
+
+2026-07-13 Phase 002 — New Order + Record Payment (write actions)
+  Branch: feature/phase-002-new-order-payment
+  Build: PASS (npm run build — 0 TypeScript errors)
+  Tests: 78 PASS, 0 FAIL (+33 new tests, all prior 45 green)
+    - src/domain/errors.test.ts: 5 tests (new)
+    - src/features/order/orderService.test.ts: 15 tests (new)
+    - src/features/payment/paymentService.test.ts: 13 tests (new)
+    - src/features/customer/selectors.test.ts: 29 tests (unchanged)
+    - src/data/customersService.test.ts: 10 tests (unchanged)
+    - src/features/search/SearchScreen.test.tsx: 6 tests (unchanged)
+  Files created:
+    src/domain/{id,errors,constants,money}.ts
+    src/features/order/{orderService,orderService.test,NewOrderModal}.ts/tsx
+    src/features/payment/{paymentService,paymentService.test,RecordPaymentModal}.ts/tsx
+    src/components/shared/{Modal,RoleGuard}.tsx
+  Files updated:
+    src/contexts/CustomerContext.tsx — mutable state (useState for orders/payments/series),
+      addOrder() and addPayment() mutations exposed
+    src/features/customer/selectors.ts — added openOrders() and paymentsForOrder()
+    src/features/customer/QuickActionButtons.tsx — enabled New Order + Record Payment buttons,
+      accepts currentUser and customerId props
+    src/features/customer/tabs/OrdersTab.tsx — enabled per-order payment button with
+      paymentCount < maxPaymentCount guard; accepts currentUser prop
+    src/features/customer/CustomerCard.tsx — passes currentUser to QuickActionButtons and OrdersTab;
+      CR-007 smart defaultTab based on activeSeries()
+    src/features/customer/tabs/TreatmentHistoryTab.tsx — migrated to Modal wrapper (CR-003)
+    src/features/customer/tabs/NotesTab.tsx — migrated to Modal wrapper (CR-003)
+    src/App.tsx — CR-006 warning comment; passes currentUser to CustomerCard
+    src/components/shared/Sidebar.tsx — CR-002 comment on role check

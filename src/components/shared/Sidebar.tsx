@@ -29,6 +29,7 @@ export function Sidebar({ currentUser }: Props) {
   return (
     <aside className="w-56 bg-white border-l border-clinic-border flex flex-col py-6">
       <nav className="flex flex-col gap-1 px-3">
+        {/* NOTE: client-side role checks are UX-only, not a security control (CR-002) */}
         {navItems.map(item => {
           if (item.managerOnly && !isManager) return null;
 
