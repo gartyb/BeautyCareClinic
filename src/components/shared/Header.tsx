@@ -13,7 +13,15 @@ export function Header({ currentUser, onUserChange }: Props) {
 
   return (
     <header className="bg-white border-b border-clinic-border shadow-sm h-14 flex items-center justify-between px-6">
-      {/* Left side: user switcher (in RTL this appears on the left visually = end side) */}
+      {/* First DOM child = visually RIGHT in RTL: clinic logo + name */}
+      <div className="flex items-center gap-2">
+        <div className="w-8 h-8 rounded-full bg-clinic-pink flex items-center justify-center">
+          <span className="text-clinic-gold font-bold text-sm">מ</span>
+        </div>
+        <span className="text-xl font-bold text-clinic-gold">מרפאת יופי</span>
+      </div>
+
+      {/* Second DOM child = visually LEFT in RTL: user switcher */}
       <div className="relative">
         <button
           onClick={() => setDropdownOpen(o => !o)}
@@ -24,7 +32,7 @@ export function Header({ currentUser, onUserChange }: Props) {
         </button>
 
         {dropdownOpen && (
-          <div className="absolute top-full mt-1 left-0 bg-white border border-clinic-border rounded-lg shadow-lg z-50 min-w-[180px]">
+          <div className="absolute top-full mt-1 right-0 bg-white border border-clinic-border rounded-lg shadow-lg z-50 min-w-[180px]">
             {therapists.map(user => (
               <button
                 key={user.id}
@@ -40,14 +48,6 @@ export function Header({ currentUser, onUserChange }: Props) {
             ))}
           </div>
         )}
-      </div>
-
-      {/* Right side: clinic name (in RTL = start side) */}
-      <div className="flex items-center gap-2">
-        <span className="text-xl font-bold text-clinic-gold">מרפאת יופי</span>
-        <div className="w-8 h-8 rounded-full bg-clinic-pink flex items-center justify-center">
-          <span className="text-clinic-gold font-bold text-sm">מ</span>
-        </div>
       </div>
     </header>
   );

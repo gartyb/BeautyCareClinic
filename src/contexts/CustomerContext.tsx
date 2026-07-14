@@ -6,15 +6,25 @@ import { Treatment } from '../types/Treatment';
 import { Appointment } from '../types/Appointment';
 import { Note } from '../types/Note';
 import { TreatmentSeries } from '../types/TreatmentSeries';
+import { User } from '../types/User';
 import { applyPaymentToOrder } from '../features/payment/paymentService';
+import {
+  toFloorMinutes,
+  buildTimerTreatment,
+  buildQuantityTreatment,
+  applyTimerTreatmentToSeries,
+  applyQuantityTreatmentToSeries,
+} from '../features/treatment/treatmentService';
 
 import { customers } from '../data/customers';
 import { orders as initialOrders } from '../data/orders';
 import { payments as initialPayments } from '../data/payments';
-import { treatments } from '../data/treatments';
+import { treatments as initialTreatments } from '../data/treatments';
 import { appointments } from '../data/appointments';
 import { notes } from '../data/notes';
 import { treatmentSeries as initialSeries } from '../data/series';
+import { packageTypes } from '../data/packageTypes';
+import { newId as generateId } from '../domain/id';
 
 interface CustomerContextValue {
   activeCustomer: Customer | null;
@@ -27,6 +37,8 @@ interface CustomerContextValue {
   treatmentSeries: TreatmentSeries[];
   addOrder: (order: CustomerOrder, series: TreatmentSeries[]) => void;
   addPayment: (payment: Payment) => void;
+  recordTimerTreatment: (seriesId: string, elapsedSeconds: number, currentUser: User) => void;
+  recordQuantityTreatment: (seriesId: string, currentUser: User) => void;
 }
 
 const CustomerContext = createContext<CustomerContextValue | null>(null);
@@ -38,6 +50,9 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { allOrdersRef.current = allOrders; }, [allOrders]);
   const [allPayments, setAllPayments] = useState<Payment[]>(initialPayments);
   const [allSeries, setAllSeries] = useState<TreatmentSeries[]>(initialSeries);
+  const allSeriesRef = useRef<TreatmentSeries[]>(initialSeries);
+  useEffect(() => { allSeriesRef.current = allSeries; }, [allSeries]);
+  const [allTreatments, setAllTreatments] = useState<Treatment[]>(initialTreatments);
 
   const setActiveCustomer = useCallback((customerId: string) => {
     setActiveCustomerId(customerId);
@@ -61,8 +76,8 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
   );
 
   const customerTreatments = useMemo(
-    () => (activeCustomerId ? treatments.filter(t => t.customerId === activeCustomerId) : []),
-    [activeCustomerId]
+    () => (activeCustomerId ? allTreatments.filter(t => t.customerId === activeCustomerId) : []),
+    [activeCustomerId, allTreatments]
   );
 
   const customerAppointments = useMemo(
@@ -95,6 +110,74 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
     setAllPayments(prev => [...prev, payment]);
   }, []);
 
+  const recordTimerTreatment = useCallback(
+    (seriesId: string, elapsedSeconds: number, currentUser: User) => {
+      const series = allSeriesRef.current.find(s => s.id === seriesId);
+      if (!series) return;
+
+      const durationMinutes = toFloorMinutes(elapsedSeconds);
+      if (durationMinutes === 0) return;
+
+      const pkg = packageTypes.find(p => p.id === series.packageTypeId);
+      if (!pkg) return;
+
+      try {
+        const updatedSeries = applyTimerTreatmentToSeries(series, durationMinutes);
+        const treatment = buildTimerTreatment(
+          {
+            seriesId,
+            customerId: series.customerId,
+            treatmentTypeId: pkg.treatmentTypeId,
+            therapistId: currentUser.id,
+            durationMinutes,
+          },
+          {
+            newId: generateId,
+            now: () => new Date().toISOString().slice(0, 10),
+          }
+        );
+
+        setAllSeries(prev => prev.map(s => s.id === updatedSeries.id ? updatedSeries : s));
+        setAllTreatments(prev => [...prev, treatment]);
+      } catch (e) {
+        console.error('[recordTimerTreatment]', e);
+      }
+    },
+    []
+  );
+
+  const recordQuantityTreatment = useCallback(
+    (seriesId: string, currentUser: User) => {
+      const series = allSeriesRef.current.find(s => s.id === seriesId);
+      if (!series) return;
+
+      const pkg = packageTypes.find(p => p.id === series.packageTypeId);
+      if (!pkg) return;
+
+      try {
+        const updatedSeries = applyQuantityTreatmentToSeries(series);
+        const treatment = buildQuantityTreatment(
+          {
+            seriesId,
+            customerId: series.customerId,
+            treatmentTypeId: pkg.treatmentTypeId,
+            therapistId: currentUser.id,
+          },
+          {
+            newId: generateId,
+            now: () => new Date().toISOString().slice(0, 10),
+          }
+        );
+
+        setAllSeries(prev => prev.map(s => s.id === updatedSeries.id ? updatedSeries : s));
+        setAllTreatments(prev => [...prev, treatment]);
+      } catch (e) {
+        console.error('[recordQuantityTreatment]', e);
+      }
+    },
+    []
+  );
+
   const value = useMemo<CustomerContextValue>(
     () => ({
       activeCustomer,
@@ -107,6 +190,8 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       treatmentSeries: customerSeries,
       addOrder,
       addPayment,
+      recordTimerTreatment,
+      recordQuantityTreatment,
     }),
     [
       activeCustomer,
@@ -119,6 +204,8 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       customerSeries,
       addOrder,
       addPayment,
+      recordTimerTreatment,
+      recordQuantityTreatment,
     ]
   );
 

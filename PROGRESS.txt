@@ -76,6 +76,41 @@
   selectors.test.ts — added import for openOrders, paymentsForOrder, Payment type;
     added test blocks for openOrders (6 tests) and paymentsForOrder (3 tests)
 
+2026-07-14 Phase 003 — Treatment Recording
+  Branch: feature/phase-003-treatment-recording
+  Build: PASS (npm run build — 0 TypeScript errors)
+  Tests: 119 PASS, 0 FAIL (+31 new tests, all prior 88 green)
+    - src/features/treatment/treatmentService.test.ts: 31 tests (new)
+    - src/features/customer/selectors.test.ts: 38 tests (unchanged)
+    - src/features/payment/paymentService.test.ts: 14 tests (unchanged)
+    - src/features/order/orderService.test.ts: 15 tests (unchanged)
+    - src/domain/errors.test.ts: 5 tests (unchanged)
+    - src/data/customersService.test.ts: 10 tests (unchanged)
+    - src/features/search/SearchScreen.test.tsx: 6 tests (unchanged)
+  Files created:
+    src/features/treatment/treatmentService.ts
+    src/features/treatment/treatmentService.test.ts
+  Files updated:
+    src/contexts/ActiveTimerContext.tsx — replaced all no-ops with real timer logic:
+      useState for targetSeriesId/isRunning/isPaused/elapsedSeconds,
+      setInterval in a useEffect keyed on isRunning with cleanup on every transition,
+      intervalRef in useRef; selectSeries blocked when timer active;
+      endAndGetElapsed() atomically snapshots state then resets all fields
+    src/contexts/CustomerContext.tsx — treatments moved from static import to useState
+      (allTreatments + allTreatmentsRef mirror); customerTreatments derived from state;
+      recordTimerTreatment() and recordQuantityTreatment() added with DomainError propagation;
+      imported packageTypes, generateId, and treatmentService functions
+    src/features/customer/TimerPanel.tsx — all buttons enabled with correct enable conditions;
+      added "סיים טיפול" button calling endAndGetElapsed + recordTimerTreatment;
+      accepts currentUser prop; shows active series name from packageTypes lookup
+    src/features/customer/tabs/ActiveSeriesTab.tsx — action buttons wired:
+      quantity series: "סמן טיפול כבוצע" calls recordQuantityTreatment;
+      timer series: "התחל טיימר" calls selectSeries+start; disabled when timerBusy;
+      accepts currentUser prop
+    src/features/customer/CustomerCard.tsx — passes currentUser to ActiveSeriesTab and TimerPanel
+    src/components/shared/Header.tsx — RTL navbar fix: clinic logo+name DOM-first (visual right),
+      user-switcher DOM-second (visual left); dropdown now anchors to right-0
+
 2026-07-13 Phase 002 — New Order + Record Payment (write actions)
   Branch: feature/phase-002-new-order-payment
   Build: PASS (npm run build — 0 TypeScript errors)

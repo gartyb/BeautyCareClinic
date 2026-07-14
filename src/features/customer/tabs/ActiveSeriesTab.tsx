@@ -1,10 +1,16 @@
 import { useCustomer } from '../../../contexts/CustomerContext';
+import { useActiveTimer } from '../../../contexts/ActiveTimerContext';
 import { activeSeries, completedTreatmentsForSeries } from '../selectors';
 import { packageTypes } from '../../../data/packageTypes';
 import { treatmentTypes } from '../../../data/treatmentTypes';
 import { Badge } from '../../../components/shared/Badge';
 import { ProgressBar } from '../../../components/shared/ProgressBar';
 import { TreatmentSeries } from '../../../types/TreatmentSeries';
+import { User } from '../../../types/User';
+
+interface ActiveSeriesTabProps {
+  currentUser: User;
+}
 
 interface StatProps {
   label: string;
@@ -22,13 +28,14 @@ function Stat({ label, value, highlight }: StatProps) {
   return (
     <div className="flex flex-col items-center gap-0.5">
       <span className={`text-2xl font-bold ${valueClass}`}>{value}</span>
-      <span className="text-xs text-clinic-muted">{label}</span>
+      <span className="text-sm text-clinic-muted">{label}</span>
     </div>
   );
 }
 
-export function ActiveSeriesTab() {
-  const { treatmentSeries } = useCustomer();
+export function ActiveSeriesTab({ currentUser }: ActiveSeriesTabProps) {
+  const { treatmentSeries, recordQuantityTreatment } = useCustomer();
+  const timer = useActiveTimer();
   const active = activeSeries(treatmentSeries);
 
   if (active.length === 0) {
@@ -38,6 +45,9 @@ export function ActiveSeriesTab() {
       </div>
     );
   }
+
+  // A timer is "busy" when any timer is running or paused
+  const timerBusy = timer.isRunning || timer.isPaused;
 
   return (
     <div className="p-6 flex flex-col gap-4">
@@ -66,9 +76,59 @@ export function ActiveSeriesTab() {
           progressValue = (s.totalMinutes ?? 0) > 0
             ? (s.usedMinutes ?? 0) / (s.totalMinutes ?? 0)
             : 0;
-          unitLabel = 'טיפולים (זמן)';
+          unitLabel = 'טיפולים';
         }
 
+        if (s.seriesKind === 'quantity') {
+          const isSeriesComplete = (s.completedTreatments ?? 0) >= (s.totalTreatments ?? 0);
+
+          return (
+            <div
+              key={s.id}
+              className="bg-white rounded-xl border border-clinic-border shadow-sm p-5 flex flex-col gap-4"
+            >
+              {/* Header: name + badge */}
+              <div className="flex items-start justify-between">
+                <Badge variant="active">פעיל</Badge>
+                <div className="flex flex-col items-end gap-0.5">
+                  <h3 className="font-semibold text-clinic-text">
+                    {pkg?.name ?? s.packageTypeId}
+                  </h3>
+                  {treatmentType && (
+                    <span className="text-base text-clinic-muted">{treatmentType.name}</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Stats row */}
+              <div className="flex justify-around border-y border-clinic-border py-3">
+                <Stat label="נרכשו" value={total} />
+                <div className="w-px bg-clinic-border" />
+                <Stat label="בוצעו" value={completed} highlight="muted" />
+                <div className="w-px bg-clinic-border" />
+                <Stat label="נותרו" value={remaining} highlight="gold" />
+              </div>
+
+              {/* Progress bar */}
+              <ProgressBar value={progressValue} label={`${completed} מתוך ${total} ${unitLabel}`} />
+
+              {/* Action button */}
+              <button
+                disabled={isSeriesComplete}
+                onClick={() => recordQuantityTreatment(s.id, currentUser)}
+                className={`w-full py-2 text-sm border border-clinic-gold text-clinic-gold rounded-lg ${
+                  isSeriesComplete
+                    ? 'opacity-50 cursor-not-allowed'
+                    : 'hover:bg-clinic-gold hover:text-white transition-colors cursor-pointer'
+                }`}
+              >
+                סמן טיפול כבוצע
+              </button>
+            </div>
+          );
+        }
+
+        // Timer series
         return (
           <div
             key={s.id}
@@ -82,7 +142,7 @@ export function ActiveSeriesTab() {
                   {pkg?.name ?? s.packageTypeId}
                 </h3>
                 {treatmentType && (
-                  <span className="text-sm text-clinic-muted">{treatmentType.name}</span>
+                  <span className="text-base text-clinic-muted">{treatmentType.name}</span>
                 )}
               </div>
             </div>
@@ -96,16 +156,34 @@ export function ActiveSeriesTab() {
               <Stat label="נותרו" value={remaining} highlight="gold" />
             </div>
 
-            {/* Progress bar */}
-            <ProgressBar value={progressValue} label={`${completed} מתוך ${total} ${unitLabel}`} />
+            {/* Progress bar + minutes per treatment */}
+            <div className="flex flex-col gap-1">
+              <ProgressBar value={progressValue} label={`${completed} מתוך ${total} ${unitLabel}`} />
+              <div className="flex justify-end items-center gap-1">
+                <span className="text-sm text-clinic-muted">דקות נוצלו</span>
+                <span className="text-sm font-medium text-clinic-muted">{s.totalMinutes ?? 0}</span>
+                <span className="text-sm text-clinic-muted">מתוך</span>
+                <span className="text-sm font-medium text-clinic-muted">{s.usedMinutes ?? 0}</span>
+              </div>
+              {s.minutesPerTreatment && (
+                <div className="flex justify-end items-center gap-1">
+                  <span className="text-sm text-clinic-muted">דקות לטיפול</span>
+                  <span className="text-sm font-medium text-clinic-muted">{s.minutesPerTreatment}</span>
+                </div>
+              )}
+            </div>
 
             {/* Action button */}
             <button
-              disabled
-              title="זמין בקרוב"
-              className="w-full py-2 text-sm border border-clinic-gold text-clinic-gold rounded-lg opacity-50 cursor-not-allowed"
+              disabled={timerBusy}
+              onClick={() => timer.selectAndStart(s.id)}
+              className={`w-full py-2 text-sm border border-clinic-gold text-clinic-gold rounded-lg ${
+                timerBusy
+                  ? 'opacity-50 cursor-not-allowed'
+                  : 'hover:bg-clinic-gold hover:text-white transition-colors cursor-pointer'
+              }`}
             >
-              {s.seriesKind === 'quantity' ? 'סמן טיפול כבוצע' : 'התחל טיימר'}
+              התחל טיימר
             </button>
           </div>
         );

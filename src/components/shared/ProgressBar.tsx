@@ -20,7 +20,7 @@ export function ProgressBar({ value, label }: Props) {
         />
       </div>
       {label && (
-        <p className="text-xs text-clinic-muted mt-1" dir="rtl">{label}</p>
+        <p className="text-sm text-clinic-muted mt-1" dir="rtl">{label}</p>
       )}
     </div>
   );

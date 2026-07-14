@@ -25,11 +25,13 @@
 
 ## Running a Timer-Based Treatment
 
-1. Customer Card → Active Series → select a timer-based series → Start Timer.
-2. Timer shows elapsed time. Controls: pause, resume, reset.
-3. End treatment → duration added to `TreatmentSeries.used_minutes`.
-4. System recalculates `completed_treatments = floor(used_minutes / minutes_per_treatment)`.
-5. A `Treatment` record is created with the measured `duration_minutes`.
+1. Customer Card → Active Series → timer-based series card → "התחל טיימר".
+2. Timer panel activates. Controls: השהה | המשך | אפס | סיים טיפול.
+3. Only one timer active globally — "התחל טיימר" disabled on other series while running.
+4. "סיים טיפול" (elapsed > 0) → `durationMinutes = floor(elapsedSeconds / 60)` added to `usedMinutes`.
+5. `completedTreatments` recalculated as `floor(usedMinutes / minutesPerTreatment)` (derived, not stored).
+6. A `Treatment` record is created. Progress bar updates immediately.
+7. If elapsed = 0 → "סיים טיפול" is disabled; אפס clears the timer without creating a Treatment.
 
 ## Recording a Quantity-Based Treatment
 

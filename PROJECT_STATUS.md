@@ -2,15 +2,15 @@
 
 ## Current State
 
-- Current phase: 002 — New Order + Record Payment
+- Current phase: 003 — Treatment Recording
 - Phase status: Completed
-- Current branch: feature/phase-002-new-order-payment
-- Latest approved version: v0.2.0
-- Latest approved tag: v0.2.0
+- Current branch: feature/phase-003-treatment-recording
+- Latest approved version: v0.3.0
+- Latest approved tag: v0.3.0
 
 ## Current Activity
 
-Phase 002 הושלמה ואושרה ע"י המשתמש.
+Phase 003 הושלמה ואושרה.
 
 ## Completed Phases
 
@@ -18,6 +18,7 @@ Phase 002 הושלמה ואושרה ע"י המשתמש.
 | ----- | ---------------------------------------- | ------- | --------- |
 | 001   | Customer Card Frontend with Mock Data    | v0.1.0  | Completed |
 | 002   | New Order + Record Payment               | v0.2.0  | Completed |
+| 003   | Treatment Recording                      | v0.3.0  | Completed |
 
 ## Open Change Requests
 
@@ -30,4 +31,4 @@ Phase 002 הושלמה ואושרה ע"י המשתמש.
 
 ## Next Step
 
-Plan Phase 3.
+Plan Phase 4.

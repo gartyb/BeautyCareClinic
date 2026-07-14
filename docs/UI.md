@@ -32,7 +32,9 @@ The highest-priority screen. Therapist must read full customer status in seconds
 **Tab: סדרות פעילות**
 - Stats row per series: נרכשו | בוצעו | נותרו (with dividers)
 - Progress bar with label (e.g. "3 מתוך 10 טיפולים")
-- Action buttons disabled (Start Timer, Mark Complete)
+- Timer series: shows "X מתוך Y דקות נוצלו" and "Z דקות לטיפול" below progress bar
+- Action button: "התחל טיימר" (timer series) or "סמן טיפול כבוצע" (quantity series)
+- "התחל טיימר" disabled on all series while any timer is active
 
 **Tab: היסטוריית טיפולים**
 - Grouped by package/order-item, newest first
@@ -45,7 +47,7 @@ The highest-priority screen. Therapist must read full customer status in seconds
 **Tab: הערות**
 - Notes list with date, author, "קרא עוד" modal
 
-**Timer panel:** Appears only when **סדרות פעילות** tab is active and a timer series exists. Skeleton / disabled in Phase 1.
+**Timer panel:** Appears only when **סדרות פעילות** tab is active and a timer series exists. Started via "התחל טיימר" in the series card only. Duration = floor(elapsedSeconds / 60) — whole minutes only. elapsed=0 → "סיים טיפול" disabled.
 
 Mockup: `docs/mockups/customer-screen-mockup.png`
 

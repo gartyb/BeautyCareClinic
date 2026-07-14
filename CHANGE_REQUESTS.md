@@ -65,6 +65,15 @@
 - Description: Customer Card always defaults to "Active Series" tab. If a customer has no active series, the therapist lands on an empty state. Consider a smart `defaultValue` that falls through to "Treatment History" or "Notes" when no active series exist.
 - Status: Closed — Phase 002 (smart defaultTab: falls through to "Treatment History" when no active series)
 
+### CR-008 — Server-side therapistId validation before backend wiring
+
+- Type: Security
+- Priority: High
+- Source: Security review — Phase 003
+- Related phase: Phase 2 (Backend)
+- Description: `recordTimerTreatment` and `recordQuantityTreatment` stamp `therapistId = currentUser.id` from the client-supplied `User` object (the dev-only header switcher). When backend is added, `therapistId` must come from the authenticated server session — never trust the client-supplied value. The Header switcher must be removed or locked behind an env flag before production.
+- Status: Open
+
 ## Planned
 
 None.

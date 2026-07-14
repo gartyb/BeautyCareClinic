@@ -92,7 +92,7 @@ export function CustomerCard({ currentUser }: CustomerCardProps) {
 
           <div className="flex-1 overflow-y-auto">
             <Tabs.Content value="series">
-              <ActiveSeriesTab />
+              <ActiveSeriesTab currentUser={currentUser} />
             </Tabs.Content>
             <Tabs.Content value="history">
               <TreatmentHistoryTab />
@@ -108,7 +108,7 @@ export function CustomerCard({ currentUser }: CustomerCardProps) {
         </Tabs.Root>
       </div>
 
-      {activeTab === 'series' && <TimerPanel />}
+      {activeTab === 'series' && <TimerPanel currentUser={currentUser} />}
     </div>
   );
 }
