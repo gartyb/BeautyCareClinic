@@ -3,14 +3,14 @@
 ## Current State
 
 - Current phase: 003 — Treatment Recording
-- Phase status: Approved — Pending Commit
+- Phase status: Completed
 - Current branch: feature/phase-003-treatment-recording
-- Latest approved version: v0.2.0
-- Latest approved tag: v0.2.0
+- Latest approved version: v0.3.0
+- Latest approved tag: v0.3.0
 
 ## Current Activity
 
-Phase 003 ממתינה לאימות משתמש.
+Phase 003 הושלמה ואושרה.
 
 ## Completed Phases
 
@@ -18,6 +18,7 @@ Phase 003 ממתינה לאימות משתמש.
 | ----- | ---------------------------------------- | ------- | --------- |
 | 001   | Customer Card Frontend with Mock Data    | v0.1.0  | Completed |
 | 002   | New Order + Record Payment               | v0.2.0  | Completed |
+| 003   | Treatment Recording                      | v0.3.0  | Completed |
 
 ## Open Change Requests
 
@@ -30,4 +31,4 @@ Phase 003 ממתינה לאימות משתמש.
 
 ## Next Step
 
-Plan Phase 3.
+Plan Phase 4.

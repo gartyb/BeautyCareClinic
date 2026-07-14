@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved — Pending Commit
+Completed
 
 ## Goal
 
@@ -193,4 +193,6 @@ Enable therapists to record treatments in real time: functional timer for timer-
 
 ## Version
 
-- Approved: v0.3.0
+- Version: v0.3.0
+- Commit: aec1147
+- Tag: v0.3.0
