@@ -140,3 +140,67 @@
     src/features/customer/tabs/NotesTab.tsx — migrated to Modal wrapper (CR-003)
     src/App.tsx — CR-006 warning comment; passes currentUser to CustomerCard
     src/components/shared/Sidebar.tsx — CR-002 comment on role check
+
+2026-07-14 Phase 004 — Treatment Notes, Photos & Add Note
+  Branch: feature/phase-003-treatment-recording
+  Build: PASS (npm run build — 0 TypeScript errors)
+  Tests: 144 PASS, 0 FAIL (+25 new tests, all prior 119 green)
+    - src/features/treatment/treatmentService.test.ts: 47 tests (+7: buildTreatmentPhoto)
+    - src/features/note/noteService.test.ts: 9 tests (new)
+    - src/features/customer/selectors.test.ts: 38 tests (unchanged)
+    - src/features/payment/paymentService.test.ts: 14 tests (unchanged)
+    - src/features/order/orderService.test.ts: 15 tests (unchanged)
+    - src/domain/errors.test.ts: 5 tests (unchanged)
+    - src/data/customersService.test.ts: 10 tests (unchanged)
+    - src/features/search/SearchScreen.test.tsx: 6 tests (unchanged)
+  Files created:
+    src/features/note/noteService.ts — pure buildNote() builder with injected deps
+    src/features/note/noteService.test.ts — 9 unit tests for buildNote
+    src/features/note/AddNoteModal.tsx — modal for customer-level quick-action note
+    src/features/customer/tabs/TreatmentModal.tsx — extracted from TreatmentHistoryTab (R1)
+      with note editing (הוסף הערה / ערוך הערה) and photo upload (הוסף תמונה)
+  Files modified:
+    src/features/treatment/treatmentService.ts — added buildTreatmentPhoto() pure builder (C3)
+    src/features/treatment/treatmentService.test.ts — added 7 unit tests for buildTreatmentPhoto
+    src/contexts/CustomerContext.tsx — notes moved to useState; added updateTreatmentNote,
+      addTreatmentPhoto, addNote; TreatmentPhoto imported
+    src/features/customer/tabs/TreatmentHistoryTab.tsx — refactored: imports TreatmentModal
+      from its own file; old inline TreatmentModal removed
+    src/features/customer/QuickActionButtons.tsx — "הוסף הערה" enabled, wired to AddNoteModal
+  Architecture conditions implemented:
+    C1: blob-URL session-scope documented in PHASE_SUMMARY.md Known Limitations
+    C2: runtime guard if (!file.type.startsWith('image/')) return in TreatmentModal.tsx
+    C3: buildTreatmentPhoto() in treatmentService.ts with unit tests; UI never builds TreatmentPhoto directly
+    R1: TreatmentModal extracted to src/features/customer/tabs/TreatmentModal.tsx
+
+2026-07-14 Phase 004 Review Fixes — Code Review + Security Review fixes
+  Branch: feature/phase-003-treatment-recording
+  Build: PASS (npm run build — 0 TypeScript errors)
+  Tests: 146 PASS, 0 FAIL (+2 new tests, all prior 144 green)
+    - src/features/note/noteService.test.ts: 11 tests (+2: DomainError on empty/whitespace)
+    - all other test files unchanged
+  Fixes applied:
+    FIX-1: TreatmentModal.tsx — "מחק הערה" delete button (Trash2 icon) shown when note exists;
+           CustomerContext.tsx updateTreatmentNote — empty string maps to notes: undefined (clears note)
+    FIX-2: TreatmentModal.tsx — replaced static useState initialiser with useEffect syncing
+           noteText to treatment.notes when prop changes
+    FIX-3: TreatmentModal.tsx — useEffect cleanup revokes blob: URLs on unmount only
+    FIX-4: TreatmentModal.tsx — (treatment.treatmentPhotos ?? []) null-guard on all accesses;
+           treatments.ts confirmed all seeded treatments already have treatmentPhotos: []
+    FIX-5: TreatmentModal.tsx — lightbox wrapped in ReactDOM.createPortal(…, document.body)
+           to escape Radix Dialog stacking context
+    FIX-6: noteService.ts — buildNote() throws DomainError('EMPTY_NOTE_TEXT') for empty/whitespace text;
+           noteService.test.ts — 2 new tests for empty and whitespace-only inputs
+    FIX-7: TreatmentModal.tsx — photo button + hidden file input moved outside ternary;
+           always rendered alongside note buttons (not hidden when editingNote is true)
+    FIX-8: TreatmentModal.tsx — ALLOWED_TYPES allowlist replaces startsWith('image/');
+           10 MB size limit added; accept attribute tightened to match allowlist
+    FIX-9: TreatmentModal.tsx — e.target.value = '' moved to top of handleFileChange,
+           before type/size guards, so rejected files can be re-selected
+    FIX-10: TreatmentModal.tsx + AddNoteModal.tsx — maxLength={2000} on both note textareas
+  Files modified:
+    src/features/customer/tabs/TreatmentModal.tsx
+    src/features/note/noteService.ts
+    src/features/note/noteService.test.ts
+    src/features/note/AddNoteModal.tsx
+    src/contexts/CustomerContext.tsx

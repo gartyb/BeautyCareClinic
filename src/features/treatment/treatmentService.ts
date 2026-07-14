@@ -1,4 +1,4 @@
-import type { Treatment } from '../../types/Treatment';
+import type { Treatment, TreatmentPhoto } from '../../types/Treatment';
 import type { TreatmentSeries } from '../../types/TreatmentSeries';
 import { DomainError } from '../../domain/errors';
 import { newId } from '../../domain/id';
@@ -69,6 +69,32 @@ export function buildQuantityTreatment(
     treatmentDate: now(),
     therapistId: params.therapistId,
     treatmentPhotos: [],
+  };
+}
+
+// ─── buildTreatmentPhoto ─────────────────────────────────────────────────────
+
+interface BuildTreatmentPhotoDeps {
+  newId?: () => string;
+  today?: () => string;
+}
+
+/**
+ * Builds a TreatmentPhoto entity.
+ * The UI must NOT construct TreatmentPhoto entities directly — always use this builder.
+ */
+export function buildTreatmentPhoto(
+  treatmentId: string,
+  photoUrl: string,
+  deps: BuildTreatmentPhotoDeps = {}
+): TreatmentPhoto {
+  const genId = deps.newId ?? newId;
+  const today = deps.today ?? (() => new Date().toISOString().slice(0, 10));
+  return {
+    id: genId(),
+    treatmentId,
+    photoUrl,
+    uploadedDate: today(),
   };
 }
 

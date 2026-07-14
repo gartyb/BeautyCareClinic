@@ -74,6 +74,24 @@
 - Description: `recordTimerTreatment` and `recordQuantityTreatment` stamp `therapistId = currentUser.id` from the client-supplied `User` object (the dev-only header switcher). When backend is added, `therapistId` must come from the authenticated server session — never trust the client-supplied value. The Header switcher must be removed or locked behind an env flag before production.
 - Status: Open
 
+### CR-009 — Code quality lows from Phase 4 review
+
+- Type: Technical Debt
+- Priority: Low
+- Source: Code review — Phase 004
+- Related phase: Backend / maintenance
+- Description: (a) UUID v4 regex in test assertions is too weak (`[0-9a-f-]{36}`). (b) `BuilderDeps` interface duplicated in `noteService.ts` and `treatmentService.ts` — extract to `src/domain/deps.ts`. (c) Cosmetic: `noteText` param name in `updateTreatmentNote`, redundant array spread in `TreatmentHistoryTab`. (d) Missing test for whitespace-only text passed directly to `buildNote` (now covered by DomainError guard, but test documents the contract explicitly).
+- Status: Open
+
+### CR-010 — UX / observability gaps deferred from Phase 4
+
+- Type: Enhancement / Technical Debt
+- Priority: Medium
+- Source: Security review — Phase 004
+- Related phase: Backend / Phase 5
+- Description: (a) No banner warning that data (notes, photos) is lost on page refresh — add a session-scoped toast or info strip before production. (b) `console.error` logs raw errors; establish a `logger` abstraction before backend wiring to prevent PII leaking into log aggregators (Sentry etc.). (c) `docs/SYSTEM_FLOWS.md` does not exist — create it to document input surfaces, trust boundaries, and client-supplied vs server-derived fields per phase. (d) `buildTreatmentPhoto` accepts any URL scheme; add a `blob:`/same-origin guard before backend phase to prevent SSRF-like patterns.
+- Status: Open
+
 ## Planned
 
 None.

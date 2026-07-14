@@ -4,6 +4,7 @@ import { useCustomer } from '../../contexts/CustomerContext';
 import { openOrders } from './selectors';
 import { NewOrderModal } from '../order/NewOrderModal';
 import { RecordPaymentModal } from '../payment/RecordPaymentModal';
+import { AddNoteModal } from '../note/AddNoteModal';
 import type { User } from '../../types/User';
 
 interface QuickActionButtonsProps {
@@ -15,6 +16,7 @@ export function QuickActionButtons({ currentUser, customerId }: QuickActionButto
   const { orders } = useCustomer();
   const [showNewOrder, setShowNewOrder] = useState(false);
   const [showRecordPayment, setShowRecordPayment] = useState(false);
+  const [showAddNote, setShowAddNote] = useState(false);
 
   const hasOpenOrders = openOrders(orders).length > 0;
 
@@ -49,9 +51,8 @@ export function QuickActionButtons({ currentUser, customerId }: QuickActionButto
         </button>
 
         <button
-          disabled
-          title="זמין בקרוב"
-          className="flex items-center gap-2 px-4 py-2 border border-clinic-gold text-clinic-gold rounded-lg text-sm font-medium opacity-50 cursor-not-allowed"
+          onClick={() => setShowAddNote(true)}
+          className="flex items-center gap-2 px-4 py-2 border border-clinic-gold text-clinic-gold rounded-lg text-sm font-medium hover:bg-clinic-blush transition-colors"
         >
           <MessageSquare size={16} />
           <span>הוסף הערה</span>
@@ -68,6 +69,13 @@ export function QuickActionButtons({ currentUser, customerId }: QuickActionButto
       <RecordPaymentModal
         open={showRecordPayment}
         onClose={() => setShowRecordPayment(false)}
+        currentUser={currentUser}
+      />
+
+      <AddNoteModal
+        open={showAddNote}
+        onClose={() => setShowAddNote(false)}
+        customerId={customerId}
         currentUser={currentUser}
       />
     </>

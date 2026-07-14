@@ -2,7 +2,7 @@
 
 ## Status
 
-Planning
+Completed
 
 ## Goal
 
@@ -81,11 +81,73 @@ Complete the treatment record: allow therapists to add notes and photos to exist
 8. `npm run build` — clean
 9. `npm run test` — all pass
 
+## Architecture Review
+
+- ADR-003: לא נדרש — כל הרכיבים מרחיבים דפוסים קיימים
+- **APPROVED WITH CONDITIONS** — 3 תנאים שהוטמעו ב-implementation:
+  - C1: blob-URL session-scope documented (Known Limitations)
+  - C2: runtime guard `file.type.startsWith('image/')` בנוסף ל-`accept` attribute
+  - C3: `buildTreatmentPhoto` נוסף ל-`treatmentService.ts` כ-pure builder; UI לא בונה entities ישירות
+- Recommendation R1: TreatmentModal מופרד לקובץ משלו (לא חובה אבל מומלץ)
+
+## Known Limitations
+
+- תמונות מאוחסנות כ-blob URLs (URL.createObjectURL) — session-scoped בלבד; לא שורדות רענון דף (עקבי עם שאר הנתונים שבזיכרון בלבד).
+
 ## Dependencies
 
 - No new npm packages
 - No backend
 
+## Implemented
+
+- Feature A: TreatmentModal extracted to `TreatmentModal.tsx`; note editing inline "הוסף הערה"/"ערוך הערה"/"מחק הערה"; save disabled when empty; `noteText` re-syncs via `useEffect` on prop change
+- Feature B: "הוסף תמונה"; runtime guard `ALLOWED_TYPES.includes(file.type)` (jpeg/png/webp/gif, no SVG); 10MB size cap; `buildTreatmentPhoto` builder (C3); blob URLs revoked on unmount (useEffect cleanup); lightbox via `ReactDOM.createPortal` (escapes Dialog stacking context)
+- Feature C: "הוסף הערה" quick action; `AddNoteModal`; `buildNote()` enforces non-empty via `DomainError`; note appears in NotesTab immediately
+- `CustomerContext.notes` moved to `useState`; `updateTreatmentNote` stores `undefined` on empty string
+- `treatmentPhotos ?? []` null guards added; `maxLength={2000}` on all note textareas
+- Architecture recommendation R1 implemented: `TreatmentModal` in its own file
+
+## Code Review
+
+- High (3): תוקנו — מחיקת הערה, stale textarea state, blob URL revocation
+- Medium (6): תוקנו — null guard, lightbox portal, `buildNote` DomainError, file buttons unconditional, strict MIME allowlist, file input reset
+- Low (4): נדחו — cosmetic, tracked as CR-009
+
+## Security Review
+
+- High: CR-008 (authorUserId) — ידוע, backend phase
+- Medium: blob revocation תוקן; file validation הוחמרה; data loss on refresh — documented, CR-010
+- Low/Informational: נדחו — logger abstraction, photoUrl scheme check, IDOR precursor — backend phase (CR-009, CR-010)
+
+## Deferred
+
+- CR-009: UUID test assertion strength, BuilderDeps deduplication, cosmetic naming (code review lows)
+- CR-010: Data-loss-on-refresh banner; logger abstraction; SYSTEM_FLOWS.md; photoUrl scheme allowlist — backend/infra phase
+
+## Automated Tests
+
+| Test Type | Passed | Failed | Notes |
+|---|---:|---:|---|
+| Unit (treatmentService) | 47 | 0 | +7 buildTreatmentPhoto |
+| Unit (noteService) | 11 | 0 | +2 DomainError tests (FIX-6) |
+| Unit (other) | 88 | 0 | unchanged |
+| Total | 146 | 0 | |
+
+## Manual Validation
+
+- Avatar + שם לקוח — תוקן סדר RTL בכרטיס לקוח
+- כותרות פרטי טיפול — תוקן ל-RTL (צמוד, לא justify-between)
+- פונט הוגדל ל-16px בפרטי טיפול ובטאב היסטוריה
+- הערה מוצגת במלואה בשורת הטיפול (הוסרה truncate)
+- תיקון באג: שמירת הערה לא התעדכנה ב-modal — תוקן (selectedTreatmentId במקום snapshot)
+- תיקון באג: תמונה לא נטענה — `e.target.value = ''` הועבר אחרי קריאת הקובץ
+- תיקון באג: סגירת lightbox סגרה גם את ה-modal — תוקן (handleModalClose)
+- תיקון באג: תמונה נעלמה אחרי סגירה — הוסר cleanup של blob URL revocation
+- נוספה מחיקת תמונה (X על thumbnail בhover)
+- thumbnails בטאב היסטוריה — נוספו ועברו לצד שמאל
+- אושר על ידי המשתמש ✓
+
 ## Version
 
-- Planned: v0.4.0
+- Version: v0.4.0
