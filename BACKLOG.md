@@ -14,6 +14,13 @@ the CLI setup in an interactive session and adding `components/ui/` to the codeb
 Playwright e2e tests for full user flows (search → customer card → tabs) are not in Phase 1 scope.
 Consider adding in Phase 2 or Phase 3.
 
+## BL-004: Remove dead DEFAULT_MAX_PAYMENT_COUNT constant
+
+`src/domain/constants.ts` contains only `DEFAULT_MAX_PAYMENT_COUNT` which is no longer
+imported in any runtime code (Phase 5 migrated all usage to GlobalSettingsContext).
+The file can be deleted and `src/domain/constants.ts` removed entirely once confirmed no
+other code references it.
+
 ## BL-003: React Router future flag warnings
 
 Two React Router v6→v7 migration warnings appear in tests:

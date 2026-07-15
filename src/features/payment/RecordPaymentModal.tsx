@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Modal } from '../../components/shared/Modal';
 import { useCustomer } from '../../contexts/CustomerContext';
+import { usePackageTypes } from '../../contexts/PackageTypesContext';
 import { buildPayment } from './paymentService';
 import { toCents } from '../../domain/money';
 import { openOrders } from '../../features/customer/selectors';
-import { packageTypes } from '../../data/packageTypes';
 import type { User } from '../../types/User';
 import type { CustomerOrder, PaymentMethod } from '../../types/Order';
 
@@ -17,6 +17,7 @@ interface RecordPaymentModalProps {
 
 export function RecordPaymentModal({ open, onClose, currentUser, preselectedOrderId }: RecordPaymentModalProps) {
   const { orders, addPayment } = useCustomer();
+  const { packageTypes } = usePackageTypes();
   const available = openOrders(orders);
 
   const [selectedOrderId, setSelectedOrderId] = useState<string>(() => {

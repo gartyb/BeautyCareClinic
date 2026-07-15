@@ -2,7 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { Customer } from '../types/Customer';
 import { CustomerOrder } from '../types/Order';
 import { Payment } from '../types/Payment';
-import { Treatment } from '../types/Treatment';
+import { Treatment, TreatmentPhoto } from '../types/Treatment';
 import { Appointment } from '../types/Appointment';
 import { Note } from '../types/Note';
 import { TreatmentSeries } from '../types/TreatmentSeries';
@@ -16,14 +16,14 @@ import {
   applyQuantityTreatmentToSeries,
 } from '../features/treatment/treatmentService';
 
-import { customers } from '../data/customers';
+import { useCustomers } from './CustomersContext';
+import { usePackageTypes } from './PackageTypesContext';
 import { orders as initialOrders } from '../data/orders';
 import { payments as initialPayments } from '../data/payments';
 import { treatments as initialTreatments } from '../data/treatments';
 import { appointments } from '../data/appointments';
-import { notes } from '../data/notes';
+import { notes as initialNotes } from '../data/notes';
 import { treatmentSeries as initialSeries } from '../data/series';
-import { packageTypes } from '../data/packageTypes';
 import { newId as generateId } from '../domain/id';
 
 interface CustomerContextValue {
@@ -39,11 +39,17 @@ interface CustomerContextValue {
   addPayment: (payment: Payment) => void;
   recordTimerTreatment: (seriesId: string, elapsedSeconds: number, currentUser: User) => void;
   recordQuantityTreatment: (seriesId: string, currentUser: User) => void;
+  updateTreatmentNote: (treatmentId: string, notes: string) => void;
+  addTreatmentPhoto: (treatmentId: string, photo: TreatmentPhoto) => void;
+  removeTreatmentPhoto: (treatmentId: string, photoId: string) => void;
+  addNote: (note: Note) => void;
 }
 
 const CustomerContext = createContext<CustomerContextValue | null>(null);
 
 export function CustomerProvider({ children }: { children: React.ReactNode }) {
+  const { customers } = useCustomers();
+  const { packageTypes } = usePackageTypes();
   const [activeCustomerId, setActiveCustomerId] = useState<string | null>(null);
   const [allOrders, setAllOrders] = useState<CustomerOrder[]>(initialOrders);
   const allOrdersRef = useRef<CustomerOrder[]>(initialOrders);
@@ -53,6 +59,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
   const allSeriesRef = useRef<TreatmentSeries[]>(initialSeries);
   useEffect(() => { allSeriesRef.current = allSeries; }, [allSeries]);
   const [allTreatments, setAllTreatments] = useState<Treatment[]>(initialTreatments);
+  const [allNotes, setAllNotes] = useState<Note[]>(initialNotes);
 
   const setActiveCustomer = useCallback((customerId: string) => {
     setActiveCustomerId(customerId);
@@ -60,7 +67,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
 
   const activeCustomer = useMemo(
     () => customers.find(c => c.id === activeCustomerId) ?? null,
-    [activeCustomerId]
+    [activeCustomerId, customers]
   );
 
   const customerOrders = useMemo(
@@ -86,8 +93,8 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
   );
 
   const customerNotes = useMemo(
-    () => (activeCustomerId ? notes.filter(n => n.customerId === activeCustomerId) : []),
-    [activeCustomerId]
+    () => (activeCustomerId ? allNotes.filter(n => n.customerId === activeCustomerId) : []),
+    [activeCustomerId, allNotes]
   );
 
   const customerSeries = useMemo(
@@ -178,6 +185,49 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
+  const updateTreatmentNote = useCallback(
+    (treatmentId: string, noteText: string) => {
+      // FIX-1: empty string clears the note (maps to undefined on the Treatment)
+      setAllTreatments(prev =>
+        prev.map(t => t.id === treatmentId ? { ...t, notes: noteText || undefined } : t)
+      );
+    },
+    []
+  );
+
+  const addTreatmentPhoto = useCallback(
+    (treatmentId: string, photo: TreatmentPhoto) => {
+      setAllTreatments(prev =>
+        prev.map(t =>
+          t.id === treatmentId
+            ? { ...t, treatmentPhotos: [...t.treatmentPhotos, photo] }
+            : t
+        )
+      );
+    },
+    []
+  );
+
+  const removeTreatmentPhoto = useCallback(
+    (treatmentId: string, photoId: string) => {
+      setAllTreatments(prev =>
+        prev.map(t =>
+          t.id === treatmentId
+            ? { ...t, treatmentPhotos: t.treatmentPhotos.filter(p => p.id !== photoId) }
+            : t
+        )
+      );
+    },
+    []
+  );
+
+  const addNote = useCallback(
+    (note: Note) => {
+      setAllNotes(prev => [...prev, note]);
+    },
+    []
+  );
+
   const value = useMemo<CustomerContextValue>(
     () => ({
       activeCustomer,
@@ -192,6 +242,10 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       addPayment,
       recordTimerTreatment,
       recordQuantityTreatment,
+      updateTreatmentNote,
+      addTreatmentPhoto,
+      removeTreatmentPhoto,
+      addNote,
     }),
     [
       activeCustomer,
@@ -206,6 +260,10 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       addPayment,
       recordTimerTreatment,
       recordQuantityTreatment,
+      updateTreatmentNote,
+      addTreatmentPhoto,
+      removeTreatmentPhoto,
+      addNote,
     ]
   );
 

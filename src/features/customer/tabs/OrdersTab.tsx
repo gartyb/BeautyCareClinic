@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { useCustomer } from '../../../contexts/CustomerContext';
+import { usePackageTypes } from '../../../contexts/PackageTypesContext';
 import { Badge } from '../../../components/shared/Badge';
 import { RecordPaymentModal } from '../../payment/RecordPaymentModal';
 import { paymentsForOrder } from '../../customer/selectors';
 import { CustomerOrder } from '../../../types/Order';
 import { Payment } from '../../../types/Payment';
-import { packageTypes } from '../../../data/packageTypes';
 import type { User } from '../../../types/User';
 import { formatDate } from '../../../utils/date';
 
@@ -30,6 +30,7 @@ function getPaymentStatus(order: CustomerOrder): { label: string; variant: 'succ
 
 export function OrdersTab({ currentUser }: OrdersTabProps) {
   const { orders, payments } = useCustomer();
+  const { packageTypes } = usePackageTypes();
   const [paymentModalOrderId, setPaymentModalOrderId] = useState<string | null>(null);
 
   const sorted = [...orders].sort((a, b) => b.createdDate.localeCompare(a.createdDate));

@@ -5,6 +5,7 @@ import {
   buildQuantityTreatment,
   applyTimerTreatmentToSeries,
   applyQuantityTreatmentToSeries,
+  buildTreatmentPhoto,
 } from './treatmentService';
 import { DomainError } from '../../domain/errors';
 import type { TreatmentSeries } from '../../types/TreatmentSeries';
@@ -281,6 +282,56 @@ describe('applyTimerTreatmentToSeries', () => {
     const series = makeTimerSeries({ totalMinutes: undefined, usedMinutes: 50, minutesPerTreatment: 60 });
     const updated = applyTimerTreatmentToSeries(series, 20);
     expect(updated.usedMinutes).toBe(70);
+  });
+});
+
+// ─── buildTreatmentPhoto ─────────────────────────────────────────────────────
+
+const photoDeps = {
+  newId: () => 'test-photo-id',
+  today: () => '2026-07-14',
+};
+
+describe('buildTreatmentPhoto', () => {
+  it('creates a TreatmentPhoto with correct fields', () => {
+    const photo = buildTreatmentPhoto('treatment-1', 'blob:http://localhost/abc', photoDeps);
+    expect(photo.id).toBe('test-photo-id');
+    expect(photo.treatmentId).toBe('treatment-1');
+    expect(photo.photoUrl).toBe('blob:http://localhost/abc');
+    expect(photo.uploadedDate).toBe('2026-07-14');
+  });
+
+  it('uses injected newId', () => {
+    const deps = { ...photoDeps, newId: () => 'custom-photo-id' };
+    const photo = buildTreatmentPhoto('t-1', 'blob:url', deps);
+    expect(photo.id).toBe('custom-photo-id');
+  });
+
+  it('uses injected today for uploadedDate', () => {
+    const deps = { ...photoDeps, today: () => '2025-12-25' };
+    const photo = buildTreatmentPhoto('t-1', 'blob:url', deps);
+    expect(photo.uploadedDate).toBe('2025-12-25');
+  });
+
+  it('stores the treatmentId', () => {
+    const photo = buildTreatmentPhoto('treatment-xyz', 'blob:url', photoDeps);
+    expect(photo.treatmentId).toBe('treatment-xyz');
+  });
+
+  it('stores the photoUrl', () => {
+    const photo = buildTreatmentPhoto('t-1', 'blob:http://localhost/unique-photo', photoDeps);
+    expect(photo.photoUrl).toBe('blob:http://localhost/unique-photo');
+  });
+
+  it('uses real newId when deps not provided', () => {
+    const photo = buildTreatmentPhoto('t-1', 'blob:url');
+    expect(photo.id).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  it('uses real today when deps not provided', () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const photo = buildTreatmentPhoto('t-1', 'blob:url');
+    expect(photo.uploadedDate).toBe(today);
   });
 });
 

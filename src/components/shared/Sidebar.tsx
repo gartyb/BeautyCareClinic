@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { Search, Calendar, Package, Users, Settings } from 'lucide-react';
+import { Search, Calendar, Package, Users, Settings, Tag } from 'lucide-react';
 import { clsx } from 'clsx';
 import { User } from '../../types/User';
 
@@ -18,9 +18,10 @@ interface NavItem {
 const navItems: NavItem[] = [
   { label: 'חיפוש לקוחה', to: '/search', icon: <Search size={18} /> },
   { label: 'תורים', icon: <Calendar size={18} />, disabled: true },
-  { label: 'סוגי חבילות', icon: <Package size={18} />, managerOnly: true, disabled: true },
-  { label: 'מטפלות', icon: <Users size={18} />, managerOnly: true, disabled: true },
-  { label: 'הגדרות', icon: <Settings size={18} />, managerOnly: true, disabled: true },
+  { label: 'סוגי טיפולים', to: '/treatment-types', icon: <Tag size={18} />, managerOnly: true },
+  { label: 'סוגי חבילות', to: '/packages', icon: <Package size={18} />, managerOnly: true },
+  { label: 'מטפלות', to: '/therapists', icon: <Users size={18} />, managerOnly: true },
+  { label: 'הגדרות', to: '/settings', icon: <Settings size={18} />, managerOnly: true },
 ];
 
 export function Sidebar({ currentUser }: Props) {

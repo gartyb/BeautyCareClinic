@@ -1,9 +1,9 @@
 import { useCustomer } from '../../contexts/CustomerContext';
 import { useActiveTimer } from '../../contexts/ActiveTimerContext';
+import { usePackageTypes } from '../../contexts/PackageTypesContext';
 import { activeSeries } from './selectors';
 import { TreatmentSeries } from '../../types/TreatmentSeries';
 import { User } from '../../types/User';
-import { packageTypes } from '../../data/packageTypes';
 
 interface TimerPanelProps {
   currentUser: User;
@@ -22,6 +22,7 @@ function formatElapsed(seconds: number): string {
 export function TimerPanel({ currentUser }: TimerPanelProps) {
   const { treatmentSeries, recordTimerTreatment } = useCustomer();
   const timer = useActiveTimer();
+  const { packageTypes } = usePackageTypes();
 
   const active = activeSeries(treatmentSeries).filter(
     (s: TreatmentSeries) => s.seriesKind === 'timer'

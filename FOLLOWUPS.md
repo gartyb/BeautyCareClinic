@@ -41,6 +41,17 @@ The payment recording and order creation flows are undocumented in the docs fold
 Add `docs/system-flows.md` describing the two happy-path flows and their error cases.
 Priority: Low.
 
+## FU-007: SearchResults.tsx still reads from static data imports
+
+Source: Phase 5 implementation.
+`src/features/search/SearchResults.tsx` still reads `treatmentSeries`, `appointments`, and
+`orders` from static data files instead of from context. This means newly added customers
+will show correct names in the list but their series/appointment/balance summary columns
+will always reflect the seed data, not live state. Should be migrated to read from context
+when CustomerContext is extended to expose cross-customer data or a new aggregate context
+is added.
+Priority: Medium.
+
 ## FU-001: Vitest 2.x / Vite 6.x type incompatibility
 
 Vitest 2.x bundles its own vite (v5.x), which conflicts with top-level vite 6.x plugin types.

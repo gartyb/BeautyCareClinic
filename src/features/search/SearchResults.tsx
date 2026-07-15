@@ -5,6 +5,7 @@ import { appointments } from '../../data/appointments';
 import { orders } from '../../data/orders';
 import { activeSeries, outstandingBalance, nextAppointment } from '../customer/selectors';
 import { formatDate } from '../../utils/date';
+import { formatPhone } from '../../utils/phone';
 
 interface Props {
   results: CustomerSummary[];
@@ -65,7 +66,7 @@ export function SearchResults({ results, query }: Props) {
                     <span className="font-semibold text-clinic-text">
                       {customer.firstName} {customer.lastName}
                     </span>
-                    <span className="text-xs text-clinic-muted" dir="ltr">{customer.phone}</span>
+                    <span className="text-xs text-clinic-muted" dir="ltr">{formatPhone(customer.phone)}</span>
                   </div>
                 </div>
               </td>

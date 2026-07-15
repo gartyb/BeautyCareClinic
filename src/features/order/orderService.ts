@@ -4,7 +4,6 @@ import type { PackageType } from '../../types/PackageType';
 import type { User } from '../../types/User';
 import { newId } from '../../domain/id';
 import { toCents, fromCents } from '../../domain/money';
-import { DEFAULT_MAX_PAYMENT_COUNT } from '../../domain/constants';
 
 interface BuildOrderDeps {
   newId?: () => string;
@@ -21,6 +20,7 @@ export function buildNewOrder(
   selectedPackageTypeIds: string[],
   packageTypes: PackageType[],
   currentUser: User,
+  defaultMaxPaymentCount: number,
   maxPaymentCountOverride?: number,
   deps: BuildOrderDeps = {}
 ): BuildOrderResult {
@@ -75,7 +75,7 @@ export function buildNewOrder(
     totalPrice: fromCents(totalCents),
     amountPaid: '0.00',
     remainingBalance: fromCents(totalCents),
-    maxPaymentCount: maxPaymentCountOverride ?? DEFAULT_MAX_PAYMENT_COUNT,
+    maxPaymentCount: maxPaymentCountOverride ?? defaultMaxPaymentCount,
     paymentCount: 0,
     orderItems,
     createdDate,
