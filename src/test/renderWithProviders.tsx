@@ -1,0 +1,39 @@
+import React from 'react';
+import { render, RenderOptions } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import { GlobalSettingsProvider } from '../contexts/GlobalSettingsContext';
+import { CustomersProvider } from '../contexts/CustomersContext';
+import { TherapistDataProvider } from '../contexts/TherapistDataContext';
+import { TherapistsProvider } from '../contexts/TherapistsContext';
+import { TreatmentTypesProvider } from '../contexts/TreatmentTypesContext';
+import { PackageTypesProvider } from '../contexts/PackageTypesContext';
+import { CustomerProvider } from '../contexts/CustomerContext';
+import { ActiveTimerProvider } from '../contexts/ActiveTimerContext';
+
+function AllProviders({ children }: { children: React.ReactNode }) {
+  return (
+    <MemoryRouter>
+      <GlobalSettingsProvider>
+        <CustomersProvider>
+          <TherapistDataProvider>
+            <TherapistsProvider>
+            <TreatmentTypesProvider>
+            <PackageTypesProvider>
+              <CustomerProvider>
+                <ActiveTimerProvider>
+                  {children}
+                </ActiveTimerProvider>
+              </CustomerProvider>
+            </PackageTypesProvider>
+            </TreatmentTypesProvider>
+            </TherapistsProvider>
+          </TherapistDataProvider>
+        </CustomersProvider>
+      </GlobalSettingsProvider>
+    </MemoryRouter>
+  );
+}
+
+export function renderWithProviders(ui: React.ReactElement, options?: Omit<RenderOptions, 'wrapper'>) {
+  return render(ui, { wrapper: AllProviders, ...options });
+}

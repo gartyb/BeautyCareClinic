@@ -1,6 +1,12 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
+import { GlobalSettingsProvider } from './contexts/GlobalSettingsContext';
+import { CustomersProvider } from './contexts/CustomersContext';
+import { TherapistDataProvider } from './contexts/TherapistDataContext';
+import { TherapistsProvider } from './contexts/TherapistsContext';
+import { TreatmentTypesProvider } from './contexts/TreatmentTypesContext';
+import { PackageTypesProvider } from './contexts/PackageTypesContext';
 import { CustomerProvider } from './contexts/CustomerContext';
 import { ActiveTimerProvider } from './contexts/ActiveTimerContext';
 import './index.css';
@@ -11,11 +17,23 @@ document.documentElement.dir = 'rtl';
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
-      <CustomerProvider>
-        <ActiveTimerProvider>
-          <App />
-        </ActiveTimerProvider>
-      </CustomerProvider>
+      <GlobalSettingsProvider>
+        <CustomersProvider>
+          <TherapistDataProvider>
+            <TherapistsProvider>
+            <TreatmentTypesProvider>
+            <PackageTypesProvider>
+              <CustomerProvider>
+                <ActiveTimerProvider>
+                  <App />
+                </ActiveTimerProvider>
+              </CustomerProvider>
+            </PackageTypesProvider>
+            </TreatmentTypesProvider>
+            </TherapistsProvider>
+          </TherapistDataProvider>
+        </CustomersProvider>
+      </GlobalSettingsProvider>
     </BrowserRouter>
   </StrictMode>
 );

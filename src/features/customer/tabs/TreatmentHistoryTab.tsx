@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useCustomer } from '../../../contexts/CustomerContext';
+import { usePackageTypes } from '../../../contexts/PackageTypesContext';
 import { TreatmentModal } from './TreatmentModal';
-import { packageTypes } from '../../../data/packageTypes';
 import { treatmentTypes } from '../../../data/treatmentTypes';
 import { therapists } from '../../../data/therapists';
 import { Treatment } from '../../../types/Treatment';
@@ -21,6 +21,7 @@ interface PackageRowProps {
 function PackageRow({ item, orderDate, seriesTreatments }: PackageRowProps) {
   const [expanded, setExpanded] = useState(true);
   const [selectedTreatmentId, setSelectedTreatmentId] = useState<string | null>(null);
+  const { packageTypes } = usePackageTypes();
   const selectedTreatment = selectedTreatmentId
     ? (seriesTreatments.find(t => t.id === selectedTreatmentId) ?? null)
     : null;

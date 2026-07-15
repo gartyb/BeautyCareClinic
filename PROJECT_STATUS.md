@@ -2,15 +2,15 @@
 
 ## Current State
 
-- Current phase: 004 — Treatment Notes, Photos & Add Note
+- Current phase: 005 — New Customer + Manager Admin Screens
 - Phase status: Completed
-- Current branch: feature/phase-004-notes-photos
-- Latest approved version: v0.4.0
-- Latest approved tag: v0.4.0
+- Current branch: feature/phase-005-new-customer-admin
+- Latest approved version: v0.5.0
+- Latest approved tag: v0.5.0
 
 ## Current Activity
 
-Phase 004 הושלמה ואושרה.
+Phase 005 הושלם — ממתין ל-merge ל-main.
 
 ## Completed Phases
 
@@ -20,6 +20,7 @@ Phase 004 הושלמה ואושרה.
 | 002   | New Order + Record Payment               | v0.2.0  | Completed |
 | 003   | Treatment Recording                      | v0.3.0  | Completed |
 | 004   | Treatment Notes, Photos & Add Note       | v0.4.0  | Completed |
+| 005   | New Customer + Manager Admin Screens     | v0.5.0  | Completed |
 
 ## Open Change Requests
 
@@ -35,4 +36,4 @@ Phase 004 הושלמה ואושרה.
 
 ## Next Step
 
-Plan Phase 5.
+Phase 005 הושלם ואושר. הכן Phase 006 (לוח זמנים לתורים — Appointment Calendar) לאחר ה-merge.

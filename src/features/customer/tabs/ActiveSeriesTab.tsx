@@ -1,7 +1,7 @@
 import { useCustomer } from '../../../contexts/CustomerContext';
 import { useActiveTimer } from '../../../contexts/ActiveTimerContext';
+import { usePackageTypes } from '../../../contexts/PackageTypesContext';
 import { activeSeries, completedTreatmentsForSeries } from '../selectors';
-import { packageTypes } from '../../../data/packageTypes';
 import { treatmentTypes } from '../../../data/treatmentTypes';
 import { Badge } from '../../../components/shared/Badge';
 import { ProgressBar } from '../../../components/shared/ProgressBar';
@@ -36,6 +36,7 @@ function Stat({ label, value, highlight }: StatProps) {
 export function ActiveSeriesTab({ currentUser }: ActiveSeriesTabProps) {
   const { treatmentSeries, recordQuantityTreatment } = useCustomer();
   const timer = useActiveTimer();
+  const { packageTypes } = usePackageTypes();
   const active = activeSeries(treatmentSeries);
 
   if (active.length === 0) {

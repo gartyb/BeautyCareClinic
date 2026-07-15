@@ -1,3 +1,49 @@
+2026-07-15 Phase 005 — New Customer, Package Admin, Therapist Management, Global Settings
+  Branch: feature/phase-005-new-customer-admin
+  Build: PASS (npm run build — 0 TypeScript errors)
+  Tests: 195 PASS, 0 FAIL (+51 new tests, all prior 144 green)
+    - src/features/customer/customerService.test.ts: 12 tests (new)
+    - src/features/packages/packageTypeService.test.ts: 16 tests (new)
+    - src/features/therapists/therapistDataService.test.ts: 14 tests (new)
+    - src/features/settings/settingsService.test.ts: 7 tests (new)
+    - src/features/order/orderService.test.ts: 15 tests (updated signature)
+    - src/features/search/SearchScreen.test.tsx: 6 tests (updated providers + button state)
+    - all prior 144 tests green
+  Files created:
+    src/contexts/CustomersContext.tsx — owns customer list, seed from data/customers.ts
+    src/contexts/GlobalSettingsContext.tsx — owns defaultMaxPaymentCount
+    src/data/globalSettings.ts — seed value defaultMaxPaymentCount: 3
+    src/data/therapistWorkingHours.ts — empty seed array
+    src/data/therapistUnavailableDates.ts — empty seed array
+    src/data/therapistCapabilities.ts — empty seed array
+    src/types/Therapist.ts — TherapistWorkingHours, TherapistUnavailableDate, TherapistCapability
+    src/features/customer/customerService.ts — buildCustomer() with DomainError validation
+    src/features/customer/customerService.test.ts — 12 unit tests
+    src/features/customer/NewCustomerModal.tsx — modal with required name+phone, optional email
+    src/features/packages/packageTypeService.ts — buildPackageType, updatePackageType, deletePackageType
+    src/features/packages/packageTypeService.test.ts — 16 unit tests
+    src/features/packages/PackageTypeModal.tsx — create/edit modal
+    src/features/packages/PackagesScreen.tsx — CRUD list with manager guard
+    src/features/therapists/therapistDataService.ts — working hours, unavailable dates, capabilities
+    src/features/therapists/therapistDataService.test.ts — 14 unit tests
+    src/features/therapists/TherapistsScreen.tsx — list Therapist-role users
+    src/features/therapists/TherapistDetail.tsx — /therapists/:userId detail page
+    src/features/settings/settingsService.ts — updateDefaultMaxPaymentCount with validation
+    src/features/settings/settingsService.test.ts — 7 unit tests
+    src/features/settings/SettingsScreen.tsx — defaultMaxPaymentCount form
+    src/test/renderWithProviders.tsx — shared test helper with all 4 providers
+  Files updated:
+    src/main.tsx — provider order: BrowserRouter → GlobalSettings → Customers → Customer → ActiveTimer
+    src/contexts/CustomerContext.tsx — uses useCustomers() instead of static customers import
+    src/domain/constants.ts — DEFAULT_MAX_PAYMENT_COUNT kept for test backward compat (not used in runtime)
+    src/features/order/orderService.ts — added defaultMaxPaymentCount param, removed constant import
+    src/features/order/orderService.test.ts — updated all calls with new param, local constant
+    src/features/order/NewOrderModal.tsx — reads defaultMaxPaymentCount via useGlobalSettings()
+    src/components/shared/RoleGuard.tsx — added optional fallback prop (default null)
+    src/components/shared/Sidebar.tsx — enabled packages/therapists/settings nav items with routes
+    src/features/search/SearchScreen.tsx — wired לקוחה חדשה button to NewCustomerModal; uses useCustomers()
+    src/App.tsx — added /packages, /therapists, /therapists/:userId, /settings routes with RoleGuard
+
 2026-07-13 Phase 001 — Foundation + Customer View
   Status: Implementation complete, awaiting user validation
   Branch: feature/phase-001-customer-view
@@ -204,3 +250,36 @@
     src/features/note/noteService.test.ts
     src/features/note/AddNoteModal.tsx
     src/contexts/CustomerContext.tsx
+
+2026-07-15 Phase 005 Code Review Fixes
+  Branch: feature/phase-005-new-customer-admin
+  Build: PASS (npm run build — 0 TypeScript errors)
+  Tests: 199 PASS, 0 FAIL (+4 new tests: H4 price, H5 >24, H2 batch range, L2 assertions)
+    - src/features/packages/packageTypeService.test.ts: 18 tests (+4: H4 PACKAGE_INVALID_PRICE x2, L2 expect.assertions on all validation tests)
+    - src/features/settings/settingsService.test.ts: 8 tests (+1: H5 value>24; removed _current param; L2 expect.assertions)
+    - src/features/therapists/therapistDataService.test.ts: 15 tests (+1: H2 batch range validation; L2 expect.assertions)
+    - all prior 175 tests green
+  Fixes applied:
+    C1: CustomerContext.tsx — added customers to useMemo([activeCustomerId, customers]) dep array
+    H1: Created src/contexts/PackageTypesContext.tsx — owns PackageType[] state, exposes createPackageType/updatePackageType/deletePackageType; seeded from data/packageTypes.ts
+        Updated src/main.tsx — PackageTypesProvider inserted between CustomersProvider and CustomerProvider
+        Updated PackagesScreen.tsx — consumes usePackageTypes() instead of local useState
+        Updated NewOrderModal.tsx — consumes usePackageTypes() instead of static import
+        Updated CustomerContext.tsx, TimerPanel.tsx, ActiveSeriesTab.tsx, TreatmentHistoryTab.tsx, OrdersTab.tsx, RecordPaymentModal.tsx — all now read from usePackageTypes() context
+        Updated src/test/renderWithProviders.tsx — PackageTypesProvider added to test provider tree
+    H2A: therapistDataService.ts — updateTherapistWorkingHours now delegates each row to buildWorkingHours, which throws DomainError('WORKING_HOURS_INVALID_RANGE') for invalid ranges
+    H2B: TherapistDetail.tsx — handleSaveHours wrapped in try/catch; DomainError shown as inline hoursError message
+    H3: TherapistDetail.tsx — hoursSuccessTimer and capsSuccessTimer stored in useRef; cleared before each new setTimeout; cleanup useEffect clears both on unmount
+    H4: packageTypeService.ts — buildPackageType validates price via parseFloat; throws DomainError('PACKAGE_INVALID_PRICE') if NaN or negative
+    H5: settingsService.ts — updateDefaultMaxPaymentCount throws if value > 24; _current param removed (L5)
+        SettingsScreen.tsx — max={24} added to input; isValid updated to check parsed <= 24 (L3)
+    M1: PackageTypeModal.tsx — isSeries checkbox handler replaced two sequential set() calls with single setForm() call
+    M2: PackagesScreen.tsx — window.confirm replaced with inline deletingId state + confirm row ("למחוק את [name]?" with מחק/ביטול buttons)
+    M3: TherapistDetail.tsx — useEffect([userId, workingHours]) changed to useEffect([userId]) to avoid overwriting unsaved edits; cleanup comment added
+    M4: NewCustomerModal.tsx — handleSave wrapped in try/catch; saveError state drives inline error banner; DomainError imported
+        CustomersContext.tsx — comment added documenting that DomainError propagates to caller
+    M5: TherapistsScreen.tsx — comment documents that Managers are intentionally excluded from therapist list per domain model
+    L1: TherapistsScreen.tsx ChevronLeft (forward/into detail) and TherapistDetail.tsx ChevronRight (back) already correct for RTL — confirmed, no change needed
+    L2: packageTypeService.test.ts, settingsService.test.ts, therapistDataService.test.ts — expect.assertions(N) added to all try/catch throw tests; added expect(e).toBeInstanceOf(DomainError)
+    L3: SettingsScreen.tsx — isValid rewritten using single parseInt call and Number.isNaN guard with <= 24 cap
+    L5: settingsService.ts — removed unused _current: number parameter; SettingsScreen and tests updated

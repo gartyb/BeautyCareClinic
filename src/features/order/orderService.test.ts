@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { buildNewOrder } from './orderService';
-import { DEFAULT_MAX_PAYMENT_COUNT } from '../../domain/constants';
 import type { PackageType } from '../../types/PackageType';
 import type { User } from '../../types/User';
+
+const DEFAULT_MAX_PAYMENT_COUNT = 3;
 
 // ─── Test fixtures ────────────────────────────────────────────────────────────
 
@@ -55,7 +56,7 @@ function resetCounter() {
 describe('buildNewOrder — non-series package', () => {
   it('creates order with correct total price and no series', () => {
     resetCounter();
-    const result = buildNewOrder('cust-1', ['pt-non-series'], [nonSeriesPkg], therapist, undefined, testDeps);
+    const result = buildNewOrder('cust-1', ['pt-non-series'], [nonSeriesPkg], therapist, DEFAULT_MAX_PAYMENT_COUNT, undefined, testDeps);
 
     expect(result.order.totalPrice).toBe('200.00');
     expect(result.order.amountPaid).toBe('0.00');
@@ -66,7 +67,7 @@ describe('buildNewOrder — non-series package', () => {
 
   it('creates order item with no treatmentSeriesId for non-series package', () => {
     resetCounter();
-    const result = buildNewOrder('cust-1', ['pt-non-series'], [nonSeriesPkg], therapist, undefined, testDeps);
+    const result = buildNewOrder('cust-1', ['pt-non-series'], [nonSeriesPkg], therapist, DEFAULT_MAX_PAYMENT_COUNT, undefined, testDeps);
 
     expect(result.order.orderItems).toHaveLength(1);
     expect(result.order.orderItems[0].packageTypeId).toBe('pt-non-series');
@@ -75,7 +76,7 @@ describe('buildNewOrder — non-series package', () => {
 
   it('sets createdByUserId from currentUser', () => {
     resetCounter();
-    const result = buildNewOrder('cust-1', ['pt-non-series'], [nonSeriesPkg], therapist, undefined, testDeps);
+    const result = buildNewOrder('cust-1', ['pt-non-series'], [nonSeriesPkg], therapist, DEFAULT_MAX_PAYMENT_COUNT, undefined, testDeps);
     expect(result.order.createdByUserId).toBe('user-therapist-1');
   });
 });
@@ -83,7 +84,7 @@ describe('buildNewOrder — non-series package', () => {
 describe('buildNewOrder — quantity series package', () => {
   it('creates series with seriesKind quantity and completedTreatments 0', () => {
     resetCounter();
-    const result = buildNewOrder('cust-1', ['pt-quantity'], [quantitySeriesPkg], therapist, undefined, testDeps);
+    const result = buildNewOrder('cust-1', ['pt-quantity'], [quantitySeriesPkg], therapist, DEFAULT_MAX_PAYMENT_COUNT, undefined, testDeps);
 
     expect(result.series).toHaveLength(1);
     const s = result.series[0];
@@ -95,7 +96,7 @@ describe('buildNewOrder — quantity series package', () => {
 
   it('links OrderItem.treatmentSeriesId to the created series id', () => {
     resetCounter();
-    const result = buildNewOrder('cust-1', ['pt-quantity'], [quantitySeriesPkg], therapist, undefined, testDeps);
+    const result = buildNewOrder('cust-1', ['pt-quantity'], [quantitySeriesPkg], therapist, DEFAULT_MAX_PAYMENT_COUNT, undefined, testDeps);
 
     const item = result.order.orderItems[0];
     expect(item.treatmentSeriesId).toBe(result.series[0].id);
@@ -103,7 +104,7 @@ describe('buildNewOrder — quantity series package', () => {
 
   it('sets correct total price', () => {
     resetCounter();
-    const result = buildNewOrder('cust-1', ['pt-quantity'], [quantitySeriesPkg], therapist, undefined, testDeps);
+    const result = buildNewOrder('cust-1', ['pt-quantity'], [quantitySeriesPkg], therapist, DEFAULT_MAX_PAYMENT_COUNT, undefined, testDeps);
     expect(result.order.totalPrice).toBe('350.00');
   });
 });
@@ -111,7 +112,7 @@ describe('buildNewOrder — quantity series package', () => {
 describe('buildNewOrder — timer series package', () => {
   it('creates series with seriesKind timer and usedMinutes 0', () => {
     resetCounter();
-    const result = buildNewOrder('cust-1', ['pt-timer'], [timerSeriesPkg], therapist, undefined, testDeps);
+    const result = buildNewOrder('cust-1', ['pt-timer'], [timerSeriesPkg], therapist, DEFAULT_MAX_PAYMENT_COUNT, undefined, testDeps);
 
     expect(result.series).toHaveLength(1);
     const s = result.series[0];
@@ -124,7 +125,7 @@ describe('buildNewOrder — timer series package', () => {
 
   it('does not set completedTreatments for timer series', () => {
     resetCounter();
-    const result = buildNewOrder('cust-1', ['pt-timer'], [timerSeriesPkg], therapist, undefined, testDeps);
+    const result = buildNewOrder('cust-1', ['pt-timer'], [timerSeriesPkg], therapist, DEFAULT_MAX_PAYMENT_COUNT, undefined, testDeps);
     expect(result.series[0].completedTreatments).toBeUndefined();
     expect(result.series[0].totalTreatments).toBeUndefined();
   });
@@ -139,6 +140,7 @@ describe('buildNewOrder — multiple packages', () => {
       ['pt-non-series', 'pt-quantity', 'pt-timer'],
       allPkgs,
       therapist,
+      DEFAULT_MAX_PAYMENT_COUNT,
       undefined,
       testDeps
     );
@@ -157,6 +159,7 @@ describe('buildNewOrder — multiple packages', () => {
       ['pt-non-series', 'pt-quantity'],
       allPkgs,
       therapist,
+      DEFAULT_MAX_PAYMENT_COUNT,
       undefined,
       testDeps
     );
@@ -170,19 +173,19 @@ describe('buildNewOrder — multiple packages', () => {
 describe('buildNewOrder — maxPaymentCount', () => {
   it('uses DEFAULT_MAX_PAYMENT_COUNT when no override given', () => {
     resetCounter();
-    const result = buildNewOrder('cust-1', ['pt-non-series'], [nonSeriesPkg], therapist, undefined, testDeps);
+    const result = buildNewOrder('cust-1', ['pt-non-series'], [nonSeriesPkg], therapist, DEFAULT_MAX_PAYMENT_COUNT, undefined, testDeps);
     expect(result.order.maxPaymentCount).toBe(DEFAULT_MAX_PAYMENT_COUNT);
   });
 
   it('uses override value when provided (Manager)', () => {
     resetCounter();
-    const result = buildNewOrder('cust-1', ['pt-non-series'], [nonSeriesPkg], manager, 5, testDeps);
+    const result = buildNewOrder('cust-1', ['pt-non-series'], [nonSeriesPkg], manager, DEFAULT_MAX_PAYMENT_COUNT, 5, testDeps);
     expect(result.order.maxPaymentCount).toBe(5);
   });
 
   it('initialises paymentCount to 0', () => {
     resetCounter();
-    const result = buildNewOrder('cust-1', ['pt-non-series'], [nonSeriesPkg], therapist, undefined, testDeps);
+    const result = buildNewOrder('cust-1', ['pt-non-series'], [nonSeriesPkg], therapist, DEFAULT_MAX_PAYMENT_COUNT, undefined, testDeps);
     expect(result.order.paymentCount).toBe(0);
   });
 });
@@ -190,14 +193,14 @@ describe('buildNewOrder — maxPaymentCount', () => {
 describe('buildNewOrder — deps injection', () => {
   it('uses injected newId and now for deterministic output', () => {
     resetCounter();
-    const result = buildNewOrder('cust-1', ['pt-non-series'], [nonSeriesPkg], therapist, undefined, testDeps);
+    const result = buildNewOrder('cust-1', ['pt-non-series'], [nonSeriesPkg], therapist, DEFAULT_MAX_PAYMENT_COUNT, undefined, testDeps);
     expect(result.order.id).toBe('test-id-1');
     expect(result.order.createdDate).toBe('2026-01-01T00:00:00.000Z');
   });
 
   it('skips unrecognised package type ids silently', () => {
     resetCounter();
-    const result = buildNewOrder('cust-1', ['pt-unknown'], [nonSeriesPkg], therapist, undefined, testDeps);
+    const result = buildNewOrder('cust-1', ['pt-unknown'], [nonSeriesPkg], therapist, DEFAULT_MAX_PAYMENT_COUNT, undefined, testDeps);
     expect(result.order.orderItems).toHaveLength(0);
     expect(result.order.totalPrice).toBe('0.00');
   });

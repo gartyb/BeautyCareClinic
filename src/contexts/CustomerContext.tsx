@@ -16,14 +16,14 @@ import {
   applyQuantityTreatmentToSeries,
 } from '../features/treatment/treatmentService';
 
-import { customers } from '../data/customers';
+import { useCustomers } from './CustomersContext';
+import { usePackageTypes } from './PackageTypesContext';
 import { orders as initialOrders } from '../data/orders';
 import { payments as initialPayments } from '../data/payments';
 import { treatments as initialTreatments } from '../data/treatments';
 import { appointments } from '../data/appointments';
 import { notes as initialNotes } from '../data/notes';
 import { treatmentSeries as initialSeries } from '../data/series';
-import { packageTypes } from '../data/packageTypes';
 import { newId as generateId } from '../domain/id';
 
 interface CustomerContextValue {
@@ -48,6 +48,8 @@ interface CustomerContextValue {
 const CustomerContext = createContext<CustomerContextValue | null>(null);
 
 export function CustomerProvider({ children }: { children: React.ReactNode }) {
+  const { customers } = useCustomers();
+  const { packageTypes } = usePackageTypes();
   const [activeCustomerId, setActiveCustomerId] = useState<string | null>(null);
   const [allOrders, setAllOrders] = useState<CustomerOrder[]>(initialOrders);
   const allOrdersRef = useRef<CustomerOrder[]>(initialOrders);
@@ -65,7 +67,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
 
   const activeCustomer = useMemo(
     () => customers.find(c => c.id === activeCustomerId) ?? null,
-    [activeCustomerId]
+    [activeCustomerId, customers]
   );
 
   const customerOrders = useMemo(

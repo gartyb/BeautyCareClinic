@@ -1,15 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
 import { SearchScreen } from './SearchScreen';
+import { renderWithProviders } from '../../test/renderWithProviders';
 
 function renderSearchScreen() {
-  return render(
-    <MemoryRouter>
-      <SearchScreen />
-    </MemoryRouter>
-  );
+  return renderWithProviders(<SearchScreen />);
 }
 
 describe('SearchScreen', () => {
@@ -64,9 +60,9 @@ describe('SearchScreen', () => {
     );
   });
 
-  it('renders "לקוחה חדשה" button in disabled state', () => {
+  it('renders "לקוחה חדשה" button in enabled state', () => {
     renderSearchScreen();
     const btn = screen.getByRole('button', { name: /לקוחה חדשה/i });
-    expect(btn).toBeDisabled();
+    expect(btn).not.toBeDisabled();
   });
 });

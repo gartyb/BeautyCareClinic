@@ -1,5 +1,6 @@
 import { Phone, Mail } from 'lucide-react';
 import { useCustomer } from '../../contexts/CustomerContext';
+import { formatPhone } from '../../utils/phone';
 
 function initials(firstName: string, lastName: string): string {
   return (firstName[0] ?? '') + (lastName[0] ?? '');
@@ -29,7 +30,7 @@ export function CustomerCardHeader() {
         <div className="flex flex-col gap-0.5 text-sm text-clinic-muted">
           <span className="flex items-center gap-1" dir="ltr">
             <Phone size={13} />
-            {activeCustomer.phone}
+            {formatPhone(activeCustomer.phone)}
           </span>
           <span className="flex items-center gap-1" dir="ltr">
             <Mail size={13} />

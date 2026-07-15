@@ -39,4 +39,4 @@ The architecture mandates Clean Architecture: business logic must not appear in 
 - Business rules have exactly one implementation site per rule.
 - Phase 2 API swap is isolated to `src/data/` service modules.
 - Components import selectors directly — no need to add derived values to context shape.
-- `createCustomer` is never on `CustomerContext` (called from Search, before an active customer exists).
+- `createCustomer` is never on `CustomerContext` (called from Search, before an active customer exists). See ADR-002: Phase 5 introduces `CustomersContext` (plural) that owns the customer list and `createCustomer`.

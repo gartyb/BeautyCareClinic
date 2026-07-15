@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { Modal } from '../../components/shared/Modal';
 import { RoleGuard } from '../../components/shared/RoleGuard';
 import { useCustomer } from '../../contexts/CustomerContext';
+import { useGlobalSettings } from '../../contexts/GlobalSettingsContext';
 import { buildNewOrder } from './orderService';
-import { DEFAULT_MAX_PAYMENT_COUNT } from '../../domain/constants';
-import { packageTypes } from '../../data/packageTypes';
+import { usePackageTypes } from '../../contexts/PackageTypesContext';
 import type { User } from '../../types/User';
 
 interface NewOrderModalProps {
@@ -16,8 +16,10 @@ interface NewOrderModalProps {
 
 export function NewOrderModal({ open, onClose, customerId, currentUser }: NewOrderModalProps) {
   const { addOrder } = useCustomer();
+  const { defaultMaxPaymentCount } = useGlobalSettings();
+  const { packageTypes } = usePackageTypes();
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [maxOverride, setMaxOverride] = useState<number>(DEFAULT_MAX_PAYMENT_COUNT);
+  const [maxOverride, setMaxOverride] = useState<number>(defaultMaxPaymentCount);
 
   function toggle(id: string) {
     setSelected(prev => {
@@ -39,11 +41,12 @@ export function NewOrderModal({ open, onClose, customerId, currentUser }: NewOrd
       [...selected],
       packageTypes,
       currentUser,
+      defaultMaxPaymentCount,
       effectiveMax
     );
     addOrder(order, series);
     setSelected(new Set());
-    setMaxOverride(DEFAULT_MAX_PAYMENT_COUNT);
+    setMaxOverride(defaultMaxPaymentCount);
     onClose();
   }
 
@@ -84,7 +87,7 @@ export function NewOrderModal({ open, onClose, customerId, currentUser }: NewOrd
             value={maxOverride}
             onChange={e => {
               const v = parseInt(e.target.value, 10);
-              setMaxOverride(Number.isFinite(v) && v >= 1 ? Math.min(v, 24) : DEFAULT_MAX_PAYMENT_COUNT);
+              setMaxOverride(Number.isFinite(v) && v >= 1 ? Math.min(v, 24) : defaultMaxPaymentCount);
             }}
             className="w-24 border border-clinic-border rounded-lg px-2 py-1 text-sm text-center"
           />
