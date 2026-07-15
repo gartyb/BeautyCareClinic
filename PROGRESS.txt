@@ -283,3 +283,90 @@
     L2: packageTypeService.test.ts, settingsService.test.ts, therapistDataService.test.ts — expect.assertions(N) added to all try/catch throw tests; added expect(e).toBeInstanceOf(DomainError)
     L3: SettingsScreen.tsx — isValid rewritten using single parseInt call and Number.isNaN guard with <= 24 cap
     L5: settingsService.ts — removed unused _current: number parameter; SettingsScreen and tests updated
+
+2026-07-16 Phase 006 — Appointment Calendar (complete)
+  Branch: feature/phase-006-appointment-calendar
+  Build: PASS (npm run build — 0 TypeScript errors)
+  Tests: 252 PASS, 0 FAIL
+  Features:
+    1. Global settings: calendar start hour and end hour; calendar displays only those hours
+    2. Appointment booking uses treatment types from the customer's active series (BookAppointmentModal pre-filters)
+    3. Calendar shows day view with one column per therapist; click date label to open date picker
+    4. Appointments tab on customer card; mark appointment as Completed or NoShow (toggle buttons, always visible)
+  New features vs initial implementation:
+    - AppointmentStatus extended with 'NoShow'
+    - updateAppointmentStatus and rescheduleAppointment added to AppointmentsContext + service
+    - RescheduleModal (3-step: date → therapist → time slot) with inline cancel confirmation
+    - AppointmentsTab component: lists all customer appointments, status toggle buttons
+    - CalendarGrid: z-index fix for multi-slot blocks; action buttons always visible at block bottom
+    - Date picker via native <input type="date"> showPicker() positioned near date button
+    - GlobalSettings extended with calendarStartHour + calendarEndHour; SettingsScreen form
+    - BookAppointmentModal filters treatment types to active-series types when opened from customer card
+  Files created:
+    src/contexts/AppointmentsContext.tsx
+    src/features/appointments/appointmentService.ts
+    src/features/appointments/appointmentService.test.ts
+    src/features/appointments/AppointmentCalendarScreen.tsx
+    src/features/appointments/BookAppointmentModal.tsx
+    src/features/appointments/AppointmentPopover.tsx
+    src/features/appointments/RescheduleModal.tsx
+    src/features/appointments/components/CalendarGrid.tsx
+    src/features/customer/tabs/AppointmentsTab.tsx
+    src/components/shared/Toast.tsx
+    docs/adr/ADR-003-appointments-global-context.md
+  Files modified:
+    src/types/Appointment.ts — added durationMinutes, NoShow status
+    src/types/TreatmentType.ts — added defaultDurationMinutes
+    src/data/appointments.ts — added durationMinutes to all seed rows
+    src/data/treatmentTypes.ts — added defaultDurationMinutes
+    src/data/globalSettings.ts — added calendarStartHour, calendarEndHour
+    src/contexts/TreatmentTypesContext.tsx — defaultDurationMinutes param
+    src/contexts/GlobalSettingsContext.tsx — calendarStartHour, calendarEndHour
+    src/contexts/CustomerContext.tsx — removed appointments; reads from AppointmentsContext
+    src/features/customer/SummaryRow.tsx — next appointment from useAppointments()
+    src/features/customer/QuickActionButtons.tsx — "קבע תור" wired to BookAppointmentModal
+    src/features/customer/CustomerCard.tsx — Appointments tab added
+    src/features/customer/selectors.test.ts — durationMinutes fixture fix
+    src/features/search/SearchResults.tsx — appointments from useAppointments()
+    src/features/settings/SettingsScreen.tsx — calendarStartHour + calendarEndHour fields
+    src/features/treatmentTypes/TreatmentTypeModal.tsx — defaultDurationMinutes field
+    src/utils/date.ts — formatDateTime added; formatDate fixed
+    src/main.tsx — AppointmentsProvider added
+    src/App.tsx — /appointments route
+    src/components/shared/Sidebar.tsx — "לוח זמנים" nav item enabled
+    src/test/renderWithProviders.tsx — AppointmentsProvider added
+    vite.config.ts — port config
+
+2026-07-15 Phase 006 — Appointment Calendar
+  Branch: feature/phase-005-new-customer-admin
+  Build: PASS (npm run build — 0 TypeScript errors)
+  Tests: 252 PASS, 0 FAIL (+57 new tests, all prior 195 green)
+    - src/features/appointments/appointmentService.test.ts: 40 tests (new)
+    - src/features/customer/selectors.test.ts: 38 tests (+1 durationMinutes field fix)
+    - all prior 212 tests green
+  Files created:
+    src/contexts/AppointmentsContext.tsx — global AppointmentsProvider; createAppointment, cancelAppointment
+    src/features/appointments/appointmentService.ts — pure service: buildAppointment, cancelAppointmentInList, getAppointmentInterval, isSlotAvailable, getAvailableSlots, getAvailableTherapists, getNextAppointment
+    src/features/appointments/appointmentService.test.ts — 40 unit tests
+    src/features/appointments/AppointmentCalendarScreen.tsx — weekly RTL calendar, week navigation, today highlight
+    src/features/appointments/BookAppointmentModal.tsx — 5-step (6 from calendar) booking wizard
+    src/features/appointments/AppointmentPopover.tsx — appointment details + cancel with confirmation
+    src/features/appointments/components/CalendarGrid.tsx — RTL CSS Grid weekly calendar
+    src/components/shared/Toast.tsx — simple auto-dismiss toast component
+  Files modified:
+    src/types/Appointment.ts — added durationMinutes field, updated datetime comment
+    src/types/TreatmentType.ts — added defaultDurationMinutes field
+    src/data/appointments.ts — added durationMinutes to all 15 seed rows
+    src/data/treatmentTypes.ts — added defaultDurationMinutes to all 3 seed entries
+    src/contexts/TreatmentTypesContext.tsx — createTreatmentType/updateTreatmentType updated with defaultDurationMinutes param and validation
+    src/contexts/CustomerContext.tsx — removed appointments array and derived selectors; removed static appointments import
+    src/features/customer/SummaryRow.tsx — reads next appointment via useAppointments() + getNextAppointment(); formatDateTime shows dd/MM/yyyy HH:mm
+    src/features/customer/QuickActionButtons.tsx — "קבע תור" button enabled, wired to BookAppointmentModal
+    src/features/customer/selectors.test.ts — added durationMinutes to Appointment fixture
+    src/features/treatmentTypes/TreatmentTypeModal.tsx — added "משך טיפול ברירת מחדל (דקות)" input
+    src/features/search/SearchResults.tsx — reads appointments via useAppointments() context
+    src/utils/date.ts — added formatDateTime (dd/MM/yyyy HH:mm); fixed formatDate to dd/MM/yyyy
+    src/main.tsx — AppointmentsProvider inserted between PackageTypesProvider and CustomerProvider
+    src/App.tsx — added /appointments route
+    src/components/shared/Sidebar.tsx — "לוח זמנים" nav item enabled, routes to /appointments, visible to both roles
+    src/test/renderWithProviders.tsx — AppointmentsProvider added to test provider tree

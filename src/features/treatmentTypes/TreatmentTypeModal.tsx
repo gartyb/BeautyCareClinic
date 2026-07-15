@@ -12,24 +12,27 @@ interface Props {
 export function TreatmentTypeModal({ open, onClose, initialValues }: Props) {
   const { createTreatmentType, updateTreatmentType } = useTreatmentTypes();
   const [name, setName] = useState('');
+  const [durationStr, setDurationStr] = useState('60');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
       setName(initialValues?.name ?? '');
+      setDurationStr(String(initialValues?.defaultDurationMinutes ?? 60));
       setError(null);
     }
   }, [open, initialValues]);
 
-  const isValid = name.trim().length > 0;
+  const durationNum = parseInt(durationStr, 10);
+  const isValid = name.trim().length > 0 && Number.isInteger(durationNum) && durationNum > 0;
 
   function handleSave() {
     if (!isValid) return;
     try {
       if (initialValues) {
-        updateTreatmentType(initialValues.id, name);
+        updateTreatmentType(initialValues.id, name, durationNum);
       } else {
-        createTreatmentType(name);
+        createTreatmentType(name, durationNum);
       }
       onClose();
     } catch (e: unknown) {
@@ -55,6 +58,20 @@ export function TreatmentTypeModal({ open, onClose, initialValues }: Props) {
             className="border border-clinic-border rounded-lg px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-clinic-gold"
             dir="rtl"
             autoFocus
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-clinic-text mb-1">
+            משך טיפול ברירת מחדל (דקות) <span className="text-red-400">*</span>
+          </label>
+          <input
+            type="number"
+            value={durationStr}
+            onChange={e => { setDurationStr(e.target.value); setError(null); }}
+            min={1}
+            step={1}
+            className="border border-clinic-border rounded-lg px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-clinic-gold"
+            dir="ltr"
           />
         </div>
       </div>

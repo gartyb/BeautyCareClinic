@@ -1,8 +1,8 @@
 import { useNavigate } from 'react-router-dom';
 import { CustomerSummary } from '../../types/Customer';
 import { treatmentSeries } from '../../data/series';
-import { appointments } from '../../data/appointments';
 import { orders } from '../../data/orders';
+import { useAppointments } from '../../contexts/AppointmentsContext';
 import { activeSeries, outstandingBalance, nextAppointment } from '../customer/selectors';
 import { formatDate } from '../../utils/date';
 import { formatPhone } from '../../utils/phone';
@@ -18,6 +18,7 @@ function initials(firstName: string, lastName: string): string {
 
 export function SearchResults({ results, query }: Props) {
   const navigate = useNavigate();
+  const { appointments } = useAppointments();
 
   if (results.length === 0 && query.trim()) {
     return (

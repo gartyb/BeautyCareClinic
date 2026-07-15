@@ -7,6 +7,7 @@ import { TherapistDataProvider } from '../contexts/TherapistDataContext';
 import { TherapistsProvider } from '../contexts/TherapistsContext';
 import { TreatmentTypesProvider } from '../contexts/TreatmentTypesContext';
 import { PackageTypesProvider } from '../contexts/PackageTypesContext';
+import { AppointmentsProvider } from '../contexts/AppointmentsContext';
 import { CustomerProvider } from '../contexts/CustomerContext';
 import { ActiveTimerProvider } from '../contexts/ActiveTimerContext';
 
@@ -19,11 +20,13 @@ function AllProviders({ children }: { children: React.ReactNode }) {
             <TherapistsProvider>
             <TreatmentTypesProvider>
             <PackageTypesProvider>
+            <AppointmentsProvider>
               <CustomerProvider>
                 <ActiveTimerProvider>
                   {children}
                 </ActiveTimerProvider>
               </CustomerProvider>
+            </AppointmentsProvider>
             </PackageTypesProvider>
             </TreatmentTypesProvider>
             </TherapistsProvider>

@@ -10,6 +10,7 @@ import { ActiveSeriesTab } from './tabs/ActiveSeriesTab';
 import { TreatmentHistoryTab } from './tabs/TreatmentHistoryTab';
 import { OrdersTab } from './tabs/OrdersTab';
 import { NotesTab } from './tabs/NotesTab';
+import { AppointmentsTab } from './tabs/AppointmentsTab';
 import { TimerPanel } from './TimerPanel';
 import type { User } from '../../types/User';
 
@@ -21,6 +22,7 @@ const tabItems = [
   { value: 'series', label: 'סדרות פעילות' },
   { value: 'history', label: 'היסטוריית טיפולים' },
   { value: 'orders', label: 'הזמנות ותשלומים' },
+  { value: 'appointments', label: 'תורים' },
   { value: 'notes', label: 'הערות' },
 ];
 
@@ -99,6 +101,10 @@ export function CustomerCard({ currentUser }: CustomerCardProps) {
             </Tabs.Content>
             <Tabs.Content value="orders">
               <OrdersTab currentUser={currentUser} />
+            </Tabs.Content>
+
+            <Tabs.Content value="appointments">
+              <AppointmentsTab />
             </Tabs.Content>
 
             <Tabs.Content value="notes">

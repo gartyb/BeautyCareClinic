@@ -9,8 +9,9 @@ export const appointments: Appointment[] = [
     treatmentTypeId: 'tt-1',
     therapistId: 'user-therapist-1',
     appointmentDateTime: '2025-10-10T10:00:00',
+    durationMinutes: 60,
     status: 'Completed',
-    createdDate: '2025-10-01',
+    createdDate: '2025-10-01T00:00:00',
   },
   {
     id: 'appt-2',
@@ -18,8 +19,9 @@ export const appointments: Appointment[] = [
     treatmentTypeId: 'tt-1',
     therapistId: 'user-therapist-1',
     appointmentDateTime: '2025-11-05T11:00:00',
+    durationMinutes: 60,
     status: 'Completed',
-    createdDate: '2025-10-25',
+    createdDate: '2025-10-25T00:00:00',
   },
   {
     id: 'appt-3',
@@ -27,8 +29,9 @@ export const appointments: Appointment[] = [
     treatmentTypeId: 'tt-2',
     therapistId: 'user-therapist-1',
     appointmentDateTime: '2025-11-20T09:00:00',
+    durationMinutes: 45,
     status: 'Completed',
-    createdDate: '2025-11-10',
+    createdDate: '2025-11-10T00:00:00',
   },
   // cust-1: upcoming appointment
   {
@@ -37,8 +40,9 @@ export const appointments: Appointment[] = [
     treatmentTypeId: 'tt-1',
     therapistId: 'user-therapist-1',
     appointmentDateTime: '2026-08-10T10:00:00',
+    durationMinutes: 60,
     status: 'Scheduled',
-    createdDate: '2026-07-10',
+    createdDate: '2026-07-10T00:00:00',
   },
   // cust-2: past appointments
   {
@@ -47,8 +51,9 @@ export const appointments: Appointment[] = [
     treatmentTypeId: 'tt-3',
     therapistId: 'user-therapist-1',
     appointmentDateTime: '2025-09-10T14:00:00',
+    durationMinutes: 90,
     status: 'Completed',
-    createdDate: '2025-09-01',
+    createdDate: '2025-09-01T00:00:00',
   },
   {
     id: 'appt-6',
@@ -56,8 +61,9 @@ export const appointments: Appointment[] = [
     treatmentTypeId: 'tt-3',
     therapistId: 'user-therapist-1',
     appointmentDateTime: '2025-10-01T14:00:00',
+    durationMinutes: 90,
     status: 'Completed',
-    createdDate: '2025-09-20',
+    createdDate: '2025-09-20T00:00:00',
   },
   // cust-2: upcoming appointment
   {
@@ -66,8 +72,9 @@ export const appointments: Appointment[] = [
     treatmentTypeId: 'tt-3',
     therapistId: 'user-therapist-1',
     appointmentDateTime: '2026-08-20T14:00:00',
+    durationMinutes: 90,
     status: 'Scheduled',
-    createdDate: '2026-07-10',
+    createdDate: '2026-07-10T00:00:00',
   },
   // cust-3: many past appointments
   {
@@ -76,8 +83,9 @@ export const appointments: Appointment[] = [
     treatmentTypeId: 'tt-1',
     therapistId: 'user-therapist-1',
     appointmentDateTime: '2024-01-20T10:00:00',
+    durationMinutes: 60,
     status: 'Completed',
-    createdDate: '2024-01-10',
+    createdDate: '2024-01-10T00:00:00',
   },
   {
     id: 'appt-9',
@@ -85,8 +93,9 @@ export const appointments: Appointment[] = [
     treatmentTypeId: 'tt-1',
     therapistId: 'user-therapist-1',
     appointmentDateTime: '2024-03-15T10:00:00',
+    durationMinutes: 60,
     status: 'Completed',
-    createdDate: '2024-03-01',
+    createdDate: '2024-03-01T00:00:00',
   },
   {
     id: 'appt-10',
@@ -94,8 +103,9 @@ export const appointments: Appointment[] = [
     treatmentTypeId: 'tt-2',
     therapistId: 'user-therapist-1',
     appointmentDateTime: '2024-06-10T09:00:00',
+    durationMinutes: 45,
     status: 'Completed',
-    createdDate: '2024-06-01',
+    createdDate: '2024-06-01T00:00:00',
   },
   // cust-3: cancelled appointment
   {
@@ -104,8 +114,9 @@ export const appointments: Appointment[] = [
     treatmentTypeId: 'tt-1',
     therapistId: 'user-therapist-1',
     appointmentDateTime: '2024-09-05T10:00:00',
+    durationMinutes: 60,
     status: 'Cancelled',
-    createdDate: '2024-08-20',
+    createdDate: '2024-08-20T00:00:00',
   },
   // cust-4: upcoming first appointment (no past)
   {
@@ -114,8 +125,9 @@ export const appointments: Appointment[] = [
     treatmentTypeId: 'tt-1',
     therapistId: 'user-therapist-1',
     appointmentDateTime: '2026-08-05T11:00:00',
+    durationMinutes: 60,
     status: 'Scheduled',
-    createdDate: '2026-07-10',
+    createdDate: '2026-07-10T00:00:00',
   },
   // cust-5: past and upcoming appointments
   {
@@ -124,8 +136,9 @@ export const appointments: Appointment[] = [
     treatmentTypeId: 'tt-2',
     therapistId: 'user-therapist-1',
     appointmentDateTime: '2025-02-15T09:00:00',
+    durationMinutes: 45,
     status: 'Completed',
-    createdDate: '2025-02-01',
+    createdDate: '2025-02-01T00:00:00',
   },
   {
     id: 'appt-14',
@@ -133,8 +146,9 @@ export const appointments: Appointment[] = [
     treatmentTypeId: 'tt-3',
     therapistId: 'user-therapist-1',
     appointmentDateTime: '2025-07-15T14:00:00',
+    durationMinutes: 90,
     status: 'Completed',
-    createdDate: '2025-07-01',
+    createdDate: '2025-07-01T00:00:00',
   },
   {
     id: 'appt-15',
@@ -142,7 +156,8 @@ export const appointments: Appointment[] = [
     treatmentTypeId: 'tt-3',
     therapistId: 'user-therapist-1',
     appointmentDateTime: '2026-09-01T14:00:00',
+    durationMinutes: 90,
     status: 'Scheduled',
-    createdDate: '2026-07-10',
+    createdDate: '2026-07-10T00:00:00',
   },
 ];

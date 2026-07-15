@@ -185,8 +185,9 @@ function makeAppt(id: string, dateTime: string, status: Appointment['status']): 
     treatmentTypeId: 'tt-1',
     therapistId: 'u1',
     appointmentDateTime: dateTime,
+    durationMinutes: 60,
     status,
-    createdDate: '2020-01-01',
+    createdDate: '2020-01-01T00:00:00',
   };
 }
 
