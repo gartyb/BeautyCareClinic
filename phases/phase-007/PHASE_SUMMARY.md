@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved — Pending Commit
+Completed
 
 ## Goal
 
@@ -284,8 +284,8 @@ AspNetUserLogins, AspNetUserRoles, AspNetUserTokens
 ## Version
 
 - Version: v0.7.0
-- Commit: —
-- Tag: —
+- Commit: 5af6f5f
+- Tag: v0.7.0
 
 ## Lessons Learned
 

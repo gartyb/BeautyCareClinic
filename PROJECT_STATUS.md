@@ -3,14 +3,14 @@
 ## Current State
 
 - Current phase: 007 — Backend Foundation
-- Phase status: Approved — Pending Commit
+- Phase status: Completed
 - Current branch: feature/phase-007-backend-foundation
-- Latest approved version: v0.6.0
-- Latest approved tag: v0.6.0
+- Latest approved version: v0.7.0
+- Latest approved tag: v0.7.0
 
 ## Current Activity
 
-Phase 007 — Backend Foundation. אושר על ידי המשתמש לאחר validation ידני + code review + security review. ממתין ליצירת commit ו-tag v0.7.0.
+Phase 007 הושלם. ממתין להצעת Phase 008.
 
 ## Completed Phases
 
@@ -22,6 +22,7 @@ Phase 007 — Backend Foundation. אושר על ידי המשתמש לאחר val
 | 004   | Treatment Notes, Photos & Add Note       | v0.4.0  | Completed |
 | 005   | New Customer + Manager Admin Screens     | v0.5.0  | Completed |
 | 006   | Appointment Calendar                     | v0.6.0  | Completed |
+| 007   | Backend Foundation                       | v0.7.0  | Completed |
 
 ## Open Change Requests
 
