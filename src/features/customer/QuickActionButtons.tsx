@@ -5,6 +5,7 @@ import { openOrders } from './selectors';
 import { NewOrderModal } from '../order/NewOrderModal';
 import { RecordPaymentModal } from '../payment/RecordPaymentModal';
 import { AddNoteModal } from '../note/AddNoteModal';
+import { BookAppointmentModal } from '../appointments/BookAppointmentModal';
 import type { User } from '../../types/User';
 
 interface QuickActionButtonsProps {
@@ -17,6 +18,7 @@ export function QuickActionButtons({ currentUser, customerId }: QuickActionButto
   const [showNewOrder, setShowNewOrder] = useState(false);
   const [showRecordPayment, setShowRecordPayment] = useState(false);
   const [showAddNote, setShowAddNote] = useState(false);
+  const [showBookAppointment, setShowBookAppointment] = useState(false);
 
   const hasOpenOrders = openOrders(orders).length > 0;
 
@@ -42,9 +44,8 @@ export function QuickActionButtons({ currentUser, customerId }: QuickActionButto
         </button>
 
         <button
-          disabled
-          title="זמין בקרוב"
-          className="flex items-center gap-2 px-4 py-2 border border-clinic-gold text-clinic-gold rounded-lg text-sm font-medium opacity-50 cursor-not-allowed"
+          onClick={() => setShowBookAppointment(true)}
+          className="flex items-center gap-2 px-4 py-2 border border-clinic-gold text-clinic-gold rounded-lg text-sm font-medium hover:bg-clinic-blush transition-colors"
         >
           <Calendar size={16} />
           <span>קבע תור</span>
@@ -77,6 +78,12 @@ export function QuickActionButtons({ currentUser, customerId }: QuickActionButto
         onClose={() => setShowAddNote(false)}
         customerId={customerId}
         currentUser={currentUser}
+      />
+
+      <BookAppointmentModal
+        open={showBookAppointment}
+        onClose={() => setShowBookAppointment(false)}
+        customerId={customerId}
       />
     </>
   );

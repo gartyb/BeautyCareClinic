@@ -17,7 +17,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { label: 'חיפוש לקוחה', to: '/search', icon: <Search size={18} /> },
-  { label: 'תורים', icon: <Calendar size={18} />, disabled: true },
+  { label: 'לוח זמנים', to: '/appointments', icon: <Calendar size={18} /> },
   { label: 'סוגי טיפולים', to: '/treatment-types', icon: <Tag size={18} />, managerOnly: true },
   { label: 'סוגי חבילות', to: '/packages', icon: <Package size={18} />, managerOnly: true },
   { label: 'מטפלות', to: '/therapists', icon: <Users size={18} />, managerOnly: true },

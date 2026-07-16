@@ -3,7 +3,6 @@ import { Customer } from '../types/Customer';
 import { CustomerOrder } from '../types/Order';
 import { Payment } from '../types/Payment';
 import { Treatment, TreatmentPhoto } from '../types/Treatment';
-import { Appointment } from '../types/Appointment';
 import { Note } from '../types/Note';
 import { TreatmentSeries } from '../types/TreatmentSeries';
 import { User } from '../types/User';
@@ -21,7 +20,6 @@ import { usePackageTypes } from './PackageTypesContext';
 import { orders as initialOrders } from '../data/orders';
 import { payments as initialPayments } from '../data/payments';
 import { treatments as initialTreatments } from '../data/treatments';
-import { appointments } from '../data/appointments';
 import { notes as initialNotes } from '../data/notes';
 import { treatmentSeries as initialSeries } from '../data/series';
 import { newId as generateId } from '../domain/id';
@@ -32,9 +30,9 @@ interface CustomerContextValue {
   orders: CustomerOrder[];
   payments: Payment[];
   treatments: Treatment[];
-  appointments: Appointment[];
   notes: Note[];
   treatmentSeries: TreatmentSeries[];
+  allSeries: TreatmentSeries[];
   addOrder: (order: CustomerOrder, series: TreatmentSeries[]) => void;
   addPayment: (payment: Payment) => void;
   recordTimerTreatment: (seriesId: string, elapsedSeconds: number, currentUser: User) => void;
@@ -85,11 +83,6 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
   const customerTreatments = useMemo(
     () => (activeCustomerId ? allTreatments.filter(t => t.customerId === activeCustomerId) : []),
     [activeCustomerId, allTreatments]
-  );
-
-  const customerAppointments = useMemo(
-    () => (activeCustomerId ? appointments.filter(a => a.customerId === activeCustomerId) : []),
-    [activeCustomerId]
   );
 
   const customerNotes = useMemo(
@@ -235,9 +228,9 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       orders: customerOrders,
       payments: customerPayments,
       treatments: customerTreatments,
-      appointments: customerAppointments,
       notes: customerNotes,
       treatmentSeries: customerSeries,
+      allSeries,
       addOrder,
       addPayment,
       recordTimerTreatment,
@@ -253,9 +246,9 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       customerOrders,
       customerPayments,
       customerTreatments,
-      customerAppointments,
       customerNotes,
       customerSeries,
+      allSeries,
       addOrder,
       addPayment,
       recordTimerTreatment,

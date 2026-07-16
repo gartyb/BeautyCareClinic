@@ -12,6 +12,7 @@ import { TherapistsScreen } from './features/therapists/TherapistsScreen';
 import { TherapistDetail } from './features/therapists/TherapistDetail';
 import { SettingsScreen } from './features/settings/SettingsScreen';
 import { TreatmentTypesScreen } from './features/treatmentTypes/TreatmentTypesScreen';
+import AppointmentCalendarScreen from './features/appointments/AppointmentCalendarScreen';
 
 export function App() {
   // WARNING: never default to a privileged role in production — replace with real auth (CR-006)
@@ -27,6 +28,7 @@ export function App() {
             <Route path="/" element={<Navigate to="/search" replace />} />
             <Route path="/search" element={<SearchScreen />} />
             <Route path="/customers/:id" element={<CustomerCard currentUser={currentUser} />} />
+            <Route path="/appointments" element={<AppointmentCalendarScreen />} />
             <Route
               path="/packages"
               element={

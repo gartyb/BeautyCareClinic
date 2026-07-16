@@ -1,14 +1,15 @@
 import type { ReactNode } from 'react';
 import { Calendar, AlertCircle, CreditCard, Zap, Package } from 'lucide-react';
 import { useCustomer } from '../../contexts/CustomerContext';
+import { useAppointments } from '../../contexts/AppointmentsContext';
 import {
   outstandingBalance,
   totalPaid,
-  nextAppointment,
   remainingUnits,
   activeSeries,
 } from './selectors';
-import { formatDate } from '../../utils/date';
+import { getNextAppointment } from '../appointments/appointmentService';
+import { formatDateTime } from '../../utils/date';
 
 interface KpiCardProps {
   icon: ReactNode;
@@ -29,9 +30,12 @@ function KpiCard({ icon, label, value }: KpiCardProps) {
 }
 
 export function SummaryRow() {
-  const { appointments, orders, payments, treatmentSeries } = useCustomer();
+  const { activeCustomer, orders, payments, treatmentSeries } = useCustomer();
+  const { appointments } = useAppointments();
 
-  const next = nextAppointment(appointments);
+  const next = activeCustomer
+    ? getNextAppointment(activeCustomer.id, appointments)
+    : null;
   const balance = outstandingBalance(orders);
   const paid = totalPaid(payments);
   const remaining = remainingUnits(treatmentSeries);
@@ -42,7 +46,7 @@ export function SummaryRow() {
       <KpiCard
         icon={<Calendar size={15} className="text-clinic-gold" />}
         label="תור הבא"
-        value={next ? formatDate(next.appointmentDateTime) : 'אין'}
+        value={next ? formatDateTime(next.appointmentDateTime) : 'אין'}
       />
       <KpiCard
         icon={<AlertCircle size={15} className={balance > 0 ? 'text-red-400' : 'text-green-500'} />}

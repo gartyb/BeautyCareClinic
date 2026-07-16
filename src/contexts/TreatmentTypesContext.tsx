@@ -6,8 +6,8 @@ import { DomainError } from '../domain/errors';
 
 interface TreatmentTypesContextValue {
   treatmentTypes: TreatmentType[];
-  createTreatmentType: (name: string) => TreatmentType;
-  updateTreatmentType: (id: string, name: string) => void;
+  createTreatmentType: (name: string, defaultDurationMinutes: number) => TreatmentType;
+  updateTreatmentType: (id: string, name: string, defaultDurationMinutes: number) => void;
   deleteTreatmentType: (id: string) => void;
 }
 
@@ -16,20 +16,26 @@ const TreatmentTypesContext = createContext<TreatmentTypesContextValue | null>(n
 export function TreatmentTypesProvider({ children }: { children: React.ReactNode }) {
   const [treatmentTypes, setTreatmentTypes] = useState<TreatmentType[]>(seedTreatmentTypes);
 
-  const createTreatmentType = useCallback((name: string): TreatmentType => {
+  const createTreatmentType = useCallback((name: string, defaultDurationMinutes: number): TreatmentType => {
     const trimmed = name.trim();
     if (!trimmed) throw new DomainError('TREATMENT_TYPE_NAME_REQUIRED', 'שם סוג טיפול נדרש');
     if (trimmed.length > 100) throw new DomainError('TREATMENT_TYPE_NAME_TOO_LONG', 'שם לא יכול לעלות על 100 תווים');
-    const tt: TreatmentType = { id: newId(), name: trimmed };
+    if (!Number.isInteger(defaultDurationMinutes) || defaultDurationMinutes <= 0) {
+      throw new DomainError('TREATMENT_TYPE_DURATION_INVALID', 'משך ברירת מחדל חייב להיות מספר שלם גדול מ-0');
+    }
+    const tt: TreatmentType = { id: newId(), name: trimmed, defaultDurationMinutes };
     setTreatmentTypes(prev => [...prev, tt]);
     return tt;
   }, []);
 
-  const updateTreatmentType = useCallback((id: string, name: string): void => {
+  const updateTreatmentType = useCallback((id: string, name: string, defaultDurationMinutes: number): void => {
     const trimmed = name.trim();
     if (!trimmed) throw new DomainError('TREATMENT_TYPE_NAME_REQUIRED', 'שם סוג טיפול נדרש');
     if (trimmed.length > 100) throw new DomainError('TREATMENT_TYPE_NAME_TOO_LONG', 'שם לא יכול לעלות על 100 תווים');
-    setTreatmentTypes(prev => prev.map(tt => tt.id === id ? { ...tt, name: trimmed } : tt));
+    if (!Number.isInteger(defaultDurationMinutes) || defaultDurationMinutes <= 0) {
+      throw new DomainError('TREATMENT_TYPE_DURATION_INVALID', 'משך ברירת מחדל חייב להיות מספר שלם גדול מ-0');
+    }
+    setTreatmentTypes(prev => prev.map(tt => tt.id === id ? { ...tt, name: trimmed, defaultDurationMinutes } : tt));
   }, []);
 
   const deleteTreatmentType = useCallback((id: string): void => {
