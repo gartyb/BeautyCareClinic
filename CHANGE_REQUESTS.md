@@ -92,6 +92,105 @@
 - Description: (a) No banner warning that data (notes, photos) is lost on page refresh — add a session-scoped toast or info strip before production. (b) `console.error` logs raw errors; establish a `logger` abstraction before backend wiring to prevent PII leaking into log aggregators (Sentry etc.). (c) `docs/SYSTEM_FLOWS.md` does not exist — create it to document input surfaces, trust boundaries, and client-supplied vs server-derived fields per phase. (d) `buildTreatmentPhoto` accepts any URL scheme; add a `blob:`/same-origin guard before backend phase to prevent SSRF-like patterns.
 - Status: Open
 
+### CR-011 — Frontend User.firstName/lastName → fullName reconciliation
+
+- Type: Technical Debt
+- Priority: High
+- Source: Architecture review — Phase 007
+- Related phase: Phase 8
+- Description: Frontend type definitions use `firstName`/`lastName` but backend schema and API use `fullName`. Must reconcile when wiring frontend to backend in Phase 8.
+- Status: Open
+
+### CR-012 — Token revocation / refresh tokens
+
+- Type: Security
+- Priority: Medium
+- Source: Architecture review + Security review — Phase 007
+- Related phase: Phase 8 or 11
+- Description: 24-hour JWT with no revocation means deleted/demoted users retain access until natural expiry. Add refresh tokens or SecurityStamp validation.
+- Status: Open
+
+### CR-013 — Production CORS policy
+
+- Type: Technical Debt
+- Priority: High
+- Source: Code review — Phase 007
+- Related phase: Phase 11
+- Description: No CORS policy is configured for non-Development environments. Define a production CORS policy reading allowed origins from configuration.
+- Status: Open
+
+### CR-014 — HTTPS redirection + HSTS
+
+- Type: Security
+- Priority: High
+- Source: Security review — Phase 007
+- Related phase: Phase 11
+- Description: `UseHttpsRedirection` and `UseHsts` are not called. Add in non-Development middleware pipeline.
+- Status: Open
+
+### CR-015 — Customer search wildcard escaping
+
+- Type: Bug
+- Priority: Medium
+- Source: Code review — Phase 007
+- Related phase: Phase 8
+- Description: `CustomerRepository.SearchAsync` interpolates search term into ILike pattern without escaping `%`, `_`, or `\`. Add escaping before interpolation.
+- Status: Open
+
+### CR-016 — JWT typed options + validation on startup
+
+- Type: Technical Debt
+- Priority: Medium
+- Source: Code review — Phase 007
+- Related phase: Phase 8
+- Description: JWT Issuer/Audience/ExpiresInHours are read from IConfiguration with null-forgiving operators. Extract into a typed `JwtOptions` class with `ValidateDataAnnotations().ValidateOnStart()`.
+- Status: Open
+
+### CR-017 — PII in JWT payload
+
+- Type: Security / Privacy
+- Priority: Medium
+- Source: Security review — Phase 007
+- Related phase: Phase 8
+- Description: JWT includes email and fullName claims. Keep only sub/role/jti in token; fetch identity from /auth/me on client.
+- Status: Open
+
+### CR-018 — RemainingBalance computed column
+
+- Type: Technical Debt
+- Priority: Low
+- Source: Code review — Phase 007
+- Related phase: Phase 8
+- Description: `CustomerOrder.RemainingBalance` is a derived value stored redundantly alongside `DiscountedPrice` and `AmountPaid`. Risk of drift if any payment path forgets to recalculate. Make it a computed property or add a DB check constraint.
+- Status: Open
+
+### CR-019 — DateTime → DateTimeOffset for timestamp columns
+
+- Type: Technical Debt
+- Priority: Low
+- Source: Code review — Phase 007
+- Related phase: Phase 8
+- Description: `Appointment.StartTime`, `EndTime`, `CreatedAt`, `Treatment.TreatmentDate`, `Note.NoteDate` use `DateTime` (unspecified kind). Migrate to `DateTimeOffset` for timezone safety.
+- Status: Open
+
+### CR-020 — AuthController: use IUserRepository instead of AppDbContext directly
+
+- Type: Technical Debt
+- Priority: Low
+- Source: Code review — Phase 007
+- Related phase: Phase 8
+- Description: `AuthController` injects `AppDbContext` directly to look up `Domain.User`. Replace with `IUserRepository.GetByIdAsync` to respect layer boundaries.
+- Status: Open
+
+### CR-021 — DomainConflictException typed exception
+
+- Type: Technical Debt
+- Priority: Low
+- Source: Code review — Phase 007
+- Related phase: Phase 8
+- Description: `ExceptionHandlingMiddleware` detects conflicts via `exception.Message.Contains("CONFLICT")` — a magic string. Introduce `DomainConflictException` and catch it explicitly.
+- Status: Open
+
 ## Planned
 
 None.

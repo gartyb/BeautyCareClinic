@@ -5,3 +5,9 @@ dist/
 .env.*.local
 *.log
 .DS_Store
+
+# .NET
+backend/**/bin/
+backend/**/obj/
+*.user
+.vs/
