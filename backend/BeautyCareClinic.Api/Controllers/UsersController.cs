@@ -48,7 +48,7 @@ public class UsersController : ControllerBase
     {
         var user = await _userRepository.GetByIdAsync(id);
         if (user == null)
-            return NotFound(new ErrorResponse(ErrorCodes.NotFound, $"User {id} not found.", DateTime.UtcNow, HttpContext.TraceIdentifier));
+            return NotFound(new ErrorResponse(ErrorCodes.NotFound, "The requested resource was not found.", DateTime.UtcNow, HttpContext.TraceIdentifier));
 
         return Ok(new UserDto(user.Id, user.FullName, user.Email, user.Role.ToString()));
     }
@@ -131,7 +131,7 @@ public class UsersController : ControllerBase
     {
         var existing = await _userRepository.GetByIdAsync(id);
         if (existing == null)
-            return NotFound(new ErrorResponse(ErrorCodes.NotFound, $"User {id} not found.", DateTime.UtcNow, HttpContext.TraceIdentifier));
+            return NotFound(new ErrorResponse(ErrorCodes.NotFound, "The requested resource was not found.", DateTime.UtcNow, HttpContext.TraceIdentifier));
 
         if (string.IsNullOrWhiteSpace(request.FullName))
             return BadRequest(new ErrorResponse(ErrorCodes.ValidationFailed, "FullName is required.", DateTime.UtcNow, HttpContext.TraceIdentifier));
@@ -206,7 +206,7 @@ public class UsersController : ControllerBase
 
         var existing = await _userRepository.GetByIdAsync(id);
         if (existing == null)
-            return NotFound(new ErrorResponse(ErrorCodes.NotFound, $"User {id} not found.", DateTime.UtcNow, HttpContext.TraceIdentifier));
+            return NotFound(new ErrorResponse(ErrorCodes.NotFound, "The requested resource was not found.", DateTime.UtcNow, HttpContext.TraceIdentifier));
 
         await using var transaction = await _dbContext.Database.BeginTransactionAsync();
         try

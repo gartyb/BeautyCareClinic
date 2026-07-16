@@ -5,7 +5,6 @@ using BeautyCareClinic.Infrastructure.Identity;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 
 namespace BeautyCareClinic.Api.Controllers;
@@ -15,20 +14,17 @@ namespace BeautyCareClinic.Api.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly UserManager<AppUser> _userManager;
-    private readonly SignInManager<AppUser> _signInManager;
     private readonly AppDbContext _context;
     private readonly IJwtService _jwtService;
 
     public AuthController(
         UserManager<AppUser> userManager,
-        SignInManager<AppUser> signInManager,
         AppDbContext context,
         IJwtService jwtService)
     {
-        _userManager   = userManager;
-        _signInManager = signInManager;
-        _context       = context;
-        _jwtService    = jwtService;
+        _userManager = userManager;
+        _context     = context;
+        _jwtService  = jwtService;
     }
 
     /// <summary>POST /api/v1/auth/login — No auth required.</summary>
@@ -48,15 +44,23 @@ public class AuthController : ControllerBase
         if (appUser == null)
             return Unauthorized(new ErrorResponse(ErrorCodes.Unauthorized, "Invalid credentials.", DateTime.UtcNow, HttpContext.TraceIdentifier));
 
-        // Use SignInManager so failed attempts are recorded and lockout is enforced
-        var result = await _signInManager.CheckPasswordSignInAsync(appUser, request.Password, lockoutOnFailure: true);
-
-        if (result.IsLockedOut)
+        // Check lockout before attempting password (avoid wasting a hash comparison when already locked)
+        if (await _userManager.IsLockedOutAsync(appUser))
             return StatusCode(StatusCodes.Status429TooManyRequests,
                 new ErrorResponse(ErrorCodes.AccountLocked, "Account temporarily locked due to multiple failed login attempts.", DateTime.UtcNow, HttpContext.TraceIdentifier));
 
-        if (!result.Succeeded)
+        // Use UserManager directly — SignInManager.CheckPasswordSignInAsync does not reliably persist
+        // AccessFailedCount in JWT-only API contexts where the cookie auth scheme is absent.
+        if (!await _userManager.CheckPasswordAsync(appUser, request.Password))
+        {
+            await _userManager.AccessFailedAsync(appUser);
+            if (await _userManager.IsLockedOutAsync(appUser))
+                return StatusCode(StatusCodes.Status429TooManyRequests,
+                    new ErrorResponse(ErrorCodes.AccountLocked, "Account temporarily locked due to multiple failed login attempts.", DateTime.UtcNow, HttpContext.TraceIdentifier));
             return Unauthorized(new ErrorResponse(ErrorCodes.Unauthorized, "Invalid credentials.", DateTime.UtcNow, HttpContext.TraceIdentifier));
+        }
+
+        await _userManager.ResetAccessFailedCountAsync(appUser);
 
         // Load the Domain User by the same shared Id
         var domainUser = await _context.Users.FindAsync(appUser.Id);

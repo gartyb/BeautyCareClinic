@@ -47,7 +47,7 @@ public class GlobalSettingsController : ControllerBase
         {
             var setting = await _repository.GetByNameAsync(req.Name);
             if (setting == null)
-                return NotFound(new ErrorResponse(ErrorCodes.NotFound, $"Setting '{req.Name}' not found.", DateTime.UtcNow, HttpContext.TraceIdentifier));
+                return NotFound(new ErrorResponse(ErrorCodes.NotFound, "The requested resource was not found.", DateTime.UtcNow, HttpContext.TraceIdentifier));
 
             setting.Value = req.Value;
             var result = await _repository.UpdateAsync(setting);

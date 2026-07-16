@@ -32,7 +32,7 @@ public class TreatmentTypesController : ControllerBase
     {
         var type = await _repository.GetByIdAsync(id);
         if (type == null)
-            return NotFound(new ErrorResponse(ErrorCodes.NotFound, $"TreatmentType {id} not found.", DateTime.UtcNow, HttpContext.TraceIdentifier));
+            return NotFound(new ErrorResponse(ErrorCodes.NotFound, "The requested resource was not found.", DateTime.UtcNow, HttpContext.TraceIdentifier));
 
         return Ok(new TreatmentTypeDto(type.Id, type.Name));
     }
@@ -67,7 +67,7 @@ public class TreatmentTypesController : ControllerBase
     {
         var existing = await _repository.GetByIdAsync(id);
         if (existing == null)
-            return NotFound(new ErrorResponse(ErrorCodes.NotFound, $"TreatmentType {id} not found.", DateTime.UtcNow, HttpContext.TraceIdentifier));
+            return NotFound(new ErrorResponse(ErrorCodes.NotFound, "The requested resource was not found.", DateTime.UtcNow, HttpContext.TraceIdentifier));
 
         if (string.IsNullOrWhiteSpace(request.Name))
             return BadRequest(new ErrorResponse(ErrorCodes.ValidationFailed, "Name is required.", DateTime.UtcNow, HttpContext.TraceIdentifier));
@@ -88,7 +88,7 @@ public class TreatmentTypesController : ControllerBase
     {
         var existing = await _repository.GetByIdAsync(id);
         if (existing == null)
-            return NotFound(new ErrorResponse(ErrorCodes.NotFound, $"TreatmentType {id} not found.", DateTime.UtcNow, HttpContext.TraceIdentifier));
+            return NotFound(new ErrorResponse(ErrorCodes.NotFound, "The requested resource was not found.", DateTime.UtcNow, HttpContext.TraceIdentifier));
 
         var hasRelated = await _repository.HasRelatedDataAsync(id);
         if (hasRelated)

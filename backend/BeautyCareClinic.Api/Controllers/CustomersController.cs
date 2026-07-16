@@ -33,7 +33,7 @@ public class CustomersController : ControllerBase
     {
         var customer = await _repository.GetByIdAsync(id);
         if (customer == null)
-            return NotFound(new ErrorResponse(ErrorCodes.NotFound, $"Customer {id} not found.", DateTime.UtcNow, HttpContext.TraceIdentifier));
+            return NotFound(new ErrorResponse(ErrorCodes.NotFound, "The requested resource was not found.", DateTime.UtcNow, HttpContext.TraceIdentifier));
 
         return Ok(new CustomerDto(customer.Id, customer.FullName, customer.Phone, customer.Email));
     }
@@ -71,7 +71,7 @@ public class CustomersController : ControllerBase
     {
         var existing = await _repository.GetByIdAsync(id);
         if (existing == null)
-            return NotFound(new ErrorResponse(ErrorCodes.NotFound, $"Customer {id} not found.", DateTime.UtcNow, HttpContext.TraceIdentifier));
+            return NotFound(new ErrorResponse(ErrorCodes.NotFound, "The requested resource was not found.", DateTime.UtcNow, HttpContext.TraceIdentifier));
 
         if (string.IsNullOrWhiteSpace(request.FullName))
             return BadRequest(new ErrorResponse(ErrorCodes.ValidationFailed, "FullName is required.", DateTime.UtcNow, HttpContext.TraceIdentifier));
@@ -97,7 +97,7 @@ public class CustomersController : ControllerBase
     {
         var existing = await _repository.GetByIdAsync(id);
         if (existing == null)
-            return NotFound(new ErrorResponse(ErrorCodes.NotFound, $"Customer {id} not found.", DateTime.UtcNow, HttpContext.TraceIdentifier));
+            return NotFound(new ErrorResponse(ErrorCodes.NotFound, "The requested resource was not found.", DateTime.UtcNow, HttpContext.TraceIdentifier));
 
         var hasRelated = await _repository.HasRelatedDataAsync(id);
         if (hasRelated)
