@@ -2,15 +2,15 @@
 
 ## Current State
 
-- Current phase: 006 — Appointment Calendar
+- Current phase: 007 — Backend Foundation
 - Phase status: Completed
-- Current branch: feature/phase-006-appointment-calendar
-- Latest approved version: v0.6.0
-- Latest approved tag: v0.6.0
+- Current branch: feature/phase-007-backend-foundation
+- Latest approved version: v0.7.0
+- Latest approved tag: v0.7.0
 
 ## Current Activity
 
-Phase 006 — Completed. Awaiting merge to main.
+Phase 007 הושלם. ממתין להצעת Phase 008.
 
 ## Completed Phases
 
@@ -22,6 +22,7 @@ Phase 006 — Completed. Awaiting merge to main.
 | 004   | Treatment Notes, Photos & Add Note       | v0.4.0  | Completed |
 | 005   | New Customer + Manager Admin Screens     | v0.5.0  | Completed |
 | 006   | Appointment Calendar                     | v0.6.0  | Completed |
+| 007   | Backend Foundation                       | v0.7.0  | Completed |
 
 ## Open Change Requests
 
@@ -37,4 +38,4 @@ Phase 006 — Completed. Awaiting merge to main.
 
 ## Next Step
 
-Phase 007 — TBD.
+Phase 007 — Backend Foundation. הקוד מוכן. נדרש: `dotnet build` + `dotnet test` + manual API validation עם Swagger. לאחר אישור → commit v0.7.0 → Phase 008.

@@ -44,15 +44,25 @@ src/
   types/         TypeScript interfaces matching the domain model
 ```
 
-## Backend Structure (Phase 2)
+## Backend Structure (Phase 7)
 
 ```
-src/
-  Domain/         Entities, value objects, domain rules
-  Application/    Use cases, DTOs, service interfaces
-  Infrastructure/ EF Core, repositories, identity
-  Api/            Controllers, middleware, startup
+backend/
+  BeautyCareClinic.Domain/         Entities (POCOs), enums
+  BeautyCareClinic.Application/    DTOs, service interfaces, ICurrentUserService
+  BeautyCareClinic.Infrastructure/ EF Core (AppDbContext), repositories, Identity (AppUser), JwtService, DbSeeder
+  BeautyCareClinic.Api/            Controllers, middleware (ExceptionHandling, SecurityHeaders), Program.cs
+  BeautyCareClinic.Tests/          xUnit tests (unit + InMemory integration)
 ```
+
+### Identity Strategy (ADR-004)
+
+`AppUser : IdentityUser<Guid>` lives in Infrastructure only. `Domain.User` is a clean POCO with the same Guid ID. `USER.role` is authoritative for authorization — never AspNetRoles. JWT role claim is read from `Domain.User.role`.
+
+### Security Middleware
+
+- `SecurityHeadersMiddleware` — X-Content-Type-Options, X-Frame-Options, Referrer-Policy
+- `ExceptionHandlingMiddleware` — structured JSON errors, no internal details to client, traceId included
 
 ## State Management
 

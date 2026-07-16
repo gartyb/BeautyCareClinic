@@ -25,17 +25,22 @@
 | `clinic-muted`  | `#8A7A7A` | Secondary text       |
 | `clinic-border` | `#F1DCDC` | Borders and dividers |
 
-## Backend (Phase 2)
+## Backend (Phase 7)
 
-| Layer     | Technology                             |
-| --------- | -------------------------------------- |
-| Framework | ASP.NET Core Web API / .NET 10 LTS     |
-| Language  | C#                                     |
-| ORM       | Entity Framework Core 10               |
-| Database  | PostgreSQL                             |
-| Auth      | ASP.NET Core Identity + Roles/Policies |
+| Layer        | Technology                                      |
+| ------------ | ----------------------------------------------- |
+| Framework    | ASP.NET Core Web API / .NET 10                  |
+| Language     | C# 13                                           |
+| ORM          | Entity Framework Core 10 + Npgsql provider      |
+| Database     | PostgreSQL 17 (Docker in dev)                   |
+| Auth         | ASP.NET Core Identity (HS256 JWT, 24 h tokens)  |
+| Auth pattern | Strategy B: `AppUser : IdentityUser<Guid>` in Infrastructure; `Domain.User` as clean POCO |
+| Roles        | Manager / Therapist (role-based policies)        |
+| Secrets      | `dotnet user-secrets` in dev; env vars in prod   |
+| API docs     | Swagger / OpenAPI (Development only)             |
+| Tests        | xUnit (~60 tests: unit + InMemory integration)  |
 
-## Deployment (Phase 3)
+## Deployment (Phase 11)
 
 | Layer          | Technology                                    |
 | -------------- | --------------------------------------------- |
