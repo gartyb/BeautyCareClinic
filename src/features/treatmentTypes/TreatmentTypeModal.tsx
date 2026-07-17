@@ -14,6 +14,7 @@ export function TreatmentTypeModal({ open, onClose, initialValues }: Props) {
   const [name, setName] = useState('');
   const [durationStr, setDurationStr] = useState('60');
   const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -26,17 +27,21 @@ export function TreatmentTypeModal({ open, onClose, initialValues }: Props) {
   const durationNum = parseInt(durationStr, 10);
   const isValid = name.trim().length > 0 && Number.isInteger(durationNum) && durationNum > 0;
 
-  function handleSave() {
+  async function handleSave() {
     if (!isValid) return;
+    setError(null);
+    setIsSaving(true);
     try {
       if (initialValues) {
-        updateTreatmentType(initialValues.id, name, durationNum);
+        await updateTreatmentType(initialValues.id, name, durationNum);
       } else {
-        createTreatmentType(name, durationNum);
+        await createTreatmentType(name, durationNum);
       }
       onClose();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'שגיאה לא צפויה');
+    } finally {
+      setIsSaving(false);
     }
   }
 
@@ -84,10 +89,10 @@ export function TreatmentTypeModal({ open, onClose, initialValues }: Props) {
         </button>
         <button
           onClick={handleSave}
-          disabled={!isValid}
+          disabled={!isValid || isSaving}
           className="px-5 py-2 text-sm rounded-lg bg-clinic-gold text-white font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90"
         >
-          שמור
+          {isSaving ? 'שומר...' : 'שמור'}
         </button>
       </div>
     </Modal>

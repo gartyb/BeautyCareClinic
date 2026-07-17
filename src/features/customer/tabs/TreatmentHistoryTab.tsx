@@ -71,7 +71,7 @@ function PackageRow({ item, orderDate, seriesTreatments }: PackageRowProps) {
                 <div className="flex flex-col items-start gap-0.5 flex-1">
                   <span className="text-base font-medium text-clinic-text">{formatDate(t.treatmentDate)}</span>
                   <div className="flex items-center gap-2 text-sm text-clinic-muted">
-                    {therapist && <span>{therapist.firstName} {therapist.lastName}</span>}
+                    {therapist && <span>{therapist.fullName}</span>}
                     {t.durationMinutes != null && t.durationMinutes > 0 && (
                       <span>{t.durationMinutes} דק׳</span>
                     )}

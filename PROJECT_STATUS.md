@@ -2,15 +2,15 @@
 
 ## Current State
 
-- Current phase: 007 — Backend Foundation
-- Phase status: Completed
-- Current branch: feature/phase-007-backend-foundation
-- Latest approved version: v0.7.0
+- Current phase: 008 — Frontend-Backend Integration
+- Phase status: Approved — Pending Commit
+- Current branch: feature/phase-008-frontend-api-integration
+- Latest approved version: v0.8.0
 - Latest approved tag: v0.7.0
 
 ## Current Activity
 
-Phase 007 הושלם. ממתין להצעת Phase 008.
+Phase 008 אושר על ידי המשתמש לאחר בדיקה ידנית. ממתין לcommit + tag v0.8.0.
 
 ## Completed Phases
 
@@ -26,16 +26,29 @@ Phase 007 הושלם. ממתין להצעת Phase 008.
 
 ## Open Change Requests
 
-- CR-001: GlobalSettings schema inconsistency (Backend phase)
-- CR-004: CSP + image allowlist (Backend/Infra phase)
-- CR-008: Server-side therapistId validation (Backend phase)
+- CR-001: GlobalSettings schema inconsistency
+- CR-004: CSP + image allowlist (Phase 11)
 - CR-009: Code quality lows from Phase 4 review
-- CR-010: UX/observability gaps — refresh warning, logger, SYSTEM_FLOWS.md
+- CR-010: UX/observability gaps
+- CR-012: Refresh tokens (Phase 9+)
+- CR-013: Production CORS policy (Phase 11)
+- CR-014: HTTPS/HSTS (Phase 11)
+- CR-016: JWT typed options (Phase 9+)
+- CR-017: PII in JWT (Phase 9+)
+- CR-018: RemainingBalance computed (Phase 9+)
+- CR-019: DateTime → DateTimeOffset (Phase 9+)
+- CR-020: AuthController use IUserRepository (Phase 9+)
+- CR-021: DomainConflictException (Phase 9+)
+- CR-022: User enumeration timing (Phase 9+)
+- CR-023: First-login password change (Phase 9+)
+- CR-024: GlobalSettings unique constraint (Phase 9+)
+- CR-025: Phase 008 P2/P3 code quality (Phase 9+)
 
 ## Known Risks or Accepted Findings
 
-- Data is in-memory only — resets on page refresh (intentional, no backend yet).
+- H2 (Security): JWT stored in localStorage — deferred to Phase 9+ (CR-012, refresh tokens + HttpOnly cookies)
+- M4/M5: Kestrel + Vite bound to 0.0.0.0 in dev — required for current remote-access dev setup
 
 ## Next Step
 
-Phase 007 — Backend Foundation. הקוד מוכן. נדרש: `dotnet build` + `dotnet test` + manual API validation עם Swagger. לאחר אישור → commit v0.7.0 → Phase 008.
+Commit + tag v0.8.0, לאחר מכן Phase 009.

@@ -258,10 +258,13 @@ public class GlobalSettingsRepositoryTests : IDisposable
     }
 
     [Fact]
-    public async Task UpdateAsync_Throws_WhenSettingNotFound()
+    public async Task UpdateAsync_Inserts_WhenSettingNotFound()
     {
-        var setting = new GlobalSetting { Id = Guid.NewGuid(), Name = "nonexistent", Value = "x" };
-        await Assert.ThrowsAsync<KeyNotFoundException>(() => _repository.UpdateAsync(setting));
+        // UpdateAsync is an upsert — inserts the row when the key does not yet exist
+        var setting = new GlobalSetting { Id = Guid.NewGuid(), Name = "new_key", Value = "42" };
+        var result = await _repository.UpdateAsync(setting);
+        Assert.Equal("new_key", result.Name);
+        Assert.Equal("42", result.Value);
     }
 }
 

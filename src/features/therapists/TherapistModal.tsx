@@ -8,7 +8,7 @@ interface Props {
   onClose: () => void;
 }
 
-const EMPTY = { firstName: '', lastName: '', email: '', phone: '' };
+const EMPTY = { fullName: '', email: '', phone: '' };
 
 export function TherapistModal({ open, onClose }: Props) {
   const { createTherapist } = useTherapists();
@@ -27,15 +27,14 @@ export function TherapistModal({ open, onClose }: Props) {
     setError(null);
   }
 
-  const isValid = form.firstName.trim().length > 0 &&
-    form.lastName.trim().length > 0 &&
+  const isValid = form.fullName.trim().length > 0 &&
     form.email.trim().length > 0 &&
     form.phone.trim().length > 0;
 
   function handleSave() {
     if (!isValid) return;
     try {
-      createTherapist(form.firstName, form.lastName, form.email, form.phone);
+      createTherapist(form.fullName, form.email, form.phone);
       onClose();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'שגיאה לא צפויה');
@@ -48,34 +47,20 @@ export function TherapistModal({ open, onClose }: Props) {
         {error && (
           <div className="text-sm text-red-500 bg-red-50 rounded-lg px-3 py-2">{error}</div>
         )}
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-sm font-medium text-clinic-text mb-1">
-              שם פרטי <span className="text-red-400">*</span>
-            </label>
-            <input
-              type="text"
-              value={form.firstName}
-              onChange={e => set('firstName', e.target.value)}
-              maxLength={50}
-              className="border border-clinic-border rounded-lg px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-clinic-gold"
-              dir="rtl"
-              autoFocus
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-clinic-text mb-1">
-              שם משפחה <span className="text-red-400">*</span>
-            </label>
-            <input
-              type="text"
-              value={form.lastName}
-              onChange={e => set('lastName', e.target.value)}
-              maxLength={50}
-              className="border border-clinic-border rounded-lg px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-clinic-gold"
-              dir="rtl"
-            />
-          </div>
+        <div>
+          <label className="block text-sm font-medium text-clinic-text mb-1">
+            שם מלא <span className="text-red-400">*</span>
+          </label>
+          <input
+            type="text"
+            value={form.fullName}
+            onChange={e => set('fullName', e.target.value)}
+            maxLength={100}
+            placeholder="שם פרטי ושם משפחה"
+            className="border border-clinic-border rounded-lg px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-clinic-gold"
+            dir="rtl"
+            autoFocus
+          />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>

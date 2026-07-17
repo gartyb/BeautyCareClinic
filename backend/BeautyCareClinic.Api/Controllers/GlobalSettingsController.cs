@@ -1,6 +1,8 @@
 using BeautyCareClinic.Application.DTOs;
 using BeautyCareClinic.Application.Interfaces;
 using BeautyCareClinic.Application.Services;
+using BeautyCareClinic.Domain.Entities;
+using BeautyCareClinic.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -12,10 +14,12 @@ namespace BeautyCareClinic.Api.Controllers;
 public class GlobalSettingsController : ControllerBase
 {
     private readonly IGlobalSettingsRepository _repository;
+    private readonly AppDbContext _dbContext;
 
-    public GlobalSettingsController(IGlobalSettingsRepository repository)
+    public GlobalSettingsController(IGlobalSettingsRepository repository, AppDbContext dbContext)
     {
         _repository = repository;
+        _dbContext  = dbContext;
     }
 
     /// <summary>GET /api/v1/global-settings — Both roles.</summary>
@@ -43,15 +47,27 @@ public class GlobalSettingsController : ControllerBase
         }
 
         var updated = new List<GlobalSettingDto>();
-        foreach (var req in requestList)
-        {
-            var setting = await _repository.GetByNameAsync(req.Name);
-            if (setting == null)
-                return NotFound(new ErrorResponse(ErrorCodes.NotFound, "The requested resource was not found.", DateTime.UtcNow, HttpContext.TraceIdentifier));
 
-            setting.Value = req.Value;
-            var result = await _repository.UpdateAsync(setting);
-            updated.Add(new GlobalSettingDto(result.Name, result.Value));
+        // Wrap all updates in a transaction so a partial failure rolls back everything
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync();
+        try
+        {
+            foreach (var req in requestList)
+            {
+                // Fix 1: upsert — create the setting if it does not yet exist
+                var setting = await _repository.GetByNameAsync(req.Name);
+                setting ??= new GlobalSetting { Id = Guid.NewGuid(), Name = req.Name };
+                setting.Value = req.Value;
+                var result = await _repository.UpdateAsync(setting);
+                updated.Add(new GlobalSettingDto(result.Name, result.Value));
+            }
+
+            await transaction.CommitAsync();
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
         }
 
         return Ok(updated);

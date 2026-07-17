@@ -6,7 +6,7 @@ export function searchCustomers(query: string): CustomerSummary[] {
   if (query.length > 100) return [];
   const q = query.toLowerCase();
   return customers.filter(c =>
-    `${c.firstName} ${c.lastName}`.toLowerCase().includes(q) ||
+    c.fullName.toLowerCase().includes(q) ||
     c.phone.includes(q)
   );
 }

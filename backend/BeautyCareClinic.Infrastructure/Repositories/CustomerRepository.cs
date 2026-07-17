@@ -20,11 +20,19 @@ public class CustomerRepository : ICustomerRepository
 
         if (!string.IsNullOrWhiteSpace(search))
         {
-            var term = search.Trim().ToLower();
-            // Case-insensitive partial match on FullName or Phone
+            // Escape wildcards so literal % _ \ in the search term are treated as literals.
+            // Order matters: escape \ first, then % and _.
+            var escaped = search.Trim()
+                .Replace("\\", "\\\\")
+                .Replace("%",  "\\%")
+                .Replace("_",  "\\_");
+
+            var pattern = $"%{escaped}%";
+
+            // Case-insensitive partial match on FullName or Phone using ESCAPE clause
             query = query.Where(c =>
-                EF.Functions.ILike(c.FullName, $"%{term}%") ||
-                EF.Functions.ILike(c.Phone, $"%{term}%"));
+                EF.Functions.ILike(c.FullName, pattern, "\\") ||
+                EF.Functions.ILike(c.Phone,    pattern, "\\"));
         }
 
         return await query

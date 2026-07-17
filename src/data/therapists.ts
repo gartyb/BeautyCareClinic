@@ -4,15 +4,13 @@ import { User } from '../types/User';
 export const therapists: User[] = [
   {
     id: 'user-manager-1',
-    firstName: 'שרה',
-    lastName: 'לוי',
+    fullName: 'שרה לוי',
     email: 'sara.levi@example.co.il',
     role: 'Manager',
   },
   {
     id: 'user-therapist-1',
-    firstName: 'מיכל',
-    lastName: 'כהן',
+    fullName: 'מיכל כהן',
     email: 'michal.cohen@example.co.il',
     role: 'Therapist',
   },

@@ -56,6 +56,10 @@ builder.Services.AddIdentity<AppUser, IdentityRole<Guid>>(options =>
     options.Password.RequireNonAlphanumeric = true;
     options.Password.RequiredLength         = 8;
     options.User.RequireUniqueEmail         = true;
+    // Explicit lockout policy
+    options.Lockout.MaxFailedAccessAttempts = 5;
+    options.Lockout.DefaultLockoutTimeSpan  = TimeSpan.FromMinutes(15);
+    options.Lockout.AllowedForNewUsers      = true;
 })
 .AddEntityFrameworkStores<AppDbContext>()
 .AddDefaultTokenProviders();
@@ -83,7 +87,9 @@ builder.Services.AddAuthentication(options =>
         ValidIssuer              = issuer,
         ValidAudience            = audience,
         IssuerSigningKey         = new SymmetricSecurityKey(keyBytes),
-        ClockSkew                = TimeSpan.Zero
+        ClockSkew                = TimeSpan.Zero,
+        // Pin to HS256 — reject tokens signed with a different algorithm (algorithm confusion attack)
+        ValidAlgorithms          = new[] { SecurityAlgorithms.HmacSha256 }
     };
 });
 
@@ -103,7 +109,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("Development", policy =>
     {
-        policy.WithOrigins("http://localhost:5173")
+        policy.WithOrigins("http://localhost:5174")
               .AllowAnyHeader()
               .AllowAnyMethod();
         // Note: AllowCredentials() is NOT set — JWT is sent as Authorization header, not cookie

@@ -217,7 +217,7 @@ export function BookAppointmentModal({ open, onClose, customerId }: BookAppointm
             <option value="">— בחר לקוחה —</option>
             {customers.map(c => (
               <option key={c.id} value={c.id}>
-                {c.firstName} {c.lastName}
+                {c.fullName}
               </option>
             ))}
           </select>
@@ -291,7 +291,7 @@ export function BookAppointmentModal({ open, onClose, customerId }: BookAppointm
                         : 'border-clinic-border hover:bg-clinic-bg'
                     }`}
                   >
-                    {t.firstName} {t.lastName}
+                    {t.fullName}
                   </button>
                 ))}
               </div>

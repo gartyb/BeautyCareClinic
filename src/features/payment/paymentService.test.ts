@@ -6,7 +6,7 @@ import type { User } from '../../types/User';
 
 // ─── Test fixtures ────────────────────────────────────────────────────────────
 
-const therapist: User = { id: 'user-therapist-1', firstName: 'מיכל', lastName: 'לוי', email: 'therapist@clinic.com', role: 'Therapist' };
+const therapist: User = { id: 'user-therapist-1', fullName: 'מיכל לוי', email: 'therapist@clinic.com', role: 'Therapist' };
 
 const testDeps = {
   newId: () => 'payment-test-id',

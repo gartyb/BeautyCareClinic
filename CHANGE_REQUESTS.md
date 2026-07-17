@@ -72,7 +72,7 @@
 - Source: Security review — Phase 003
 - Related phase: Phase 2 (Backend)
 - Description: `recordTimerTreatment` and `recordQuantityTreatment` stamp `therapistId = currentUser.id` from the client-supplied `User` object (the dev-only header switcher). When backend is added, `therapistId` must come from the authenticated server session — never trust the client-supplied value. The Header switcher must be removed or locked behind an env flag before production.
-- Status: Open
+- Status: Closed — Phase 008 (dev user switcher removed from `Header.tsx` and `App.tsx`; `currentUser` now comes exclusively from `AuthContext` backed by JWT + `/auth/me`)
 
 ### CR-009 — Code quality lows from Phase 4 review
 
@@ -99,7 +99,7 @@
 - Source: Architecture review — Phase 007
 - Related phase: Phase 8
 - Description: Frontend type definitions use `firstName`/`lastName` but backend schema and API use `fullName`. Must reconcile when wiring frontend to backend in Phase 8.
-- Status: Open
+- Status: Closed — Phase 008 (`firstName`/`lastName` removed from `CustomerSummary`, `User`, all mock data, all forms and displays; `fullName` used throughout)
 
 ### CR-012 — Token revocation / refresh tokens
 
@@ -135,7 +135,7 @@
 - Source: Code review — Phase 007
 - Related phase: Phase 8
 - Description: `CustomerRepository.SearchAsync` interpolates search term into ILike pattern without escaping `%`, `_`, or `\`. Add escaping before interpolation.
-- Status: Open
+- Status: Closed — Phase 008 (`CustomerRepository.SearchAsync` now escapes `\`, `%`, `_` in that order before ILike interpolation; `ESCAPE` clause `"\\"` passed to EF Core)
 
 ### CR-016 — JWT typed options + validation on startup
 
@@ -191,10 +191,53 @@
 - Description: `ExceptionHandlingMiddleware` detects conflicts via `exception.Message.Contains("CONFLICT")` — a magic string. Introduce `DomainConflictException` and catch it explicitly.
 - Status: Open
 
+### CR-022 — User enumeration via login timing
+
+- Type: Security
+- Priority: Medium
+- Source: Security review — Phase 008 (M3)
+- Related phase: Phase 9+
+- Description: `AuthController.Login` returns immediately with 401 when the email is not found, but runs a slow PBKDF2 hash when the email exists. The response time delta allows enumeration of valid emails. Fix: run a dummy `PasswordHasher.VerifyHashedPassword` on a constant hash when the user is not found, making both paths constant-time.
+- Status: Open
+
+### CR-023 — First-login mandatory password change
+
+- Type: Security / UX
+- Priority: Medium
+- Source: Security review — Phase 008 (M8)
+- Related phase: Phase 9+
+- Description: Manager-created users receive a known initial password with no forced change on first login. Add a `MustChangePassword` flag to the `User` entity; on login, if the flag is set, return a specific code that directs the client to a password-change screen before proceeding.
+- Status: Open
+
+### CR-024 — GlobalSettings race condition / unique constraint
+
+- Type: Technical Debt
+- Priority: Low
+- Source: Security review — Phase 008 (L6)
+- Related phase: Phase 9+
+- Description: `GlobalSettingsRepository.UpdateAsync` is a read-modify-write upsert with no unique constraint on `Name`. Two concurrent requests for a new key can both insert, producing duplicate rows. Add a `UNIQUE` constraint on `GlobalSettings.Name` and handle the conflict in the repository.
+- Status: Open
+
+### CR-025 — Phase 008 code quality P2/P3 items
+
+- Type: Technical Debt
+- Priority: Low
+- Source: Code review — Phase 008
+- Related phase: Phase 9+
+- Description: Bundle of deferred P2/P3 items: (a) `globalSettingsApi.updateSetting` returns `GlobalSettingDto[]` but callers expect a scalar — change return type to `Promise<GlobalSettingDto>`. (b) `GlobalSettingsContext.setCalendarHours` makes two sequential non-atomic API calls. (c) `setup.ts` uses substring URL matching that can match multiple routes. (d) `AuthController`/`UsersController` read claims directly instead of using `ICurrentUserService`. (e) `api/index.ts` barrel does not re-export entity API modules. (f) `UserDto`/`UserApiDto` duplicated across `authApi.ts` and `usersApi.ts`. (g) `IsValidEmail` helper duplicated in two controllers.
+- Status: Open
+
 ## Planned
 
 None.
 
 ## Completed
 
-None.
+### CR-002 — Closed Phase 002. RoleGuard + sidebar UX comment.
+### CR-003 — Closed Phase 002. All modals migrated to Radix Dialog.
+### CR-005 — Closed Phase 002. `DomainError` established.
+### CR-006 — Closed Phase 002. Warning comment in App.tsx; null user default.
+### CR-007 — Closed Phase 002. Smart defaultTab.
+### CR-008 — Closed Phase 008. Dev user switcher removed; `currentUser` from `AuthContext` only.
+### CR-011 — Closed Phase 008. `firstName`/`lastName` → `fullName` throughout all frontend types, forms, displays, and tests.
+### CR-015 — Closed Phase 008. `CustomerRepository.SearchAsync` escapes `\`, `%`, `_` before ILike interpolation. Also fixed `TreatmentTypeRepository.ExistsByNameAsync` (same pattern).

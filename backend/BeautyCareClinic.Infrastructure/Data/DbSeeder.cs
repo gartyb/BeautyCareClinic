@@ -20,15 +20,17 @@ public static class DbSeeder
         if (await context.Users.AnyAsync())
             return;
 
-        // Read seed password from configuration; fall back to dev-only default with a warning
+        // Read seed password from user-secrets or environment.
+        // Never fall back to a hardcoded value — skip user seeding when absent.
         var seedPassword = configuration["SeedData:DefaultPassword"];
-        if (string.IsNullOrWhiteSpace(seedPassword))
+        var seedUsers    = !string.IsNullOrWhiteSpace(seedPassword);
+
+        if (!seedUsers)
         {
-            seedPassword = "Clinic@123";
             logger.LogWarning(
                 "SeedData:DefaultPassword is not configured. " +
-                "Using built-in fallback password. " +
-                "Set 'SeedData:DefaultPassword' in appsettings.Development.json.");
+                "Skipping user seeding. " +
+                "Set the password via: dotnet user-secrets set \"SeedData:DefaultPassword\" \"<password>\"");
         }
 
         await using var transaction = await context.Database.BeginTransactionAsync();
@@ -37,21 +39,18 @@ public static class DbSeeder
             // Treatment types
             var treatmentTypes = new[]
             {
-                new TreatmentType { Id = Guid.NewGuid(), Name = "פנים" },
-                new TreatmentType { Id = Guid.NewGuid(), Name = "לייזר" },
-                new TreatmentType { Id = Guid.NewGuid(), Name = "עיסוי" }
+                new TreatmentType { Id = Guid.NewGuid(), Name = "פנים",   DefaultDurationMinutes = 60 },
+                new TreatmentType { Id = Guid.NewGuid(), Name = "לייזר",  DefaultDurationMinutes = 30 },
+                new TreatmentType { Id = Guid.NewGuid(), Name = "עיסוי",  DefaultDurationMinutes = 60 }
             };
             context.TreatmentTypes.AddRange(treatmentTypes);
 
             // Global settings
             var globalSettings = new[]
             {
-                new GlobalSetting
-                {
-                    Id = Guid.NewGuid(),
-                    Name = "default_max_payment_count",
-                    Value = "12"
-                }
+                new GlobalSetting { Id = Guid.NewGuid(), Name = "default_max_payment_count", Value = "12" },
+                new GlobalSetting { Id = Guid.NewGuid(), Name = "calendar_start_hour",        Value = "8"  },
+                new GlobalSetting { Id = Guid.NewGuid(), Name = "calendar_end_hour",           Value = "20" },
             };
             context.GlobalSettings.AddRange(globalSettings);
 
@@ -68,50 +67,55 @@ public static class DbSeeder
 
             await context.SaveChangesAsync();
 
-            // Users — Domain.User + AppUser share the same Guid Id
-            var usersToSeed = new[]
+            if (seedUsers)
             {
-                (FullName: "ניהול אחראית",  Email: "manager@clinic.local",    Role: UserRole.Manager   ),
-                (FullName: "טלי מטפלת",    Email: "therapist1@clinic.local",  Role: UserRole.Therapist ),
-                (FullName: "שרה מטפלת",    Email: "therapist2@clinic.local",  Role: UserRole.Therapist ),
-            };
-
-            foreach (var u in usersToSeed)
-            {
-                var id = Guid.NewGuid();
-                var normalizedEmail = u.Email.ToLowerInvariant();
-
-                // Domain user (no framework references)
-                var domainUser = new User
+                // Users — Domain.User + AppUser share the same Guid Id
+                var usersToSeed = new[]
                 {
-                    Id    = id,
-                    FullName = u.FullName,
-                    Email = normalizedEmail,
-                    Role  = u.Role
-                };
-                context.Users.Add(domainUser);
-
-                // Identity user — same Id, provides password hashing / security stamp
-                var appUser = new AppUser
-                {
-                    Id                  = id,
-                    UserName            = normalizedEmail,
-                    Email               = normalizedEmail,
-                    NormalizedUserName  = normalizedEmail.ToUpperInvariant(),
-                    NormalizedEmail     = normalizedEmail.ToUpperInvariant(),
-                    EmailConfirmed      = true
+                    (FullName: "ניהול אחראית",  Email: "manager@clinic.local",    Role: UserRole.Manager,   Phone: (string?)"050-0000000" ),
+                    (FullName: "טלי מטפלת",    Email: "therapist1@clinic.local",  Role: UserRole.Therapist, Phone: (string?)"052-1111111" ),
+                    (FullName: "שרה מטפלת",    Email: "therapist2@clinic.local",  Role: UserRole.Therapist, Phone: (string?)"054-2222222" ),
                 };
 
-                var result = await userManager.CreateAsync(appUser, seedPassword);
-                if (!result.Succeeded)
+                foreach (var u in usersToSeed)
                 {
-                    throw new InvalidOperationException(
-                        $"Failed to create user {u.Email}: " +
-                        string.Join(", ", result.Errors.Select(e => e.Description)));
+                    var id              = Guid.NewGuid();
+                    var normalizedEmail = u.Email.ToLowerInvariant();
+
+                    // Domain user (no framework references)
+                    var domainUser = new User
+                    {
+                        Id       = id,
+                        FullName = u.FullName,
+                        Email    = normalizedEmail,
+                        Role     = u.Role,
+                        Phone    = u.Phone
+                    };
+                    context.Users.Add(domainUser);
+
+                    // Identity user — same Id, provides password hashing / security stamp
+                    var appUser = new AppUser
+                    {
+                        Id                 = id,
+                        UserName           = normalizedEmail,
+                        Email              = normalizedEmail,
+                        NormalizedUserName = normalizedEmail.ToUpperInvariant(),
+                        NormalizedEmail    = normalizedEmail.ToUpperInvariant(),
+                        EmailConfirmed     = true
+                    };
+
+                    var result = await userManager.CreateAsync(appUser, seedPassword!);
+                    if (!result.Succeeded)
+                    {
+                        throw new InvalidOperationException(
+                            $"Failed to create user {u.Email}: " +
+                            string.Join(", ", result.Errors.Select(e => e.Description)));
+                    }
                 }
+
+                await context.SaveChangesAsync();
             }
 
-            await context.SaveChangesAsync();
             await transaction.CommitAsync();
         }
         catch

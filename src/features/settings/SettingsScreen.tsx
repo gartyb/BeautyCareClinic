@@ -2,19 +2,22 @@ import { useState } from 'react';
 import { useGlobalSettings } from '../../contexts/GlobalSettingsContext';
 import { updateDefaultMaxPaymentCount } from './settingsService';
 import { DomainError } from '../../domain/errors';
+import { ApiRequestError } from '../../api/apiError';
 
 export function SettingsScreen() {
   const { defaultMaxPaymentCount, setDefaultMaxPaymentCount, calendarStartHour, calendarEndHour, setCalendarHours } = useGlobalSettings();
   const [inputValue, setInputValue] = useState<string>(defaultMaxPaymentCount.toString());
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isSavingPayments, setIsSavingPayments] = useState(false);
 
   const [startHourStr, setStartHourStr] = useState<string>(calendarStartHour.toString());
   const [endHourStr, setEndHourStr] = useState<string>(calendarEndHour.toString());
   const [calendarSuccess, setCalendarSuccess] = useState<string | null>(null);
   const [calendarError, setCalendarError] = useState<string | null>(null);
+  const [isSavingCalendar, setIsSavingCalendar] = useState(false);
 
-  function handleSaveCalendarHours() {
+  async function handleSaveCalendarHours() {
     setCalendarSuccess(null);
     setCalendarError(null);
     const start = parseInt(startHourStr, 10);
@@ -31,24 +34,37 @@ export function SettingsScreen() {
       setCalendarError('שעת הפתיחה חייבת להיות לפני שעת הסיום');
       return;
     }
-    setCalendarHours(start, end);
-    setCalendarSuccess('ההגדרות נשמרו בהצלחה');
+    setIsSavingCalendar(true);
+    try {
+      await setCalendarHours(start, end);
+      setCalendarSuccess('ההגדרות נשמרו בהצלחה');
+    } catch (e) {
+      const msg = e instanceof ApiRequestError ? e.message : 'שגיאה בשמירת הגדרות';
+      setCalendarError(msg);
+    } finally {
+      setIsSavingCalendar(false);
+    }
   }
 
-  function handleSave() {
+  async function handleSave() {
     setSuccessMessage(null);
     setErrorMessage(null);
     const parsed = parseInt(inputValue, 10);
     try {
       const validated = updateDefaultMaxPaymentCount(parsed);
-      setDefaultMaxPaymentCount(validated);
+      setIsSavingPayments(true);
+      await setDefaultMaxPaymentCount(validated);
       setSuccessMessage('ההגדרות נשמרו בהצלחה');
     } catch (e) {
       if (e instanceof DomainError) {
         setErrorMessage(e.message);
+      } else if (e instanceof ApiRequestError) {
+        setErrorMessage(e.message);
       } else {
         setErrorMessage('שגיאה לא צפויה');
       }
+    } finally {
+      setIsSavingPayments(false);
     }
   }
 
@@ -88,9 +104,10 @@ export function SettingsScreen() {
             </div>
             <button
               onClick={handleSaveCalendarHours}
-              className="bg-clinic-gold text-white hover:opacity-90 rounded-lg px-4 py-2 text-sm font-medium"
+              disabled={isSavingCalendar}
+              className="bg-clinic-gold text-white hover:opacity-90 rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50"
             >
-              שמור
+              {isSavingCalendar ? 'שומר...' : 'שמור'}
             </button>
           </div>
           {calendarError && <p className="mt-3 text-sm text-red-500">{calendarError}</p>}
@@ -134,10 +151,10 @@ export function SettingsScreen() {
 
             <button
               onClick={handleSave}
-              disabled={!isValid}
+              disabled={!isValid || isSavingPayments}
               className="bg-clinic-gold text-white hover:opacity-90 rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              שמור הגדרות
+              {isSavingPayments ? 'שומר...' : 'שמור הגדרות'}
             </button>
           </div>
         </div>

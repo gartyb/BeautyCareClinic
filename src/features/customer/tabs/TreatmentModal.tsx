@@ -127,7 +127,7 @@ export function TreatmentModal({ treatment, onClose }: TreatmentModalProps) {
         {therapist && (
           <div className="flex items-center gap-2">
             <span className="text-clinic-muted">מטפלת:</span>
-            <span className="text-clinic-text">{therapist.firstName} {therapist.lastName}</span>
+            <span className="text-clinic-text">{therapist.fullName}</span>
           </div>
         )}
         {treatment.durationMinutes != null && treatment.durationMinutes > 0 && (

@@ -28,8 +28,15 @@ public class TreatmentTypeRepository : ITreatmentTypeRepository
 
     public async Task<bool> ExistsByNameAsync(string name, Guid? excludeId = null)
     {
+        // Escape wildcards so a literal % or _ in the name is not treated as a pattern.
+        // Order matters: escape \ first, then % and _.
+        var escaped = name
+            .Replace("\\", "\\\\")
+            .Replace("%",  "\\%")
+            .Replace("_",  "\\_");
+
         var query = _context.TreatmentTypes
-            .Where(t => EF.Functions.ILike(t.Name, name));
+            .Where(t => EF.Functions.ILike(t.Name, escaped, "\\"));
 
         if (excludeId.HasValue)
             query = query.Where(t => t.Id != excludeId.Value);

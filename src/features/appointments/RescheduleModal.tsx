@@ -140,7 +140,7 @@ export function RescheduleModal({ appointment, onClose }: RescheduleModalProps) 
                         : 'border-clinic-border hover:bg-clinic-bg'
                     }`}
                   >
-                    {t.firstName} {t.lastName}
+                    {t.fullName}
                   </button>
                 ))}
               </div>

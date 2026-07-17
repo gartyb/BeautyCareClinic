@@ -49,7 +49,7 @@ export function TherapistsScreen() {
                   onClick={() => navigate(`/therapists/${user.id}`)}
                 >
                   <span className="font-semibold text-clinic-text">
-                    {user.firstName} {user.lastName}
+                    {user.fullName}
                   </span>
                   <span className="text-sm text-clinic-muted" dir="ltr">{user.email}</span>
                   {user.phone && (
@@ -74,7 +74,7 @@ export function TherapistsScreen() {
               {deletingId === user.id && (
                 <div className="flex items-center gap-4 px-6 py-3 bg-red-50 border-b border-clinic-border text-sm" dir="rtl">
                   <span className="text-clinic-text">
-                    למחוק את <strong>{user.firstName} {user.lastName}</strong>? שעות עבודה, תאריכים ויכולות יימחקו.
+                    למחוק את <strong>{user.fullName}</strong>? שעות עבודה, תאריכים ויכולות יימחקו.
                   </span>
                   <button
                     onClick={() => handleConfirmDelete(user)}

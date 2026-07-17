@@ -23,7 +23,7 @@ public class TreatmentTypesController : ControllerBase
     public async Task<IActionResult> GetAll()
     {
         var types = await _repository.GetAllAsync();
-        return Ok(types.Select(t => new TreatmentTypeDto(t.Id, t.Name)));
+        return Ok(types.Select(t => new TreatmentTypeDto(t.Id, t.Name, t.DefaultDurationMinutes)));
     }
 
     /// <summary>GET /api/v1/treatment-types/{id} — Both roles.</summary>
@@ -34,7 +34,7 @@ public class TreatmentTypesController : ControllerBase
         if (type == null)
             return NotFound(new ErrorResponse(ErrorCodes.NotFound, "The requested resource was not found.", DateTime.UtcNow, HttpContext.TraceIdentifier));
 
-        return Ok(new TreatmentTypeDto(type.Id, type.Name));
+        return Ok(new TreatmentTypeDto(type.Id, type.Name, type.DefaultDurationMinutes));
     }
 
     /// <summary>POST /api/v1/treatment-types — Manager only.</summary>
@@ -51,13 +51,14 @@ public class TreatmentTypesController : ControllerBase
 
         var treatmentType = new TreatmentType
         {
-            Id   = Guid.NewGuid(),
-            Name = request.Name.Trim()
+            Id                     = Guid.NewGuid(),
+            Name                   = request.Name.Trim(),
+            DefaultDurationMinutes = request.DefaultDurationMinutes
         };
 
         var created = await _repository.CreateAsync(treatmentType);
         return CreatedAtAction(nameof(GetById), new { id = created.Id },
-            new TreatmentTypeDto(created.Id, created.Name));
+            new TreatmentTypeDto(created.Id, created.Name, created.DefaultDurationMinutes));
     }
 
     /// <summary>PUT /api/v1/treatment-types/{id} — Manager only.</summary>
@@ -76,9 +77,10 @@ public class TreatmentTypesController : ControllerBase
         if (nameExists)
             return Conflict(new ErrorResponse(ErrorCodes.Conflict, $"A treatment type named '{request.Name}' already exists.", DateTime.UtcNow, HttpContext.TraceIdentifier));
 
-        existing.Name = request.Name.Trim();
+        existing.Name                   = request.Name.Trim();
+        existing.DefaultDurationMinutes = request.DefaultDurationMinutes;
         var updated = await _repository.UpdateAsync(existing);
-        return Ok(new TreatmentTypeDto(updated.Id, updated.Name));
+        return Ok(new TreatmentTypeDto(updated.Id, updated.Name, updated.DefaultDurationMinutes));
     }
 
     /// <summary>DELETE /api/v1/treatment-types/{id} — Manager only.</summary>

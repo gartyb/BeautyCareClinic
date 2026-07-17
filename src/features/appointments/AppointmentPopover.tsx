@@ -60,7 +60,7 @@ export function AppointmentPopover({ appointment, onClose }: AppointmentPopoverP
           <div>
             <span className="text-clinic-muted text-xs">לקוחה</span>
             <p className="font-medium text-clinic-text">
-              {customer ? `${customer.firstName} ${customer.lastName}` : appointment.customerId}
+              {customer ? customer.fullName : appointment.customerId}
             </p>
           </div>
           <div>
@@ -72,7 +72,7 @@ export function AppointmentPopover({ appointment, onClose }: AppointmentPopoverP
           <div>
             <span className="text-clinic-muted text-xs">מטפלת</span>
             <p className="font-medium text-clinic-text">
-              {therapist ? `${therapist.firstName} ${therapist.lastName}` : appointment.therapistId}
+              {therapist ? therapist.fullName : appointment.therapistId}
             </p>
           </div>
           <div>

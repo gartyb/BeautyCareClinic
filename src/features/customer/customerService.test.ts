@@ -110,22 +110,19 @@ describe('buildCustomer — validation', () => {
 });
 
 describe('buildCustomer — happy path', () => {
-  it('builds customer with first and last name split on first space', () => {
+  it('builds customer with fullName from input', () => {
     const customer = buildCustomer('רחל אברהם', '0501234567', undefined, testDeps);
-    expect(customer.firstName).toBe('רחל');
-    expect(customer.lastName).toBe('אברהם');
+    expect(customer.fullName).toBe('רחל אברהם');
   });
 
-  it('handles single-word name (no space)', () => {
+  it('handles single-word name', () => {
     const customer = buildCustomer('שרה', '0500000001', undefined, testDeps);
-    expect(customer.firstName).toBe('שרה');
-    expect(customer.lastName).toBe('');
+    expect(customer.fullName).toBe('שרה');
   });
 
-  it('handles multi-word last name (only splits on first space)', () => {
+  it('handles multi-word name', () => {
     const customer = buildCustomer('מרים בן דוד', '0501111111', undefined, testDeps);
-    expect(customer.firstName).toBe('מרים');
-    expect(customer.lastName).toBe('בן דוד');
+    expect(customer.fullName).toBe('מרים בן דוד');
   });
 
   it('sets phone correctly', () => {
@@ -151,7 +148,7 @@ describe('buildCustomer — happy path', () => {
 
   it('trims whitespace from inputs', () => {
     const customer = buildCustomer('  רחל אברהם  ', '  0501234567  ', undefined, testDeps);
-    expect(customer.firstName).toBe('רחל');
+    expect(customer.fullName).toBe('רחל אברהם');
     expect(customer.phone).toBe('0501234567');
   });
 });

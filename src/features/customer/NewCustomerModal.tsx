@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Modal } from '../../components/shared/Modal';
 import { useCustomers } from '../../contexts/CustomersContext';
-import { DomainError } from '../../domain/errors';
+import { ApiRequestError } from '../../api/apiError';
 import { parsePhone } from '../../utils/phone';
 
 interface NewCustomerModalProps {
@@ -17,6 +17,7 @@ export function NewCustomerModal({ open, onClose }: NewCustomerModalProps) {
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const isValid = fullName.trim().length > 0 && phone.trim().length > 0;
 
@@ -28,18 +29,24 @@ export function NewCustomerModal({ open, onClose }: NewCustomerModalProps) {
     onClose();
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!isValid) return;
+    setSaveError(null);
+    setIsSaving(true);
     try {
-      const newCustomer = createCustomer(fullName, phone, email || undefined);
+      const newCustomer = await createCustomer(fullName, phone, email || undefined);
       handleClose();
       navigate('/customers/' + newCustomer.id);
     } catch (e) {
-      if (e instanceof DomainError) {
+      if (e instanceof ApiRequestError) {
+        setSaveError(e.message);
+      } else if (e instanceof Error) {
         setSaveError(e.message);
       } else {
         setSaveError('שגיאה לא צפויה');
       }
+    } finally {
+      setIsSaving(false);
     }
   }
 
@@ -105,10 +112,10 @@ export function NewCustomerModal({ open, onClose }: NewCustomerModalProps) {
         </button>
         <button
           onClick={handleSave}
-          disabled={!isValid}
+          disabled={!isValid || isSaving}
           className="px-5 py-2 text-sm rounded-lg bg-clinic-gold text-white font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90"
         >
-          שמור לקוחה
+          {isSaving ? 'שומר...' : 'שמור לקוחה'}
         </button>
       </div>
     </Modal>

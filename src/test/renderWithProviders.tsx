@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, RenderOptions } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { AuthProvider } from '../contexts/AuthContext';
 import { GlobalSettingsProvider } from '../contexts/GlobalSettingsContext';
 import { CustomersProvider } from '../contexts/CustomersContext';
 import { TherapistDataProvider } from '../contexts/TherapistDataContext';
@@ -14,25 +15,27 @@ import { ActiveTimerProvider } from '../contexts/ActiveTimerContext';
 function AllProviders({ children }: { children: React.ReactNode }) {
   return (
     <MemoryRouter>
-      <GlobalSettingsProvider>
-        <CustomersProvider>
-          <TherapistDataProvider>
-            <TherapistsProvider>
-            <TreatmentTypesProvider>
-            <PackageTypesProvider>
-            <AppointmentsProvider>
-              <CustomerProvider>
-                <ActiveTimerProvider>
-                  {children}
-                </ActiveTimerProvider>
-              </CustomerProvider>
-            </AppointmentsProvider>
-            </PackageTypesProvider>
-            </TreatmentTypesProvider>
-            </TherapistsProvider>
-          </TherapistDataProvider>
-        </CustomersProvider>
-      </GlobalSettingsProvider>
+      <AuthProvider>
+        <GlobalSettingsProvider>
+          <CustomersProvider>
+            <TherapistDataProvider>
+              <TherapistsProvider>
+              <TreatmentTypesProvider>
+              <PackageTypesProvider>
+              <AppointmentsProvider>
+                <CustomerProvider>
+                  <ActiveTimerProvider>
+                    {children}
+                  </ActiveTimerProvider>
+                </CustomerProvider>
+              </AppointmentsProvider>
+              </PackageTypesProvider>
+              </TreatmentTypesProvider>
+              </TherapistsProvider>
+            </TherapistDataProvider>
+          </CustomersProvider>
+        </GlobalSettingsProvider>
+      </AuthProvider>
     </MemoryRouter>
   );
 }

@@ -113,7 +113,7 @@ export function CalendarGrid({ selectedDate, appointments }: CalendarGridProps) 
             key={t.id}
             className="h-12 flex items-center justify-center text-xs font-semibold text-clinic-text border-r border-clinic-border first:border-r-0 px-2 text-center"
           >
-            {t.firstName} {t.lastName}
+            {t.fullName}
           </div>
         ))}
       </div>
@@ -186,7 +186,7 @@ export function CalendarGrid({ selectedDate, appointments }: CalendarGridProps) 
                               onClick={e => handleApptClick(e, block.appointment)}
                             >
                               <p className="text-xs font-semibold text-clinic-text truncate leading-tight">
-                                {customer ? `${customer.firstName} ${customer.lastName}` : '—'}
+                                {customer ? customer.fullName : '—'}
                               </p>
                               {tt && (
                                 <p className="text-xs text-clinic-gold truncate leading-tight">{tt.name}</p>

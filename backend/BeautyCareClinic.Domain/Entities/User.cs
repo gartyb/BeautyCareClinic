@@ -8,6 +8,7 @@ public class User
     public string FullName { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
     public UserRole Role { get; set; }
+    public string? Phone { get; set; }
 
     // Navigation
     public ICollection<Appointment> Appointments { get; set; } = new List<Appointment>();
