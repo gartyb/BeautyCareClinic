@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved — Pending Commit
+Completed
 
 ## Goal
 
@@ -405,9 +405,9 @@ Frontend `CustomerOrder.paymentCount` (`src/types/Order.ts:17`) בשימוש ב-
 
 ## Version
 
-- Version: v0.9.0 (feature מרכזי חדש — Orders, Payments, Series backend + frontend)
-- Commit: —
-- Tag: —
+- Version: v0.9.0
+- Commit: c1c374e
+- Tag: v0.9.0
 
 ## Lessons Learned
 

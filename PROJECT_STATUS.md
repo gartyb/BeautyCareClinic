@@ -3,14 +3,14 @@
 ## Current State
 
 - Current phase: 009 — Orders, Series & Payments
-- Phase status: Approved — Pending Commit
+- Phase status: Completed
 - Current branch: feature/phase-009-orders-payments
-- Latest approved version: v0.8.0
-- Latest approved tag: v0.8.0
+- Latest approved version: v0.9.0
+- Latest approved tag: v0.9.0
 
 ## Current Activity
 
-Phase 009 — אושר על ידי המשתמש ב-2026-07-17. ממתין לקומיט וטאג v0.9.0.
+Phase 009 הושלם ואושר. ממתין למיזוג ל-main והצעת Phase 010.
 
 ## Completed Phases
 
@@ -24,6 +24,7 @@ Phase 009 — אושר על ידי המשתמש ב-2026-07-17. ממתין לקו
 | 006   | Appointment Calendar                     | v0.6.0  | Completed |
 | 007   | Backend Foundation                       | v0.7.0  | Completed |
 | 008   | Frontend-Backend Integration             | v0.8.0  | Completed |
+| 009   | Orders, Series & Payments                | v0.9.0  | Completed |
 
 ## Open Change Requests
 
@@ -52,4 +53,4 @@ Phase 009 — אושר על ידי המשתמש ב-2026-07-17. ממתין לקו
 
 ## Next Step
 
-אישור תוכנית Phase 009 + מענה על 5 שאלות פתוחות → Architecture Review.
+Phase 009 הושלם (v0.9.0). מוכן להצעת Phase 010.
