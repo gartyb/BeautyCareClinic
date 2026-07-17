@@ -76,7 +76,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
   const orderIds = useMemo(() => customerOrders.map(o => o.id), [customerOrders]);
 
   const customerPayments = useMemo(
-    () => allPayments.filter(p => orderIds.includes(p.customerOrderId)),
+    () => allPayments.filter(p => orderIds.includes(p.orderId ?? p.customerOrderId ?? '')),
     [orderIds, allPayments]
   );
 
@@ -103,7 +103,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
   const addPayment = useCallback((payment: Payment) => {
     // Pre-compute outside setState so DomainError propagates to the caller
     // before any state mutation occurs (avoids orphaned payment in allPayments)
-    const currentOrder = allOrdersRef.current.find(o => o.id === payment.customerOrderId);
+    const currentOrder = allOrdersRef.current.find(o => o.id === (payment.orderId ?? payment.customerOrderId));
     if (!currentOrder) return;
     const updatedOrder = applyPaymentToOrder(currentOrder, payment); // throws DomainError if guard fails
     setAllOrders(prev => prev.map(o => o.id === updatedOrder.id ? updatedOrder : o));
@@ -120,6 +120,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
 
       const pkg = packageTypes.find(p => p.id === series.packageTypeId);
       if (!pkg) return;
+      if (!series.customerId) return;
 
       try {
         const updatedSeries = applyTimerTreatmentToSeries(series, durationMinutes);
@@ -153,6 +154,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
 
       const pkg = packageTypes.find(p => p.id === series.packageTypeId);
       if (!pkg) return;
+      if (!series.customerId) return;
 
       try {
         const updatedSeries = applyQuantityTreatmentToSeries(series);

@@ -99,7 +99,8 @@ public class ExceptionHandlingMiddlewareTests
     [Fact]
     public async Task ConflictException_Returns409_WithConflictCode()
     {
-        using var host = BuildHost(_ => throw new InvalidOperationException("CONFLICT: duplicate name"));
+        // CR-021: use DomainConflictException (not InvalidOperationException with magic string)
+        using var host = BuildHost(_ => throw new BeautyCareClinic.Domain.Exceptions.DomainConflictException("כפילות שם"));
         await host.StartAsync();
         var client = host.GetTestClient();
 
@@ -144,19 +145,40 @@ public class ExceptionHandlingMiddlewareTests
     }
 
     [Fact]
-    public async Task ConflictException_Returns_StaticClientMessage_NotInternalDetails()
+    public async Task DomainConflictException_Returns409WithDomainMessage()
     {
+        // CR-021: DomainConflictException is now a typed exception caught explicitly.
+        // The old InvalidOperationException with ".Contains(CONFLICT)" magic-string check has been removed.
+        const string domainMessage = "לא ניתן למחוק — קיימים תשלומים";
+        using var host = BuildHost(_ => throw new BeautyCareClinic.Domain.Exceptions.DomainConflictException(domainMessage));
+        await host.StartAsync();
+        var client = host.GetTestClient();
+
+        var response = await client.GetAsync("/");
+        Assert.Equal(System.Net.HttpStatusCode.Conflict, response.StatusCode);
+
+        var body = await response.Content.ReadAsStringAsync();
+        var doc  = JsonDocument.Parse(body);
+
+        var message = doc.RootElement.GetProperty("message").GetString();
+        Assert.Equal(domainMessage, message);
+    }
+
+    [Fact]
+    public async Task InvalidOperationException_WithConflictText_Returns500_NotLeakingDetails()
+    {
+        // After CR-021 removal of magic-string check: InvalidOperationException goes to 500
         const string internalDetail = "CONFLICT: record with internal-id=9876 already exists in table xyz";
         using var host = BuildHost(_ => throw new InvalidOperationException(internalDetail));
         await host.StartAsync();
         var client = host.GetTestClient();
 
         var response = await client.GetAsync("/");
-        var body = await response.Content.ReadAsStringAsync();
-        var doc  = JsonDocument.Parse(body);
+        // Now falls through to InternalServerError (no magic-string check)
+        Assert.Equal(System.Net.HttpStatusCode.InternalServerError, response.StatusCode);
 
-        var message = doc.RootElement.GetProperty("message").GetString();
-        Assert.Equal("The operation conflicts with existing data.", message);
+        var body = await response.Content.ReadAsStringAsync();
+        // Client does not see internal details
         Assert.DoesNotContain("internal-id=9876", body);
         Assert.DoesNotContain("table xyz", body);
     }

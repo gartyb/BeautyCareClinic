@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using BeautyCareClinic.Application.DTOs;
 using BeautyCareClinic.Application.Interfaces;
 using BeautyCareClinic.Domain.Entities;
@@ -19,15 +18,18 @@ public class UsersController : ControllerBase
     private readonly IUserRepository _userRepository;
     private readonly UserManager<AppUser> _userManager;
     private readonly AppDbContext _dbContext;
+    private readonly ICurrentUserService _currentUserService;
 
     public UsersController(
         IUserRepository userRepository,
         UserManager<AppUser> userManager,
-        AppDbContext dbContext)
+        AppDbContext dbContext,
+        ICurrentUserService currentUserService)
     {
-        _userRepository = userRepository;
-        _userManager    = userManager;
-        _dbContext      = dbContext;
+        _userRepository     = userRepository;
+        _userManager        = userManager;
+        _dbContext          = dbContext;
+        _currentUserService = currentUserService;
     }
 
     /// <summary>GET /api/v1/users?role= — Manager only.</summary>
@@ -200,10 +202,12 @@ public class UsersController : ControllerBase
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id)
     {
-        // Prevent self-deletion
-        var subClaim = User.FindFirstValue(ClaimTypes.NameIdentifier)
-            ?? User.FindFirstValue("sub");
-        if (Guid.TryParse(subClaim, out var currentUserId) && currentUserId == id)
+        // CR-025: use ICurrentUserService instead of reading claims directly
+        Guid currentUserId;
+        try { currentUserId = _currentUserService.GetCurrentUserId(); }
+        catch (UnauthorizedAccessException) { currentUserId = Guid.Empty; }
+
+        if (currentUserId == id)
             return BadRequest(new ErrorResponse(ErrorCodes.ValidationFailed, "You cannot delete your own account.", DateTime.UtcNow, HttpContext.TraceIdentifier));
 
         var existing = await _userRepository.GetByIdAsync(id);

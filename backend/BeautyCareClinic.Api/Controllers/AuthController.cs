@@ -18,17 +18,23 @@ public class AuthController : ControllerBase
     private readonly AppDbContext _context;
     private readonly IJwtService _jwtService;
     private readonly IConfiguration _configuration;
+    private readonly ICurrentUserService _currentUserService;
+    private readonly IUserRepository _userRepository;
 
     public AuthController(
         UserManager<AppUser> userManager,
         AppDbContext context,
         IJwtService jwtService,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        ICurrentUserService currentUserService,
+        IUserRepository userRepository)
     {
-        _userManager   = userManager;
-        _context       = context;
-        _jwtService    = jwtService;
-        _configuration = configuration;
+        _userManager        = userManager;
+        _context            = context;
+        _jwtService         = jwtService;
+        _configuration      = configuration;
+        _currentUserService = currentUserService;
+        _userRepository     = userRepository;
     }
 
     /// <summary>POST /api/v1/auth/login — No auth required.</summary>
@@ -83,13 +89,18 @@ public class AuthController : ControllerBase
     [Authorize]
     public async Task<IActionResult> Me()
     {
-        var subClaim = User.FindFirstValue(ClaimTypes.NameIdentifier)
-            ?? User.FindFirstValue("sub");
-
-        if (!Guid.TryParse(subClaim, out var userId))
+        // CR-025: use ICurrentUserService instead of reading claims directly
+        Guid userId;
+        try
+        {
+            userId = _currentUserService.GetCurrentUserId();
+        }
+        catch (UnauthorizedAccessException)
+        {
             return Unauthorized(new ErrorResponse(ErrorCodes.Unauthorized, "Invalid token.", DateTime.UtcNow, HttpContext.TraceIdentifier));
+        }
 
-        var domainUser = await _context.Users.FindAsync(userId);
+        var domainUser = await _userRepository.GetByIdAsync(userId);
         if (domainUser == null)
             return NotFound(new ErrorResponse(ErrorCodes.NotFound, "User not found.", DateTime.UtcNow, HttpContext.TraceIdentifier));
 

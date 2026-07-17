@@ -2,20 +2,32 @@ export type PaymentMethod = 'Cash' | 'Credit Card' | 'Bank Transfer' | 'Other';
 
 export interface OrderItem {
   id: string;
-  customerOrderId: string;
   packageTypeId: string;
+  packageTypeName?: string;
+  unitPrice?: number;
+  seriesId?: string;
+  // Legacy field preserved for mock-data compatibility
   treatmentSeriesId?: string;
 }
 
 export interface CustomerOrder {
   id: string;
   customerId: string;
-  totalPrice: string;      // decimal as string
-  amountPaid: string;      // decimal as string
-  remainingBalance: string; // decimal as string
+  orderDate?: string;
+  // New API fields (numeric)
+  originalPrice?: number;
+  discountedPrice?: number;
+  discountPercentage?: number;
+  // Financials (string | number: formatted decimal strings in domain layer; number from raw API)
+  amountPaid: string | number;
+  remainingBalance: string | number;
   maxPaymentCount: number;
   paymentCount: number;
-  orderItems: OrderItem[];
-  createdDate: string;
-  createdByUserId: string;
+  // Items
+  items?: OrderItem[];
+  // Legacy fields preserved for mock-data compatibility
+  orderItems?: OrderItem[];
+  totalPrice?: string | number;
+  createdDate?: string;
+  createdByUserId?: string;
 }

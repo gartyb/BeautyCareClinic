@@ -3,7 +3,7 @@ import { therapists } from '../../../data/therapists';
 import { Payment } from '../../../types/Payment';
 import { formatDate } from '../../../utils/date';
 
-const methodLabels: Record<Payment['method'], string> = {
+const methodLabels: Record<string, string> = {
   Cash: 'מזומן',
   'Credit Card': 'כרטיס אשראי',
   'Bank Transfer': 'העברה בנקאית',
@@ -29,7 +29,7 @@ export function PaymentsTab() {
     <div className="p-6 flex flex-col gap-3">
       {sorted.map((payment: Payment) => {
         const recorder = therapists.find(t => t.id === payment.createdByUserId);
-        const shortOrderId = payment.customerOrderId.replace('order-', '#');
+        const shortOrderId = (payment.customerOrderId ?? payment.orderId ?? '').replace('order-', '#');
 
         return (
           <div
@@ -47,9 +47,9 @@ export function PaymentsTab() {
 
             <div className="flex flex-col items-end gap-0.5">
               <span className="font-bold text-clinic-text">
-                ₪{parseFloat(payment.amount).toLocaleString('he-IL')}
+                ₪{parseFloat(String(payment.amount)).toLocaleString('he-IL')}
               </span>
-              <span className="text-sm text-clinic-muted">{methodLabels[payment.method]}</span>
+              <span className="text-sm text-clinic-muted">{methodLabels[payment.method ?? ''] ?? payment.method}</span>
               <span className="text-xs text-clinic-muted">{formatDate(payment.paymentDate)}</span>
             </div>
           </div>

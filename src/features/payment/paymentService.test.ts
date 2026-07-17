@@ -153,4 +153,46 @@ describe('applyPaymentToOrder', () => {
     expect(updated.paymentCount).toBe(3);
     expect(updated.remainingBalance).toBe('0.00');
   });
+
+  // C3 fix: discountedPrice must take priority over originalPrice as the order total baseline
+  it('uses discountedPrice (not originalPrice) as the total when both are present', () => {
+    // 20% discount: originalPrice=1000, discountedPrice=800
+    // Customer should only be charged up to 800, not 1000
+    const order = makeOrder({
+      totalPrice: undefined,
+      originalPrice: 1000,
+      discountedPrice: 800,
+      amountPaid: '0.00',
+      remainingBalance: '800.00',
+      paymentCount: 0,
+    });
+    const payment = buildPayment('order-test', '800.00', 'Cash', '2026-01-15', therapist, testDeps);
+    const updated = applyPaymentToOrder(order, payment);
+
+    // Should succeed — 800 equals discountedPrice, not overpayment
+    expect(updated.remainingBalance).toBe('0.00');
+    expect(updated.amountPaid).toBe('800.00');
+  });
+
+  it('throws OVERPAYMENT when payment exceeds discountedPrice (not originalPrice)', () => {
+    // 20% discount: originalPrice=1000, discountedPrice=800
+    // Paying 900 must be rejected because the real total is 800
+    const order = makeOrder({
+      totalPrice: undefined,
+      originalPrice: 1000,
+      discountedPrice: 800,
+      amountPaid: '0.00',
+      remainingBalance: '800.00',
+      paymentCount: 0,
+    });
+    const payment = buildPayment('order-test', '900.00', 'Cash', '2026-01-15', therapist, testDeps);
+
+    try {
+      applyPaymentToOrder(order, payment);
+      expect.fail('should have thrown OVERPAYMENT');
+    } catch (err) {
+      expect(err).toBeInstanceOf(DomainError);
+      expect((err as DomainError).code).toBe('OVERPAYMENT');
+    }
+  });
 });

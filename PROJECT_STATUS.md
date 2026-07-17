@@ -2,15 +2,15 @@
 
 ## Current State
 
-- Current phase: 008 — Frontend-Backend Integration
+- Current phase: 009 — Orders, Series & Payments
 - Phase status: Completed
-- Current branch: feature/phase-008-frontend-api-integration
-- Latest approved version: v0.8.0
-- Latest approved tag: v0.8.0
+- Current branch: feature/phase-009-orders-payments
+- Latest approved version: v0.9.0
+- Latest approved tag: v0.9.0
 
 ## Current Activity
 
-Phase 008 הושלם. מוכן למיזוג ל-main ולהצעת Phase 009.
+Phase 009 הושלם ואושר. ממתין למיזוג ל-main והצעת Phase 010.
 
 ## Completed Phases
 
@@ -23,6 +23,8 @@ Phase 008 הושלם. מוכן למיזוג ל-main ולהצעת Phase 009.
 | 005   | New Customer + Manager Admin Screens     | v0.5.0  | Completed |
 | 006   | Appointment Calendar                     | v0.6.0  | Completed |
 | 007   | Backend Foundation                       | v0.7.0  | Completed |
+| 008   | Frontend-Backend Integration             | v0.8.0  | Completed |
+| 009   | Orders, Series & Payments                | v0.9.0  | Completed |
 
 ## Open Change Requests
 
@@ -51,4 +53,4 @@ Phase 008 הושלם. מוכן למיזוג ל-main ולהצעת Phase 009.
 
 ## Next Step
 
-Commit + tag v0.8.0, לאחר מכן Phase 009.
+Phase 009 הושלם (v0.9.0). מוכן להצעת Phase 010.

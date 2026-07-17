@@ -115,7 +115,7 @@ export function TreatmentHistoryTab() {
 
   // Flatten orderItems, each carrying its order's createdDate, sorted newest first
   const flatItems = orders
-    .flatMap(order => order.orderItems.map(item => ({ item, orderDate: order.createdDate })))
+    .flatMap(order => (order.orderItems ?? []).map(item => ({ item, orderDate: order.createdDate ?? '' })))
     .sort((a, b) => b.orderDate.localeCompare(a.orderDate));
 
   if (flatItems.length === 0) {

@@ -73,3 +73,13 @@
 
 1. Global Settings → set `default_max_payment_count` (whole number > 0).
 2. Save. Applies to all future orders.
+
+## Access Model and Trust Boundary (Phase 009)
+
+The following rules govern who can access Phase 009 endpoints:
+
+- All authenticated users (Therapist and Manager roles) can read all orders, payments, and treatment series across all customers.
+- The system currently has no per-therapist customer scoping. This is intentional: the clinic operates from a single location where all therapists serve all customers.
+- Mutations (create/update/delete PackageTypes, update/delete Orders) require the Manager role.
+- Creating orders and recording payments are permitted for both roles.
+- Future CR-029 covers adding per-therapist scoping if multi-location or per-therapist privacy requirements arise.

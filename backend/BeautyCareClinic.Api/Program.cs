@@ -160,6 +160,10 @@ builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
 builder.Services.AddScoped<ITreatmentTypeRepository, TreatmentTypeRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IGlobalSettingsRepository, GlobalSettingsRepository>();
+builder.Services.AddScoped<IPackageTypeRepository, PackageTypeRepository>();
+builder.Services.AddScoped<ICustomerOrderRepository, CustomerOrderRepository>();
+builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
+builder.Services.AddScoped<ITreatmentSeriesRepository, TreatmentSeriesRepository>();
 
 builder.Services.AddControllers();
 

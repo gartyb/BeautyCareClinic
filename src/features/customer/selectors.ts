@@ -2,13 +2,14 @@ import { CustomerOrder } from '../../types/Order';
 import { TreatmentSeries } from '../../types/TreatmentSeries';
 import { Appointment } from '../../types/Appointment';
 import { Payment } from '../../types/Payment';
+import { toCents } from '../../domain/money';
 
 // Sum of remainingBalance across open orders (remainingBalance > 0)
 export function outstandingBalance(orders: CustomerOrder[]): number {
-  const total = orders
-    .filter(o => parseFloat(o.remainingBalance) > 0)
-    .reduce((sum, o) => sum + parseFloat(o.remainingBalance), 0);
-  return Math.round(total * 100) / 100;
+  const totalCents = orders
+    .filter(o => toCents(o.remainingBalance) > 0)
+    .reduce((sum, o) => sum + toCents(o.remainingBalance), 0);
+  return Math.round(totalCents) / 100;
 }
 
 // Series where all treatments are not yet completed
@@ -47,7 +48,7 @@ export function nextAppointment(appointments: Appointment[]): Appointment | null
 }
 
 export function totalPaid(payments: Payment[]): number {
-  return Math.round(payments.reduce((sum, p) => sum + parseFloat(p.amount), 0) * 100) / 100;
+  return Math.round(payments.reduce((sum, p) => sum + toCents(p.amount), 0)) / 100;
 }
 
 export function remainingUnits(series: TreatmentSeries[]): number {
@@ -61,9 +62,9 @@ export function remainingUnits(series: TreatmentSeries[]): number {
 }
 
 export function openOrders(orders: CustomerOrder[]): CustomerOrder[] {
-  return orders.filter(o => parseFloat(o.remainingBalance) > 0 && o.paymentCount < o.maxPaymentCount);
+  return orders.filter(o => toCents(o.remainingBalance) > 0 && o.paymentCount < o.maxPaymentCount);
 }
 
 export function paymentsForOrder(payments: Payment[], orderId: string): Payment[] {
-  return payments.filter(p => p.customerOrderId === orderId);
+  return payments.filter(p => (p.orderId ?? p.customerOrderId) === orderId);
 }

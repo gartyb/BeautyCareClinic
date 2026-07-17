@@ -486,3 +486,51 @@
     docs/UI.md — Login screen added; Global Settings updated
     CHANGE_REQUESTS.md — CR-008/CR-011/CR-015 closed; Completed section updated
     phases/phase-008/PHASE_SUMMARY.md — implementation results, test results, lessons learned
+
+2026-07-17 Phase 009 Review Fixes — Code review, security and correctness fixes
+  Branch: feature/phase-009-orders-payments
+  Build: PASS (dotnet build — 0 errors; npm run build — 0 TypeScript errors)
+  Tests: 254 PASS, 0 FAIL (frontend, +2 new); 105 PASS, 0 FAIL (backend, +21 new)
+  Fixes applied:
+    C3 (CRITICAL): paymentService.ts applyPaymentToOrder — changed priority of total baseline:
+      discountedPrice now takes precedence over originalPrice.
+      Before: totalPrice ?? originalPrice ?? discountedPrice; a customer with 20% discount on
+      1000₪ could be charged 900₪ because originalPrice=1000 was picked first.
+      After: discountedPrice ?? totalPrice ?? originalPrice
+      New frontend tests: 'uses discountedPrice (not originalPrice) as the total when both present',
+      'throws OVERPAYMENT when payment exceeds discountedPrice (not originalPrice)'
+    C2: TreatmentSeriesController.cs ListByCustomer — removed broken active query param.
+      Both branches were calling GetActiveByCustomerIdAsync; ?active=false silently returned active results.
+      Endpoint now always returns active series; active param removed entirely.
+      XML doc updated to say "Returns active series only."
+      treatmentSeriesApi.ts listActiveByCustomer — removed ?active=true query string (now implicit).
+    C1: N+1 fix in CustomerOrdersController ListByCustomer.
+      ICustomerOrderRepository — added GetPaymentCountsByOrderIdsAsync(IEnumerable<Guid>).
+      CustomerOrderRepository — implemented via single GroupBy EF query (no loop).
+      CustomerOrdersController.ListByCustomer — batch call replaces per-order loop.
+      New backend test: GetPaymentCountsByOrderIds_ReturnsBatchCounts (3 orders, mixed counts).
+      New backend test: GetPaymentCountsByOrderIds_ReturnsEmptyForNoOrders.
+    S4: CustomerOrdersController.Create — added Items.Count > 50 guard returning 400.
+    S1: PaymentsController.Create — payment method allowlist: Cash, Credit Card, Bank Transfer, Check, Other.
+    S2: PaymentsController.Create — amount upper bound (> 99,999,999.99 → 400) and decimal
+      precision guard (more than 2 places → 400).
+    S3: PaymentsController.Create — PaymentDate bounds: future date → 400; older than 10 years → 400.
+    C4: PackageTypesController.cs — changed all 3 English "The requested resource was not found."
+      messages to Hebrew "סוג החבילה לא נמצא." in GetById, Update, Delete.
+  New backend tests (21 total in Phase009Tests.cs):
+    PaymentValidation_RejectsAmountAboveUpperBound
+    PaymentValidation_RejectsMoreThanTwoDecimalPlaces (theory: 3 cases)
+    PaymentValidation_AcceptsValidDecimalPrecision (theory: 3 cases)
+    PaymentValidation_RejectsDisallowedPaymentMethod (theory: 4 cases)
+    PaymentValidation_AcceptsAllowedPaymentMethods (theory: 5 cases)
+    PaymentValidation_RejectsFutureDate
+    PaymentValidation_RejectsDateOlderThan10Years
+    PaymentValidation_AcceptsToday
+    CustomerOrderRepository_GetPaymentCountsByOrderIds_ReturnsBatchCounts
+    CustomerOrderRepository_GetPaymentCountsByOrderIds_ReturnsEmptyForNoOrders
+  New frontend tests (2 in paymentService.test.ts):
+    uses discountedPrice (not originalPrice) as the total when both are present
+    throws OVERPAYMENT when payment exceeds discountedPrice (not originalPrice)
+  Documentation updated:
+    docs/WORKFLOWS.md — new section "Access Model and Trust Boundary (Phase 009)"
+    CHANGE_REQUESTS.md — added CR-026 through CR-030 under Open

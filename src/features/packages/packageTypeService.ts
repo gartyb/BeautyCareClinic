@@ -5,7 +5,7 @@ import { DomainError } from '../../domain/errors';
 interface BuildPackageTypeParams {
   name: string;
   treatmentTypeId: string;
-  price: string;
+  price: string | number;
   isSeries: boolean;
   treatmentCount?: number;
   isTimerBased?: boolean;
@@ -26,7 +26,7 @@ export function buildPackageType(
   if (!params.treatmentTypeId.trim()) {
     throw new DomainError('PACKAGE_TREATMENT_TYPE_REQUIRED', 'יש לבחור סוג טיפול');
   }
-  const priceNum = parseFloat(params.price);
+  const priceNum = typeof params.price === 'number' ? params.price : parseFloat(params.price);
   if (isNaN(priceNum) || priceNum < 0) {
     throw new DomainError('PACKAGE_INVALID_PRICE', 'מחיר לא תקין');
   }
@@ -36,7 +36,8 @@ export function buildPackageType(
   if (priceNum > 999_999) {
     throw new DomainError('PACKAGE_PRICE_TOO_HIGH', 'מחיר גבוה מדי');
   }
-  const canonicalPrice = priceNum.toFixed(2);
+  // Round to 2 decimal places and format as string
+  const canonicalPrice = (Math.round(priceNum * 100) / 100).toFixed(2);
 
   if (params.isTimerBased && !params.isSeries) {
     throw new DomainError('PACKAGE_TIMER_REQUIRES_SERIES', 'חבילה מבוססת טיימר חייבת להיות סדרה');

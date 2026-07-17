@@ -5,7 +5,6 @@ import { Badge } from '../../../components/shared/Badge';
 import { RecordPaymentModal } from '../../payment/RecordPaymentModal';
 import { paymentsForOrder } from '../../customer/selectors';
 import { CustomerOrder } from '../../../types/Order';
-import { Payment } from '../../../types/Payment';
 import type { User } from '../../../types/User';
 import { formatDate } from '../../../utils/date';
 
@@ -13,7 +12,7 @@ interface OrdersTabProps {
   currentUser: User;
 }
 
-const methodLabels: Record<Payment['method'], string> = {
+const methodLabels: Record<string, string> = {
   Cash: 'מזומן',
   'Credit Card': 'כרטיס אשראי',
   'Bank Transfer': 'העברה בנקאית',
@@ -21,8 +20,8 @@ const methodLabels: Record<Payment['method'], string> = {
 };
 
 function getPaymentStatus(order: CustomerOrder): { label: string; variant: 'success' | 'warning' | 'error' } {
-  const remaining = parseFloat(order.remainingBalance);
-  const paid = parseFloat(order.amountPaid);
+  const remaining = parseFloat(String(order.remainingBalance));
+  const paid = parseFloat(String(order.amountPaid));
   if (remaining === 0) return { label: 'שולם במלואו', variant: 'success' };
   if (paid === 0) return { label: 'ממתין לתשלום', variant: 'error' };
   return { label: 'חלקי', variant: 'warning' };
@@ -33,7 +32,7 @@ export function OrdersTab({ currentUser }: OrdersTabProps) {
   const { packageTypes } = usePackageTypes();
   const [paymentModalOrderId, setPaymentModalOrderId] = useState<string | null>(null);
 
-  const sorted = [...orders].sort((a, b) => b.createdDate.localeCompare(a.createdDate));
+  const sorted = [...orders].sort((a, b) => (b.createdDate ?? '').localeCompare(a.createdDate ?? ''));
 
   if (sorted.length === 0) {
     return (
@@ -72,13 +71,13 @@ export function OrdersTab({ currentUser }: OrdersTabProps) {
                   <span className="text-sm font-medium text-clinic-text">
                     הזמנה #{sorted.length - index}
                   </span>
-                  <span className="text-xs text-clinic-muted">{formatDate(order.createdDate)}</span>
+                  <span className="text-xs text-clinic-muted">{formatDate(order.createdDate ?? '')}</span>
                 </div>
               </div>
 
               {/* Package items */}
               <ul dir="rtl" className="px-4 py-2 border-b border-clinic-border flex flex-col gap-1">
-                {order.orderItems.map(item => {
+                {(order.orderItems ?? []).map(item => {
                   const pkg = packageTypes.find(p => p.id === item.packageTypeId);
                   return (
                     <li key={item.id} className="flex items-center gap-1.5 text-sm text-clinic-text">
@@ -94,19 +93,19 @@ export function OrdersTab({ currentUser }: OrdersTabProps) {
                 <div className="flex flex-col items-center gap-0.5">
                   <span className="text-xs text-clinic-muted">סה&quot;כ</span>
                   <span className="font-semibold text-clinic-text">
-                    ₪{parseFloat(order.totalPrice).toLocaleString('he-IL')}
+                    ₪{parseFloat(String(order.totalPrice ?? 0)).toLocaleString('he-IL')}
                   </span>
                 </div>
                 <div className="flex flex-col items-center gap-0.5">
                   <span className="text-xs text-clinic-muted">שולם</span>
                   <span className="font-medium text-clinic-text">
-                    ₪{parseFloat(order.amountPaid).toLocaleString('he-IL')}
+                    ₪{parseFloat(String(order.amountPaid)).toLocaleString('he-IL')}
                   </span>
                 </div>
                 <div className="flex flex-col items-center gap-0.5">
                   <span className="text-xs text-clinic-muted">יתרה לתשלום</span>
-                  <span className={`font-medium ${parseFloat(order.remainingBalance) > 0 ? 'text-red-500' : 'text-green-600'}`}>
-                    ₪{parseFloat(order.remainingBalance).toLocaleString('he-IL')}
+                  <span className={`font-medium ${parseFloat(String(order.remainingBalance)) > 0 ? 'text-red-500' : 'text-green-600'}`}>
+                    ₪{parseFloat(String(order.remainingBalance)).toLocaleString('he-IL')}
                   </span>
                 </div>
               </div>
@@ -123,9 +122,9 @@ export function OrdersTab({ currentUser }: OrdersTabProps) {
                     <li key={payment.id} className="flex items-center justify-between px-4 py-2.5">
                       <div className="text-xs text-clinic-muted">{formatDate(payment.paymentDate)}</div>
                       <div className="flex items-center gap-3">
-                        <span className="text-xs text-clinic-muted">{methodLabels[payment.method]}</span>
+                        <span className="text-xs text-clinic-muted">{methodLabels[payment.method ?? ''] ?? payment.method}</span>
                         <span className="font-semibold text-clinic-text">
-                          ₪{parseFloat(payment.amount).toLocaleString('he-IL')}
+                          ₪{parseFloat(String(payment.amount)).toLocaleString('he-IL')}
                         </span>
                       </div>
                     </li>

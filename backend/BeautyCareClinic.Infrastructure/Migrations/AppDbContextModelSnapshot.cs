@@ -115,7 +115,9 @@ namespace BeautyCareClinic.Infrastructure.Migrations
                         .HasColumnType("decimal(10,2)");
 
                     b.Property<decimal>("RemainingBalance")
-                        .HasColumnType("decimal(10,2)");
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("decimal(10,2)")
+                        .HasComputedColumnSql("\"DiscountedPrice\" - \"AmountPaid\"", true);
 
                     b.HasKey("Id");
 
@@ -191,6 +193,9 @@ namespace BeautyCareClinic.Infrastructure.Migrations
                     b.Property<Guid>("PackageTypeId")
                         .HasColumnType("uuid");
 
+                    b.Property<decimal>("UnitPrice")
+                        .HasColumnType("decimal(10,2)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("OrderId");
@@ -218,6 +223,9 @@ namespace BeautyCareClinic.Infrastructure.Migrations
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<decimal>("Price")
+                        .HasColumnType("decimal(10,2)");
 
                     b.Property<int?>("TreatmentCount")
                         .HasColumnType("integer");
@@ -250,6 +258,13 @@ namespace BeautyCareClinic.Infrastructure.Migrations
                     b.Property<string>("PaymentMethod")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<string>("RecordedByFullName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("RecordedByUserId")
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id");
 

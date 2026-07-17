@@ -110,6 +110,13 @@ public class AppDbContext : IdentityDbContext<AppUser, IdentityRole<Guid>, Guid>
             .HasConversion<string>();
 
         // -----------------------------------------------------------------------
+        // PackageType
+        // -----------------------------------------------------------------------
+        modelBuilder.Entity<PackageType>()
+            .Property(p => p.Price)
+            .HasColumnType("decimal(10,2)");
+
+        // -----------------------------------------------------------------------
         // TreatmentType
         // -----------------------------------------------------------------------
         modelBuilder.Entity<TreatmentType>()
@@ -183,9 +190,13 @@ public class AppDbContext : IdentityDbContext<AppUser, IdentityRole<Guid>, Guid>
             .Property(o => o.AmountPaid)
             .HasColumnType("decimal(10,2)");
 
+        // RemainingBalance is a PostgreSQL GENERATED ALWAYS AS (discounted_price - amount_paid) STORED column.
+        // Never set this in C# — reload via Entry(order).ReloadAsync() after SaveChangesAsync.
         modelBuilder.Entity<CustomerOrder>()
             .Property(o => o.RemainingBalance)
-            .HasColumnType("decimal(10,2)");
+            .HasColumnType("decimal(10,2)")
+            .HasComputedColumnSql("\"DiscountedPrice\" - \"AmountPaid\"", stored: true)
+            .ValueGeneratedOnAddOrUpdate();
 
         // CustomerOrder → Items (Cascade: items belong to the order)
         modelBuilder.Entity<CustomerOrder>()
@@ -206,6 +217,10 @@ public class AppDbContext : IdentityDbContext<AppUser, IdentityRole<Guid>, Guid>
         // -----------------------------------------------------------------------
         modelBuilder.Entity<OrderItem>()
             .HasIndex(oi => oi.OrderId);
+
+        modelBuilder.Entity<OrderItem>()
+            .Property(oi => oi.UnitPrice)
+            .HasColumnType("decimal(10,2)");
 
         // OrderItem → TreatmentSeries (1:1, Cascade: series belongs to item)
         modelBuilder.Entity<OrderItem>()
