@@ -91,7 +91,7 @@ export function PackagesScreen() {
                     <td className="px-4 py-3 font-medium text-clinic-text">{pkg.name}</td>
                     <td className="px-4 py-3 text-clinic-muted">{getTreatmentTypeName(pkg.treatmentTypeId)}</td>
                     <td className="px-4 py-3 text-clinic-text">
-                      ₪{parseFloat(pkg.price).toLocaleString('he-IL')}
+                      ₪{parseFloat(String(pkg.price)).toLocaleString('he-IL')}
                     </td>
                     <td className="px-4 py-3 text-clinic-muted">
                       {!pkg.isSeries ? 'טיפול בודד' : pkg.isTimerBased ? 'סדרה (טיימר)' : 'סדרה (כמות)'}

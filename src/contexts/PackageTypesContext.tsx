@@ -6,7 +6,7 @@ import { buildPackageType, updatePackageType, deletePackageType } from '../featu
 interface BuildPackageTypeParams {
   name: string;
   treatmentTypeId: string;
-  price: string;
+  price: string | number;
   isSeries: boolean;
   treatmentCount?: number;
   isTimerBased?: boolean;

@@ -2,9 +2,9 @@ export interface PackageType {
   id: string;
   name: string;
   treatmentTypeId: string;
-  price: string; // decimal as string
+  price: string | number;
   isSeries: boolean;
+  isTimerBased: boolean;
   treatmentCount?: number;
-  isTimerBased?: boolean;
   minutesPerTreatment?: number;
 }

@@ -60,6 +60,7 @@ erDiagram
         boolean is_timer_based
         integer treatment_count
         integer minutes_per_treatment
+        decimal price
     }
 
     CUSTOMER_ORDER {
@@ -71,13 +72,14 @@ erDiagram
         decimal discount_percentage
         integer max_payment_count
         decimal amount_paid
-        decimal remaining_balance
+        decimal remaining_balance_generated
     }
 
     ORDER_ITEM {
         uuid id PK
         uuid order_id FK
         uuid package_type_id FK
+        decimal unit_price
     }
 
     PAYMENT {
@@ -86,6 +88,8 @@ erDiagram
         decimal amount
         string payment_method
         date payment_date
+        uuid recorded_by_user_id FK
+        string recorded_by_full_name
     }
 
     TREATMENT_SERIES {
@@ -164,3 +168,7 @@ erDiagram
 - `TreatmentSeries` is created only for `PackageType.is_series = true` packages.
 - `completed_treatments` for timer-based series is derived: `floor(used_minutes / minutes_per_treatment)`. Updated after each timer session.
 - `GLOBAL_SETTINGS` is a key-value table. Each setting is a separate row with a unique `name` and a string `value`. Currently defined: `default_max_payment_count`.
+- `PACKAGE_TYPE.price` — catalog price (`decimal(10,2)`). Snapshot copied to `ORDER_ITEM.unit_price` at order creation. Price changes do not affect historical orders.
+- `CUSTOMER_ORDER.remaining_balance` — PostgreSQL `GENERATED ALWAYS AS (discounted_price - amount_paid) STORED`. Never written from application code.
+- `PAYMENT.recorded_by_user_id` / `recorded_by_full_name` — server-derived from the authenticated JWT at payment creation. Client never supplies these values.
+- Money columns: `decimal(10,2)` throughout.

@@ -6,7 +6,7 @@ export const payments: Payment[] = [
   {
     id: 'pay-1',
     customerOrderId: 'order-1',
-    amount: '500',
+    amount: 500,
     method: 'Credit Card',
     paymentDate: '2025-10-01',
     createdDate: '2025-10-01',
@@ -15,7 +15,7 @@ export const payments: Payment[] = [
   {
     id: 'pay-2',
     customerOrderId: 'order-1',
-    amount: '300',
+    amount: 300,
     method: 'Cash',
     paymentDate: '2025-11-01',
     createdDate: '2025-11-01',
@@ -25,7 +25,7 @@ export const payments: Payment[] = [
   {
     id: 'pay-3',
     customerOrderId: 'order-2',
-    amount: '200',
+    amount: 200,
     method: 'Cash',
     paymentDate: '2025-08-20',
     createdDate: '2025-08-20',
@@ -35,7 +35,7 @@ export const payments: Payment[] = [
   {
     id: 'pay-4',
     customerOrderId: 'order-3',
-    amount: '400',
+    amount: 400,
     method: 'Bank Transfer',
     paymentDate: '2025-09-01',
     createdDate: '2025-09-01',
@@ -45,7 +45,7 @@ export const payments: Payment[] = [
   {
     id: 'pay-5',
     customerOrderId: 'order-5',
-    amount: '800',
+    amount: 800,
     method: 'Credit Card',
     paymentDate: '2024-01-10',
     createdDate: '2024-01-10',
@@ -54,7 +54,7 @@ export const payments: Payment[] = [
   {
     id: 'pay-6',
     customerOrderId: 'order-5',
-    amount: '750',
+    amount: 750,
     method: 'Credit Card',
     paymentDate: '2024-02-10',
     createdDate: '2024-02-10',
@@ -64,7 +64,7 @@ export const payments: Payment[] = [
   {
     id: 'pay-7',
     customerOrderId: 'order-6',
-    amount: '200',
+    amount: 200,
     method: 'Cash',
     paymentDate: '2024-08-15',
     createdDate: '2024-08-15',
@@ -74,7 +74,7 @@ export const payments: Payment[] = [
   {
     id: 'pay-8',
     customerOrderId: 'order-8',
-    amount: '240',
+    amount: 240,
     method: 'Cash',
     paymentDate: '2025-07-01',
     createdDate: '2025-07-01',
@@ -84,7 +84,7 @@ export const payments: Payment[] = [
   {
     id: 'pay-9',
     customerOrderId: 'order-9',
-    amount: '400',
+    amount: 400,
     method: 'Credit Card',
     paymentDate: '2025-02-01',
     createdDate: '2025-02-01',
@@ -93,7 +93,7 @@ export const payments: Payment[] = [
   {
     id: 'pay-10',
     customerOrderId: 'order-9',
-    amount: '400',
+    amount: 400,
     method: 'Credit Card',
     paymentDate: '2025-03-01',
     createdDate: '2025-03-01',
@@ -102,7 +102,7 @@ export const payments: Payment[] = [
   {
     id: 'pay-11',
     customerOrderId: 'order-9',
-    amount: '400',
+    amount: 400,
     method: 'Credit Card',
     paymentDate: '2025-04-01',
     createdDate: '2025-04-01',
@@ -112,7 +112,7 @@ export const payments: Payment[] = [
   {
     id: 'pay-12',
     customerOrderId: 'order-10',
-    amount: '200',
+    amount: 200,
     method: 'Cash',
     paymentDate: '2025-05-10',
     createdDate: '2025-05-10',

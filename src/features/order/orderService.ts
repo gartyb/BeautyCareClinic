@@ -66,15 +66,16 @@ export function buildNewOrder(
       seriesList.push(series);
     }
 
-    orderItems.push({ id: itemId, customerOrderId: orderId, packageTypeId: pt.id, treatmentSeriesId });
+    orderItems.push({ id: itemId, packageTypeId: pt.id, treatmentSeriesId });
   }
 
+  const total = fromCents(totalCents);
   const order: CustomerOrder = {
     id: orderId,
     customerId,
-    totalPrice: fromCents(totalCents),
-    amountPaid: '0.00',
-    remainingBalance: fromCents(totalCents),
+    totalPrice: total,
+    amountPaid: fromCents(0),
+    remainingBalance: total,
     maxPaymentCount: maxPaymentCountOverride ?? defaultMaxPaymentCount,
     paymentCount: 0,
     orderItems,

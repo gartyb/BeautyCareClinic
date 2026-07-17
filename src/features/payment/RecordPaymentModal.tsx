@@ -45,11 +45,11 @@ export function RecordPaymentModal({ open, onClose, currentUser, preselectedOrde
   useEffect(() => {
     const order = orders.find(o => o.id === selectedOrderId);
     if (order && order.paymentCount === order.maxPaymentCount - 1) {
-      setAmount(parseFloat(order.remainingBalance).toFixed(2));
+      setAmount(parseFloat(String(order.remainingBalance)).toFixed(2));
     }
   }, [selectedOrderId, orders]);
 
-  const sortedOrders = [...orders].sort((a, b) => b.createdDate.localeCompare(a.createdDate));
+  const sortedOrders = [...orders].sort((a, b) => (b.createdDate ?? '').localeCompare(a.createdDate ?? ''));
   const selectedOrder = orders.find(o => o.id === selectedOrderId);
   const selectedOrderNumber = selectedOrder
     ? sortedOrders.length - sortedOrders.findIndex(o => o.id === selectedOrderId)
@@ -58,7 +58,7 @@ export function RecordPaymentModal({ open, onClose, currentUser, preselectedOrde
   const step = needsOrderSelection ? 'select-order' : 'payment-form';
 
   function getOrderLabel(order: CustomerOrder): string {
-    const items = order.orderItems
+    const items = (order.orderItems ?? [])
       .map(oi => packageTypes.find(pt => pt.id === oi.packageTypeId)?.name ?? oi.packageTypeId)
       .join(', ');
     const num = sortedOrders.length - sortedOrders.findIndex(o => o.id === order.id);
@@ -125,7 +125,7 @@ export function RecordPaymentModal({ open, onClose, currentUser, preselectedOrde
               className="w-full text-right p-3 rounded-lg border border-clinic-border hover:border-clinic-gold hover:bg-clinic-bg text-sm"
             >
               <div className="font-medium text-clinic-text">{getOrderLabel(order)}</div>
-              <div className="text-clinic-muted mt-1">יתרה: ₪{parseFloat(order.remainingBalance).toLocaleString('he-IL')}</div>
+              <div className="text-clinic-muted mt-1">יתרה: ₪{parseFloat(String(order.remainingBalance)).toLocaleString('he-IL')}</div>
             </button>
           ))}
         </div>
@@ -139,7 +139,7 @@ export function RecordPaymentModal({ open, onClose, currentUser, preselectedOrde
               )}
               {/* Package list */}
               <ul className="flex flex-col gap-1">
-                {selectedOrder.orderItems.map(oi => {
+                {(selectedOrder.orderItems ?? []).map(oi => {
                   const pkg = packageTypes.find(pt => pt.id === oi.packageTypeId);
                   return (
                     <li key={oi.id} className="flex items-center gap-1.5 text-clinic-text">
@@ -153,15 +153,15 @@ export function RecordPaymentModal({ open, onClose, currentUser, preselectedOrde
               <div className="grid grid-cols-3 gap-2 border-t border-clinic-border pt-3 text-center">
                 <div className="flex flex-col gap-0.5">
                   <span className="text-xs text-clinic-muted">סה&quot;כ</span>
-                  <span className="font-semibold text-clinic-text">₪{parseFloat(selectedOrder.totalPrice).toLocaleString('he-IL')}</span>
+                  <span className="font-semibold text-clinic-text">₪{parseFloat(String(selectedOrder.totalPrice ?? 0)).toLocaleString('he-IL')}</span>
                 </div>
                 <div className="flex flex-col gap-0.5">
                   <span className="text-xs text-clinic-muted">שולם</span>
-                  <span className="font-medium text-clinic-text">₪{parseFloat(selectedOrder.amountPaid).toLocaleString('he-IL')}</span>
+                  <span className="font-medium text-clinic-text">₪{parseFloat(String(selectedOrder.amountPaid)).toLocaleString('he-IL')}</span>
                 </div>
                 <div className="flex flex-col gap-0.5">
                   <span className="text-xs text-clinic-muted">יתרה</span>
-                  <span className="font-semibold text-red-500">₪{parseFloat(selectedOrder.remainingBalance).toLocaleString('he-IL')}</span>
+                  <span className="font-semibold text-red-500">₪{parseFloat(String(selectedOrder.remainingBalance)).toLocaleString('he-IL')}</span>
                 </div>
               </div>
               {/* Payment count */}

@@ -70,8 +70,8 @@ describe('buildNewOrder — non-series package', () => {
     const result = buildNewOrder('cust-1', ['pt-non-series'], [nonSeriesPkg], therapist, DEFAULT_MAX_PAYMENT_COUNT, undefined, testDeps);
 
     expect(result.order.orderItems).toHaveLength(1);
-    expect(result.order.orderItems[0].packageTypeId).toBe('pt-non-series');
-    expect(result.order.orderItems[0].treatmentSeriesId).toBeUndefined();
+    expect(result.order.orderItems![0].packageTypeId).toBe('pt-non-series');
+    expect(result.order.orderItems![0].treatmentSeriesId).toBeUndefined();
   });
 
   it('sets createdByUserId from currentUser', () => {
@@ -98,7 +98,7 @@ describe('buildNewOrder — quantity series package', () => {
     resetCounter();
     const result = buildNewOrder('cust-1', ['pt-quantity'], [quantitySeriesPkg], therapist, DEFAULT_MAX_PAYMENT_COUNT, undefined, testDeps);
 
-    const item = result.order.orderItems[0];
+    const item = result.order.orderItems![0];
     expect(item.treatmentSeriesId).toBe(result.series[0].id);
   });
 
@@ -164,7 +164,7 @@ describe('buildNewOrder — multiple packages', () => {
       testDeps
     );
 
-    const pkgIds = result.order.orderItems.map(i => i.packageTypeId);
+    const pkgIds = (result.order.orderItems ?? []).map(i => i.packageTypeId);
     expect(pkgIds).toContain('pt-non-series');
     expect(pkgIds).toContain('pt-quantity');
   });

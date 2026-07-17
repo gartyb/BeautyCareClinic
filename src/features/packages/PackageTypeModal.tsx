@@ -32,7 +32,7 @@ export function PackageTypeModal({ open, onClose, onSave, initialValues }: Packa
         setForm({
           name: initialValues.name,
           treatmentTypeId: initialValues.treatmentTypeId,
-          price: initialValues.price,
+          price: String(initialValues.price),
           isSeries: initialValues.isSeries,
           treatmentCount: initialValues.treatmentCount?.toString() ?? '',
           isTimerBased: initialValues.isTimerBased ?? false,

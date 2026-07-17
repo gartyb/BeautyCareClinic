@@ -51,7 +51,7 @@ export function NewOrderModal({ open, onClose, customerId, currentUser }: NewOrd
   }
 
   const selectedPkgs = packageTypes.filter(pt => selected.has(pt.id));
-  const total = selectedPkgs.reduce((sum, pt) => sum + parseFloat(pt.price), 0);
+  const total = selectedPkgs.reduce((sum, pt) => sum + parseFloat(String(pt.price)), 0);
 
   return (
     <Modal open={open} onClose={onClose} title="הזמנה חדשה">
@@ -65,7 +65,7 @@ export function NewOrderModal({ open, onClose, customerId, currentUser }: NewOrd
               className="w-4 h-4 accent-clinic-gold"
             />
             <span className="flex-1 text-clinic-text">{pt.name}</span>
-            <span className="text-clinic-muted text-sm">₪{parseFloat(pt.price).toLocaleString('he-IL')}</span>
+            <span className="text-clinic-muted text-sm">₪{parseFloat(String(pt.price)).toLocaleString('he-IL')}</span>
           </label>
         ))}
       </div>

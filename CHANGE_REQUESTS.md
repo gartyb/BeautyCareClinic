@@ -162,7 +162,7 @@
 - Source: Code review — Phase 007
 - Related phase: Phase 8
 - Description: `CustomerOrder.RemainingBalance` is a derived value stored redundantly alongside `DiscountedPrice` and `AmountPaid`. Risk of drift if any payment path forgets to recalculate. Make it a computed property or add a DB check constraint.
-- Status: Open
+- Status: Closed — Phase 009 (`remaining_balance` implemented as PostgreSQL `GENERATED ALWAYS AS (discounted_price - amount_paid) STORED`. EF Core: `HasComputedColumnSql("discounted_price - amount_paid", stored: true)` + `[DatabaseGenerated(Computed)]`. Service layer never writes this field; reloads entity via `ReloadAsync()` after `SaveChangesAsync()`. Integration test deferred to CR-028.)
 
 ### CR-019 — DateTime → DateTimeOffset for timestamp columns
 
@@ -189,7 +189,7 @@
 - Source: Code review — Phase 007
 - Related phase: Phase 8
 - Description: `ExceptionHandlingMiddleware` detects conflicts via `exception.Message.Contains("CONFLICT")` — a magic string. Introduce `DomainConflictException` and catch it explicitly.
-- Status: Open
+- Status: Closed — Phase 009 (`DomainConflictException` added to `BeautyCareClinic.Domain/Exceptions/`. `ExceptionHandlingMiddleware` catches it explicitly — `.Contains` magic string removed.)
 
 ### CR-022 — User enumeration via login timing
 
@@ -218,13 +218,58 @@
 - Description: `GlobalSettingsRepository.UpdateAsync` is a read-modify-write upsert with no unique constraint on `Name`. Two concurrent requests for a new key can both insert, producing duplicate rows. Add a `UNIQUE` constraint on `GlobalSettings.Name` and handle the conflict in the repository.
 - Status: Open
 
-### CR-025 — Phase 008 code quality P2/P3 items
+### CR-025 — Phase 008 code quality P2/P3 items (remaining)
 
 - Type: Technical Debt
 - Priority: Low
 - Source: Code review — Phase 008
-- Related phase: Phase 9+
-- Description: Bundle of deferred P2/P3 items: (a) `globalSettingsApi.updateSetting` returns `GlobalSettingDto[]` but callers expect a scalar — change return type to `Promise<GlobalSettingDto>`. (b) `GlobalSettingsContext.setCalendarHours` makes two sequential non-atomic API calls. (c) `setup.ts` uses substring URL matching that can match multiple routes. (d) `AuthController`/`UsersController` read claims directly instead of using `ICurrentUserService`. (e) `api/index.ts` barrel does not re-export entity API modules. (f) `UserDto`/`UserApiDto` duplicated across `authApi.ts` and `usersApi.ts`. (g) `IsValidEmail` helper duplicated in two controllers.
+- Related phase: Phase 10+
+- Description: Remaining deferred items: (b) `GlobalSettingsContext.setCalendarHours` makes two sequential non-atomic API calls. (c) `setup.ts` uses substring URL matching that can match multiple routes. (e) `api/index.ts` barrel does not re-export entity API modules. (f) `UserDto`/`UserApiDto` duplicated across `authApi.ts` and `usersApi.ts`. (g) `IsValidEmail` helper duplicated in two controllers. Items (a) and (d) were resolved in Phase 009.
+- Status: Open
+
+### CR-026 — Clean Architecture: extract controller business logic into Application-layer services
+
+- Type: Technical Debt
+- Priority: Medium
+- Source: Phase 009 code review
+- Related phase: Phase 10+
+- Description: `CustomerOrdersController` and `PaymentsController` both inject `AppDbContext` directly, bypassing repository abstractions and violating the Clean Architecture layer boundary. Extract order creation and payment recording into Application-layer services.
+- Status: Open
+
+### CR-027 — Remove dead `IPaymentRepository.AddAsync` or move payment creation through repository
+
+- Type: Technical Debt
+- Priority: Low
+- Source: Phase 009 code review
+- Related phase: Phase 10+
+- Description: `IPaymentRepository.AddAsync` exists but payment creation in `PaymentsController` bypasses it and writes directly to `AppDbContext.Payments`. Either remove the dead surface or route all payment creation through the repository inside the transaction.
+- Status: Open
+
+### CR-028 — Rewrite payment validation tests as controller-level integration tests
+
+- Type: Technical Debt
+- Priority: Medium
+- Source: Phase 009 code review
+- Related phase: Phase 10+
+- Description: Payment validation tests in `Phase009Tests.cs` inline the validation logic directly instead of calling production code. Rewrite as controller-level integration tests using `WebApplicationFactory` so the tests call the real controller and validate HTTP response codes.
+- Status: Open
+
+### CR-029 — Per-therapist customer scoping
+
+- Type: Feature
+- Priority: Low
+- Source: Phase 009 security review
+- Related phase: Future
+- Description: Currently all authenticated users can read all customer financial data (orders, payments, treatment series). Add per-therapist scoping when multi-location or per-therapist privacy is required. See access model in `docs/WORKFLOWS.md`.
+- Status: Open
+
+### CR-030 — Batch package type lookup in `CustomerOrdersController.Create`
+
+- Type: Performance
+- Priority: Medium
+- Source: Phase 009 code review
+- Related phase: Phase 10+
+- Description: `CustomerOrdersController.Create` fetches each package type with a separate `GetByIdAsync` call per item (N round-trips). Replace with a single `WHERE Id IN (...)` batch lookup.
 - Status: Open
 
 ## Planned
@@ -241,3 +286,6 @@ None.
 ### CR-008 — Closed Phase 008. Dev user switcher removed; `currentUser` from `AuthContext` only.
 ### CR-011 — Closed Phase 008. `firstName`/`lastName` → `fullName` throughout all frontend types, forms, displays, and tests.
 ### CR-015 — Closed Phase 008. `CustomerRepository.SearchAsync` escapes `\`, `%`, `_` before ILike interpolation. Also fixed `TreatmentTypeRepository.ExistsByNameAsync` (same pattern).
+### CR-018 — Closed Phase 009. `remaining_balance` as PostgreSQL GENERATED STORED column. Service layer reloads entity post-save.
+### CR-021 — Closed Phase 009. `DomainConflictException` in Domain layer; middleware catches explicitly.
+### CR-025 (partial) — Items (a) and (d) closed Phase 009: `globalSettingsApi.updateSetting` return type fixed; `AuthController`/`UsersController` use `ICurrentUserService`.

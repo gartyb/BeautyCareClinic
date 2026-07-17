@@ -196,18 +196,133 @@ Only known keys are accepted. Unknown keys return **400**.
 
 ---
 
-## Planned Endpoints (Phase 8+)
+## Package Types
+
+Auth: JWT. Write endpoints require Manager role.
+
+### GET /api/v1/package-types
+
+**Response 200:** `PackageType[]`
+```json
+[{ "id": "<uuid>", "treatmentTypeId": "<uuid>", "name": "חבילת פנים", "price": "200.00", "isSeries": true, "isTimerBased": false, "treatmentCount": 5, "minutesPerTreatment": 0 }]
+```
+
+### GET /api/v1/package-types/{id}
+
+**Response 200:** `PackageType` | **404**.
+
+### POST /api/v1/package-types — Manager
+
+**Request:** `{ "treatmentTypeId": "<uuid>", "name": "...", "price": 200.00, "isSeries": true, "isTimerBased": false, "treatmentCount": 5, "minutesPerTreatment": 0 }`
+
+Validation: `isSeries = false` disallows `isTimerBased = true`. `isTimerBased = true` requires `minutesPerTreatment > 0`.
+
+**Response 201:** Created `PackageType`.
+
+### PUT /api/v1/package-types/{id} — Manager
+
+**Request:** Same as POST.
+
+**Response 200:** Updated `PackageType` | **404**.
+
+### DELETE /api/v1/package-types/{id} — Manager
+
+**Response 204** | **409** if referenced by an `OrderItem`.
+
+---
+
+## Orders
+
+Auth: JWT. Write endpoints require Manager role unless noted.
+
+### GET /api/v1/customers/{customerId}/orders
+
+**Response 200:** `CustomerOrder[]` — summary list including `paymentCount`.
+
+### GET /api/v1/orders/{id}
+
+**Response 200:** Full `CustomerOrder` with nested `items`, `payments`. | **404**.
+
+```json
+{
+  "id": "<uuid>", "customerId": "<uuid>", "orderDate": "2026-07-17",
+  "originalPrice": "1000.00", "discountedPrice": "900.00", "discountPercentage": "10.00",
+  "maxPaymentCount": 3, "amountPaid": "450.00", "remainingBalance": "450.00",
+  "paymentCount": 1,
+  "items": [{ "id": "<uuid>", "packageTypeId": "<uuid>", "unitPrice": "200.00", "treatmentSeriesId": "<uuid>" }],
+  "payments": [{ "id": "<uuid>", "amount": "450.00", "paymentMethod": "Cash", "paymentDate": "2026-07-17", "recordedByFullName": "..." }]
+}
+```
+
+### POST /api/v1/customers/{customerId}/orders
+
+Creates order + items + treatment series (for `is_series` packages) in a single transaction.
+
+**Request:**
+```json
+{ "discountPercentage": 10, "maxPaymentCount": 3, "items": [{ "packageTypeId": "<uuid>" }] }
+```
+
+`maxPaymentCount` defaults to `GlobalSettings.default_max_payment_count` if omitted.
+
+**Response 201:** Created `CustomerOrder` (full). | **404** customer or packageType not found. | **422** validation error.
+
+### PUT /api/v1/orders/{id} — Manager
+
+Updates `discountPercentage` and/or `maxPaymentCount` only.
+
+**Response 200:** Updated `CustomerOrder`. | **404**.
+
+### DELETE /api/v1/orders/{id} — Manager
+
+**Response 204** | **409** if order has payments or treatments linked to its series.
+
+---
+
+## Payments
+
+Auth: JWT.
+
+### GET /api/v1/orders/{orderId}/payments
+
+**Response 200:** `Payment[]`.
+
+### POST /api/v1/orders/{orderId}/payments
+
+**Request:** `{ "amount": 450.00, "paymentMethod": "Cash", "paymentDate": "2026-07-17" }`
+
+`paymentMethod` allowlist: `Cash`, `Credit Card`, `Bank Transfer`, `Check`, `Other`.
+`recordedByUserId` / `recordedByFullName` are server-derived from JWT — never accepted from client.
+
+**Response 201:** Created `Payment`. | **422** amount ≤ 0, amount > remainingBalance, or amount > 99,999,999.99. | **409** paymentCount ≥ maxPaymentCount.
+
+Payment rows are immutable — no PUT or DELETE.
+
+---
+
+## Treatment Series
+
+Auth: JWT. Read-only — created automatically from orders.
+
+### GET /api/v1/customers/{customerId}/treatment-series
+
+Returns active series only (quantity: `completedTreatments < totalTreatments`; timer: `usedMinutes < totalMinutes`).
+
+**Response 200:** `TreatmentSeries[]`.
+
+### GET /api/v1/treatment-series/{id}
+
+**Response 200:** `TreatmentSeries` | **404**.
+
+---
+
+## Planned Endpoints (Phase 10+)
 
 | Resource             | Planned |
 | -------------------- | ------- |
-| Orders               | CRUD per customer |
-| Order Items          | Add/remove |
-| Payments             | Create per order |
-| Treatment Series     | Read per order item |
-| Treatments           | CRUD per customer |
-| Treatment Photos     | Upload + list |
-| Appointments         | CRUD + availability |
-| Working Hours        | Per therapist |
-| Unavailable Dates    | Per therapist |
-| Therapist Capability | Per therapist |
-| Package Types        | Manager CRUD |
+| Treatments           | CRUD per customer (Phase 010) |
+| Treatment Photos     | Upload + list (Phase 011) |
+| Appointments         | CRUD + availability (Phase 011) |
+| Working Hours        | Per therapist (Phase 011) |
+| Unavailable Dates    | Per therapist (Phase 011) |
+| Therapist Capability | Per therapist (Phase 011) |

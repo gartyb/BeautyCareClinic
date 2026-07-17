@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using BeautyCareClinic.Application.DTOs;
+using BeautyCareClinic.Domain.Exceptions;
 
 namespace BeautyCareClinic.Api.Middleware;
 
@@ -37,8 +38,11 @@ public class ExceptionHandlingMiddleware
             UnauthorizedAccessException =>
                 (HttpStatusCode.Unauthorized, ErrorCodes.Unauthorized, "Unauthorized."),
 
-            InvalidOperationException e when e.Message.Contains("CONFLICT") =>
-                (HttpStatusCode.Conflict, ErrorCodes.Conflict, "The operation conflicts with existing data."),
+            DomainConflictException e =>
+                (HttpStatusCode.Conflict, ErrorCodes.Conflict, e.Message),
+
+            DomainValidationException e =>
+                (HttpStatusCode.UnprocessableEntity, ErrorCodes.ValidationFailed, e.Message),
 
             _ =>
                 (HttpStatusCode.InternalServerError, ErrorCodes.InternalError, "An unexpected error occurred.")
