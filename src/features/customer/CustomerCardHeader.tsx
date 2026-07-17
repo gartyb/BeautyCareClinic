@@ -2,8 +2,13 @@ import { Phone, Mail } from 'lucide-react';
 import { useCustomer } from '../../contexts/CustomerContext';
 import { formatPhone } from '../../utils/phone';
 
-function initials(firstName: string, lastName: string): string {
-  return (firstName[0] ?? '') + (lastName[0] ?? '');
+function initials(fullName: string): string {
+  return fullName
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(w => w[0].toUpperCase())
+    .join('');
 }
 
 export function CustomerCardHeader() {
@@ -18,11 +23,11 @@ export function CustomerCardHeader() {
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-full bg-clinic-pink flex items-center justify-center flex-shrink-0">
             <span className="text-base font-bold text-clinic-gold">
-              {initials(activeCustomer.firstName, activeCustomer.lastName)}
+              {initials(activeCustomer.fullName)}
             </span>
           </div>
           <h1 className="text-xl font-bold text-clinic-text">
-            {activeCustomer.firstName} {activeCustomer.lastName}
+            {activeCustomer.fullName}
           </h1>
         </div>
 

@@ -11,20 +11,24 @@ namespace BeautyCareClinic.Api.Controllers;
 
 [ApiController]
 [Route("api/v1/auth")]
+[ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
 public class AuthController : ControllerBase
 {
     private readonly UserManager<AppUser> _userManager;
     private readonly AppDbContext _context;
     private readonly IJwtService _jwtService;
+    private readonly IConfiguration _configuration;
 
     public AuthController(
         UserManager<AppUser> userManager,
         AppDbContext context,
-        IJwtService jwtService)
+        IJwtService jwtService,
+        IConfiguration configuration)
     {
-        _userManager = userManager;
-        _context     = context;
-        _jwtService  = jwtService;
+        _userManager   = userManager;
+        _context       = context;
+        _jwtService    = jwtService;
+        _configuration = configuration;
     }
 
     /// <summary>POST /api/v1/auth/login — No auth required.</summary>
@@ -67,11 +71,10 @@ public class AuthController : ControllerBase
         if (domainUser == null)
             return Unauthorized(new ErrorResponse(ErrorCodes.Unauthorized, "User account is incomplete.", DateTime.UtcNow, HttpContext.TraceIdentifier));
 
-        var token    = _jwtService.GenerateToken(domainUser);
-        var expiresIn = int.Parse(HttpContext.RequestServices
-            .GetRequiredService<IConfiguration>()["Jwt:ExpiresInHours"] ?? "24") * 3600;
+        var token     = _jwtService.GenerateToken(domainUser);
+        var expiresIn = _configuration.GetValue<int>("Jwt:ExpiresInHours", 24) * 3600;
 
-        var userDto = new UserDto(domainUser.Id, domainUser.FullName, domainUser.Email, domainUser.Role.ToString());
+        var userDto = new UserDto(domainUser.Id, domainUser.FullName, domainUser.Email, domainUser.Role.ToString(), domainUser.Phone);
         return Ok(new LoginResponse(token, expiresIn, userDto));
     }
 
@@ -90,6 +93,6 @@ public class AuthController : ControllerBase
         if (domainUser == null)
             return NotFound(new ErrorResponse(ErrorCodes.NotFound, "User not found.", DateTime.UtcNow, HttpContext.TraceIdentifier));
 
-        return Ok(new UserDto(domainUser.Id, domainUser.FullName, domainUser.Email, domainUser.Role.ToString()));
+        return Ok(new UserDto(domainUser.Id, domainUser.FullName, domainUser.Email, domainUser.Role.ToString(), domainUser.Phone));
     }
 }

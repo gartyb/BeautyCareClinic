@@ -39,7 +39,7 @@ public class UsersController : ControllerBase
             roleFilter = parsed;
 
         var users = await _userRepository.GetAllAsync(roleFilter);
-        return Ok(users.Select(u => new UserDto(u.Id, u.FullName, u.Email, u.Role.ToString())));
+        return Ok(users.Select(u => new UserDto(u.Id, u.FullName, u.Email, u.Role.ToString(), u.Phone)));
     }
 
     /// <summary>GET /api/v1/users/{id} — Manager only.</summary>
@@ -50,7 +50,7 @@ public class UsersController : ControllerBase
         if (user == null)
             return NotFound(new ErrorResponse(ErrorCodes.NotFound, "The requested resource was not found.", DateTime.UtcNow, HttpContext.TraceIdentifier));
 
-        return Ok(new UserDto(user.Id, user.FullName, user.Email, user.Role.ToString()));
+        return Ok(new UserDto(user.Id, user.FullName, user.Email, user.Role.ToString(), user.Phone));
     }
 
     /// <summary>
@@ -85,7 +85,8 @@ public class UsersController : ControllerBase
             Id       = id,
             FullName = request.FullName.Trim(),
             Email    = normalizedEmail,
-            Role     = UserRole.Therapist  // Only Therapists can be created via API
+            Role     = UserRole.Therapist,  // Only Therapists can be created via API
+            Phone    = string.IsNullOrWhiteSpace(request.Phone) ? null : request.Phone.Trim()
         };
 
         var appUser = new AppUser
@@ -113,7 +114,7 @@ public class UsersController : ControllerBase
             await transaction.CommitAsync();
 
             return CreatedAtAction(nameof(GetById), new { id = created.Id },
-                new UserDto(created.Id, created.FullName, created.Email, created.Role.ToString()));
+                new UserDto(created.Id, created.FullName, created.Email, created.Role.ToString(), created.Phone));
         }
         catch
         {
@@ -151,6 +152,7 @@ public class UsersController : ControllerBase
 
         existing.FullName = request.FullName.Trim();
         existing.Email    = normalizedEmail;
+        existing.Phone    = string.IsNullOrWhiteSpace(request.Phone) ? null : request.Phone.Trim();
 
         await using var transaction = await _dbContext.Database.BeginTransactionAsync();
         try
@@ -182,7 +184,7 @@ public class UsersController : ControllerBase
             }
 
             await transaction.CommitAsync();
-            return Ok(new UserDto(updated.Id, updated.FullName, updated.Email, updated.Role.ToString()));
+            return Ok(new UserDto(updated.Id, updated.FullName, updated.Email, updated.Role.ToString(), updated.Phone));
         }
         catch
         {

@@ -9,7 +9,6 @@ interface BuildCustomerDeps {
 
 /**
  * Builds a Customer entity from raw input.
- * fullName is split on the first space into firstName + lastName.
  * Throws DomainError for invalid inputs.
  */
 export function buildCustomer(
@@ -40,15 +39,9 @@ export function buildCustomer(
   const genId = deps.newId ?? newId;
   const today = deps.today ?? (() => new Date().toISOString().slice(0, 10));
 
-  const trimmedName = fullName.trim();
-  const spaceIndex = trimmedName.indexOf(' ');
-  const firstName = spaceIndex === -1 ? trimmedName : trimmedName.slice(0, spaceIndex);
-  const lastName = spaceIndex === -1 ? '' : trimmedName.slice(spaceIndex + 1).trim();
-
   return {
     id: genId(),
-    firstName,
-    lastName,
+    fullName: fullName.trim(),
     phone: phone.trim(),
     email: email?.trim() ?? '',
     createdDate: today(),

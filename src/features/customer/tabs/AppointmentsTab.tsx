@@ -60,7 +60,7 @@ export function AppointmentsTab() {
                 {tt?.name ?? '—'}
               </p>
               <p className="text-xs text-clinic-muted truncate">
-                {therapist ? `${therapist.firstName} ${therapist.lastName}` : '—'}
+                {therapist ? therapist.fullName : '—'}
               </p>
             </div>
 

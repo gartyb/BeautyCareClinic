@@ -370,3 +370,119 @@
     src/App.tsx — added /appointments route
     src/components/shared/Sidebar.tsx — "לוח זמנים" nav item enabled, routes to /appointments, visible to both roles
     src/test/renderWithProviders.tsx — AppointmentsProvider added to test provider tree
+
+2026-07-17 Phase 008 Review Fixes — Security, correctness, and quality fixes
+  Branch: feature/phase-007-backend-foundation
+  Build: PASS (dotnet build — 0 errors; npm run build — 0 TypeScript errors)
+  Tests: 252 PASS, 0 FAIL (frontend); 58 PASS, 0 FAIL (backend)
+  Fixes applied:
+    Fix 1 (P0): GlobalSettingsController.cs — removed null-guard blocking upsert; setting is now
+      created with new Guid when absent; UpdateAsync upsert is now reachable
+    Fix 1+12 (P0+P2): GlobalSettingsController.cs — bulk PUT loop wrapped in a DB transaction;
+      AppDbContext injected; partial failures roll back all changes
+    Fix 2 (P1/H3): appsettings.Development.json — SeedData:DefaultPassword removed; comment
+      instructs use of dotnet user-secrets; DbSeeder.cs — missing password logs a warning and
+      skips user seeding instead of falling back to a hardcoded password
+    Fix 3 (P1): tokenManager.ts — getToken() now clears and returns null when token is expired
+    Fix 4 (P1): apiClient.ts — auth:unauthorized event is suppressed when URL ends with /auth/login
+    Fix 5 (P1): AuthController.cs — ExpiresInHours read via _configuration.GetValue<int>(…, 24)
+      replacing int.Parse; IConfiguration injected as constructor parameter
+    Fix 6 (P1): LoginPage.tsx — reads location.state?.from?.pathname via useLocation;
+      navigates to saved path (or /search) after successful login;
+      AuthContext.login no longer navigates (navigation delegated to caller)
+    Fix 7 (H1): Program.cs — TokenValidationParameters.ValidAlgorithms pinned to HS256
+    Fix 8 (H4): AuthController.cs — [ResponseCache(NoStore = true, …)] attribute on class;
+      prevents proxy caching of auth responses
+    Fix 9 (M2): Program.cs — explicit lockout policy: MaxFailedAccessAttempts=5,
+      DefaultLockoutTimeSpan=15min, AllowedForNewUsers=true
+    Fix 10 (L1): apiClient.ts — body removed from POST/PUT log statements
+    Fix 11 (P2): TreatmentTypeRepository.cs — ExistsByNameAsync escapes \, %, _ in name
+      before ILike; ESCAPE clause '\\' added
+  Files changed:
+    backend/BeautyCareClinic.Api/Controllers/GlobalSettingsController.cs
+    backend/BeautyCareClinic.Api/Controllers/AuthController.cs
+    backend/BeautyCareClinic.Api/appsettings.Development.json
+    backend/BeautyCareClinic.Api/Program.cs
+    backend/BeautyCareClinic.Infrastructure/Data/DbSeeder.cs
+    backend/BeautyCareClinic.Infrastructure/Repositories/TreatmentTypeRepository.cs
+    src/api/tokenManager.ts
+    src/api/apiClient.ts
+    src/contexts/AuthContext.tsx
+    src/features/auth/LoginPage.tsx
+
+2026-07-17 Phase 008 — Frontend-Backend Integration
+  Branch: feature/phase-007-backend-foundation
+  Build: PASS (npm run build — 0 TypeScript errors; dotnet build — 0 errors)
+  Tests: 252 PASS, 0 FAIL (all 252 prior tests green + fetch mock setup)
+    - 13 frontend test files: 252 tests (unchanged count; existing tests adapted to work with API-wired contexts)
+    - Backend: 58 xUnit tests PASS (unchanged)
+  Changes Closed: CR-008 (dev switcher removed), CR-011 (fullName migration), CR-015 (wildcard escaping)
+  Files created (frontend):
+    src/api/apiClient.ts — singleton fetch wrapper, Bearer auth, 401 → auth:unauthorized event
+    src/api/apiError.ts — ApiError interface + ApiRequestError class
+    src/api/tokenManager.ts — localStorage JWT with expiry tracking (authToken, authTokenExpiresAt)
+    src/api/authApi.ts — loginUser(), getCurrentUser()
+    src/api/customersApi.ts — CRUD /customers
+    src/api/treatmentTypesApi.ts — CRUD /treatment-types
+    src/api/usersApi.ts — CRUD /users
+    src/api/globalSettingsApi.ts — GET + PUT /global-settings
+    src/api/index.ts — re-exports
+    src/contexts/AuthContext.tsx — currentUser, isInitializing, login, logout; auto-logout on 401 event
+    src/components/shared/PrivateRoute.tsx — Outlet wrapper with initializing spinner + redirect
+    src/features/auth/LoginPage.tsx — /login, RTL Hebrew, error mapping per HTTP code
+    .env.example — VITE_API_URL=http://localhost:5000/api/v1
+  Files created (backend migration):
+    BeautyCareClinic.Infrastructure/Migrations/*_Phase008Changes.cs — TreatmentType.DefaultDurationMinutes + User.Phone
+  Files modified (frontend):
+    src/types/Customer.ts — fullName replaces firstName/lastName in CustomerSummary
+    src/types/User.ts — fullName replaces firstName/lastName in User
+    src/data/customers.ts — 5 customers updated to fullName
+    src/data/therapists.ts — 2 users updated to fullName
+    src/contexts/CustomersContext.tsx — API-wired; async CRUD; isLoading/error/refetch added
+    src/contexts/TreatmentTypesContext.tsx — API-wired; async CRUD; isLoading/error added
+    src/contexts/GlobalSettingsContext.tsx — API-wired; async setters; isLoading/error added; calendarHours setters async
+    src/App.tsx — AuthProvider integration; /login public route; PrivateRoute wrapper; user switcher removed
+    src/main.tsx — AuthProvider added inside BrowserRouter, outside other providers
+    src/components/shared/Header.tsx — fullName from useAuth(); logout button; dev switcher removed
+    src/features/search/SearchScreen.tsx — isLoading skeleton; error + retry; fullName filter
+    src/features/customer/customerService.ts — no more name-splitting; returns fullName directly
+    src/features/customer/CustomerCardHeader.tsx — initials from fullName; display fullName
+    src/features/customer/NewCustomerModal.tsx — async handleSave; ApiRequestError error display
+    src/features/therapists/TherapistModal.tsx — fullName single field (firstName/lastName collapsed)
+    src/contexts/TherapistsContext.tsx — createTherapist(fullName, email, phone)
+    src/features/settings/SettingsScreen.tsx — async save handlers with loading state
+    src/features/treatmentTypes/TreatmentTypeModal.tsx — async handleSave with isSaving state
+    src/features/treatmentTypes/TreatmentTypesScreen.tsx — async delete
+    src/features/appointments/AppointmentPopover.tsx — customer.fullName
+    src/features/appointments/RescheduleModal.tsx — therapist.fullName
+    src/features/appointments/BookAppointmentModal.tsx — customer.fullName / therapist.fullName
+    src/features/appointments/components/CalendarGrid.tsx — therapist.fullName
+    src/features/customer/tabs/NotesTab.tsx — author fullName
+    src/features/customer/tabs/TreatmentModal.tsx — therapist.fullName
+    src/features/customer/tabs/PaymentsTab.tsx — fullName
+    src/features/customer/tabs/TreatmentHistoryTab.tsx — fullName
+    src/features/customer/tabs/AppointmentsTab.tsx — therapist.fullName
+    src/data/customersService.ts — fullName property
+    src/test/setup.ts — global fetch mock for API-wired contexts
+    src/test/renderWithProviders.tsx — AuthProvider added
+    src/features/customer/customerService.test.ts — fullName assertions
+    src/data/customersService.test.ts — fullName property assertions
+    src/features/order/orderService.test.ts — User fixture uses fullName
+    src/features/payment/paymentService.test.ts — User fixture uses fullName
+  Files modified (backend):
+    BeautyCareClinic.Domain/Entities/TreatmentType.cs — DefaultDurationMinutes int?
+    BeautyCareClinic.Domain/Entities/User.cs — Phone string?
+    BeautyCareClinic.Application/DTOs/TreatmentTypeDtos.cs — DefaultDurationMinutes in all 3 records
+    BeautyCareClinic.Application/DTOs/AuthDtos.cs — Phone? in UserDto
+    BeautyCareClinic.Application/DTOs/UserDtos.cs — Phone? in Create/UpdateUserRequest
+    BeautyCareClinic.Application/Services/GlobalSettingsKeys.cs — CalendarStartHour/CalendarEndHour keys + KnownKeys
+    BeautyCareClinic.Api/Controllers/TreatmentTypesController.cs — DefaultDurationMinutes mapping
+    BeautyCareClinic.Api/Controllers/UsersController.cs — Phone mapping (trim + null-coerce)
+    BeautyCareClinic.Api/Controllers/AuthController.cs — Phone in UserDto
+    BeautyCareClinic.Infrastructure/Repositories/CustomerRepository.cs — CR-015 wildcard escaping
+    BeautyCareClinic.Infrastructure/Data/DbSeeder.cs — Phone + DefaultDurationMinutes + calendar settings seed
+  Documentation updated:
+    docs/ARCHITECTURE.md — Frontend structure (Phase 8), API Layer Pattern, State Management table
+    docs/UI.md — Login screen added; Global Settings updated
+    CHANGE_REQUESTS.md — CR-008/CR-011/CR-015 closed; Completed section updated
+    phases/phase-008/PHASE_SUMMARY.md — implementation results, test results, lessons learned

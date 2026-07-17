@@ -169,7 +169,7 @@ export function TherapistDetail() {
             <ChevronRight size={20} />
           </button>
           <h1 className="text-2xl font-bold text-clinic-text">
-            {therapist.firstName} {therapist.lastName}
+            {therapist.fullName}
           </h1>
           {therapist.phone && (
             <span className="text-sm text-clinic-muted" dir="ltr">{formatPhone(therapist.phone)}</span>

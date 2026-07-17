@@ -7,8 +7,8 @@ const DEFAULT_MAX_PAYMENT_COUNT = 3;
 
 // ─── Test fixtures ────────────────────────────────────────────────────────────
 
-const manager: User = { id: 'user-manager-1', firstName: 'שרה', lastName: 'כהן', email: 'manager@clinic.com', role: 'Manager' };
-const therapist: User = { id: 'user-therapist-1', firstName: 'מיכל', lastName: 'לוי', email: 'therapist@clinic.com', role: 'Therapist' };
+const manager: User = { id: 'user-manager-1', fullName: 'שרה כהן', email: 'manager@clinic.com', role: 'Manager' };
+const therapist: User = { id: 'user-therapist-1', fullName: 'מיכל לוי', email: 'therapist@clinic.com', role: 'Therapist' };
 
 const nonSeriesPkg: PackageType = {
   id: 'pt-non-series',

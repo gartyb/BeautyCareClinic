@@ -1,50 +1,72 @@
-import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { TreatmentType } from '../types/TreatmentType';
-import { treatmentTypes as seedTreatmentTypes } from '../data/treatmentTypes';
-import { newId } from '../domain/id';
-import { DomainError } from '../domain/errors';
+import {
+  getTreatmentTypes,
+  createTreatmentType as apiCreate,
+  updateTreatmentType as apiUpdate,
+  deleteTreatmentType as apiDelete,
+} from '../api/treatmentTypesApi';
+import { ApiRequestError } from '../api/apiError';
 
 interface TreatmentTypesContextValue {
   treatmentTypes: TreatmentType[];
-  createTreatmentType: (name: string, defaultDurationMinutes: number) => TreatmentType;
-  updateTreatmentType: (id: string, name: string, defaultDurationMinutes: number) => void;
-  deleteTreatmentType: (id: string) => void;
+  isLoading: boolean;
+  error: string | null;
+  createTreatmentType: (name: string, defaultDurationMinutes: number) => Promise<TreatmentType>;
+  updateTreatmentType: (id: string, name: string, defaultDurationMinutes: number) => Promise<void>;
+  deleteTreatmentType: (id: string) => Promise<void>;
 }
 
 const TreatmentTypesContext = createContext<TreatmentTypesContextValue | null>(null);
 
 export function TreatmentTypesProvider({ children }: { children: React.ReactNode }) {
-  const [treatmentTypes, setTreatmentTypes] = useState<TreatmentType[]>(seedTreatmentTypes);
+  const [treatmentTypes, setTreatmentTypes] = useState<TreatmentType[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const createTreatmentType = useCallback((name: string, defaultDurationMinutes: number): TreatmentType => {
-    const trimmed = name.trim();
-    if (!trimmed) throw new DomainError('TREATMENT_TYPE_NAME_REQUIRED', 'שם סוג טיפול נדרש');
-    if (trimmed.length > 100) throw new DomainError('TREATMENT_TYPE_NAME_TOO_LONG', 'שם לא יכול לעלות על 100 תווים');
-    if (!Number.isInteger(defaultDurationMinutes) || defaultDurationMinutes <= 0) {
-      throw new DomainError('TREATMENT_TYPE_DURATION_INVALID', 'משך ברירת מחדל חייב להיות מספר שלם גדול מ-0');
+  const fetchAll = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const dtos = await getTreatmentTypes();
+      setTreatmentTypes(dtos.map(dto => ({
+        id: dto.id,
+        name: dto.name,
+        defaultDurationMinutes: dto.defaultDurationMinutes ?? 60,
+      })));
+    } catch (e) {
+      const msg = e instanceof ApiRequestError ? e.message : 'שגיאה בטעינת סוגי טיפולים';
+      setError(msg);
+    } finally {
+      setIsLoading(false);
     }
-    const tt: TreatmentType = { id: newId(), name: trimmed, defaultDurationMinutes };
+  }, []);
+
+  useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  const createTreatmentType = useCallback(async (name: string, defaultDurationMinutes: number): Promise<TreatmentType> => {
+    const dto = await apiCreate({ name, defaultDurationMinutes });
+    const tt: TreatmentType = { id: dto.id, name: dto.name, defaultDurationMinutes: dto.defaultDurationMinutes ?? defaultDurationMinutes };
     setTreatmentTypes(prev => [...prev, tt]);
     return tt;
   }, []);
 
-  const updateTreatmentType = useCallback((id: string, name: string, defaultDurationMinutes: number): void => {
-    const trimmed = name.trim();
-    if (!trimmed) throw new DomainError('TREATMENT_TYPE_NAME_REQUIRED', 'שם סוג טיפול נדרש');
-    if (trimmed.length > 100) throw new DomainError('TREATMENT_TYPE_NAME_TOO_LONG', 'שם לא יכול לעלות על 100 תווים');
-    if (!Number.isInteger(defaultDurationMinutes) || defaultDurationMinutes <= 0) {
-      throw new DomainError('TREATMENT_TYPE_DURATION_INVALID', 'משך ברירת מחדל חייב להיות מספר שלם גדול מ-0');
-    }
-    setTreatmentTypes(prev => prev.map(tt => tt.id === id ? { ...tt, name: trimmed, defaultDurationMinutes } : tt));
+  const updateTreatmentType = useCallback(async (id: string, name: string, defaultDurationMinutes: number): Promise<void> => {
+    const dto = await apiUpdate(id, { name, defaultDurationMinutes });
+    setTreatmentTypes(prev => prev.map(tt => tt.id === id
+      ? { ...tt, name: dto.name, defaultDurationMinutes: dto.defaultDurationMinutes ?? defaultDurationMinutes }
+      : tt
+    ));
   }, []);
 
-  const deleteTreatmentType = useCallback((id: string): void => {
+  const deleteTreatmentType = useCallback(async (id: string): Promise<void> => {
+    await apiDelete(id);
     setTreatmentTypes(prev => prev.filter(tt => tt.id !== id));
   }, []);
 
   const value = useMemo<TreatmentTypesContextValue>(
-    () => ({ treatmentTypes, createTreatmentType, updateTreatmentType, deleteTreatmentType }),
-    [treatmentTypes, createTreatmentType, updateTreatmentType, deleteTreatmentType]
+    () => ({ treatmentTypes, isLoading, error, createTreatmentType, updateTreatmentType, deleteTreatmentType }),
+    [treatmentTypes, isLoading, error, createTreatmentType, updateTreatmentType, deleteTreatmentType]
   );
 
   return (

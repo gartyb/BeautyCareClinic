@@ -63,3 +63,15 @@ Resolution options:
 
 Deferred to: Phase 2 dependency audit.
 
+
+## FU-008: TherapistsContext createTherapist is still mock-only
+
+Source: Phase 008 implementation.
+`TherapistsContext.tsx` uses an in-memory array for therapists and `createTherapist(fullName, email, phone)` only mutates local state. The `UsersController` API exists and is wired for global-settings/customers, but TherapistContext was explicitly kept on mock data for Phase 008. When Phase 009 wires Users to the API, this context must be updated to call `usersApi.createUser` and `getUsers(role='Therapist')`.
+Priority: High (blocks Phase 009 Users wire-up).
+
+## FU-009: React act() warnings in tests from async context effects
+
+Source: Phase 008 implementation.
+`CustomersContext`, `TreatmentTypesContext`, and `GlobalSettingsContext` all fire async `useEffect` calls on mount which update state. Test components that render these contexts without wrapping assertions in `act()` produce React act() warnings. All 252 tests pass but the warnings add noise. Wrap relevant test helper `renderWithProviders` in `act()` or migrate context tests to use `waitFor()`.
+Priority: Low.

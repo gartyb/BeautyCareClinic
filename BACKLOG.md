@@ -27,3 +27,11 @@ Two React Router v6→v7 migration warnings appear in tests:
 - v7_startTransition
 - v7_relativeSplatPath
 These are harmless but could be addressed by adding future flags to BrowserRouter in main.tsx.
+
+## BL-005: Retry logic on transient 5xx errors
+
+`apiClient.ts` throws immediately on any non-OK response. The Phase 008 spec mentioned "retry once on 5xx". This was deferred — no retry logic was implemented. Consider adding a single automatic retry with exponential backoff for 500/502/503/504 responses, skipped for 4xx.
+
+## BL-006: Centralized error-to-Hebrew toast mapper
+
+Error display is currently inline per component (NewCustomerModal, TreatmentTypeModal, SettingsScreen). A shared `useApiError()` hook or `errorToHebrew(err: ApiRequestError): string` utility would eliminate repetition and ensure consistent Hebrew error messages across all future API-wired components.

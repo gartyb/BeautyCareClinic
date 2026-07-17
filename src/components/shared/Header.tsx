@@ -1,15 +1,8 @@
-import { useState } from 'react';
-import { ChevronDown } from 'lucide-react';
-import { therapists } from '../../data/therapists';
-import { User } from '../../types/User';
+import { LogOut } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
-interface Props {
-  currentUser: User;
-  onUserChange: (user: User) => void;
-}
-
-export function Header({ currentUser, onUserChange }: Props) {
-  const [dropdownOpen, setDropdownOpen] = useState(false);
+export function Header() {
+  const { currentUser, logout } = useAuth();
 
   return (
     <header className="bg-white border-b border-clinic-border shadow-sm h-14 flex items-center justify-between px-6">
@@ -21,33 +14,21 @@ export function Header({ currentUser, onUserChange }: Props) {
         <span className="text-xl font-bold text-clinic-gold">מרפאת יופי</span>
       </div>
 
-      {/* Second DOM child = visually LEFT in RTL: user switcher */}
-      <div className="relative">
-        <button
-          onClick={() => setDropdownOpen(o => !o)}
-          className="flex items-center gap-2 text-sm text-clinic-muted hover:text-clinic-text transition-colors"
-        >
-          <span>Dev: {currentUser.firstName} {currentUser.lastName}</span>
-          <ChevronDown size={14} />
-        </button>
-
-        {dropdownOpen && (
-          <div className="absolute top-full mt-1 right-0 bg-white border border-clinic-border rounded-lg shadow-lg z-50 min-w-[180px]">
-            {therapists.map(user => (
-              <button
-                key={user.id}
-                onClick={() => {
-                  onUserChange(user);
-                  setDropdownOpen(false);
-                }}
-                className="w-full text-right px-4 py-2 text-sm text-clinic-text hover:bg-clinic-blush first:rounded-t-lg last:rounded-b-lg"
-              >
-                {user.firstName} {user.lastName}
-                <span className="text-clinic-muted mr-2">({user.role === 'Manager' ? 'מנהלת' : 'מטפלת'})</span>
-              </button>
-            ))}
-          </div>
+      {/* Second DOM child = visually LEFT in RTL: user info + logout */}
+      <div className="flex items-center gap-3">
+        {currentUser && (
+          <span className="text-sm text-clinic-text font-medium">
+            {currentUser.fullName}
+          </span>
         )}
+        <button
+          onClick={logout}
+          title="יציאה"
+          className="flex items-center gap-1.5 text-sm text-clinic-muted hover:text-red-500 transition-colors px-2 py-1 rounded-lg hover:bg-red-50"
+        >
+          <LogOut size={16} />
+          <span>יציאה</span>
+        </button>
       </div>
     </header>
   );

@@ -27,7 +27,7 @@ describe('searchCustomers', () => {
 
   it('finds customer by phone prefix', () => {
     const results = searchCustomers('050');
-    // cust-1 has 050-1234567, cust-5 has 050-3334455
+    // cust-1 has 0501234567, cust-5 has 0503334455
     expect(results.length).toBeGreaterThanOrEqual(1);
     expect(results.some(c => c.id === 'cust-1')).toBe(true);
   });
@@ -50,8 +50,7 @@ describe('searchCustomers', () => {
   it('returned items have expected CustomerSummary shape', () => {
     const results = searchCustomers('רחל');
     expect(results[0]).toHaveProperty('id');
-    expect(results[0]).toHaveProperty('firstName');
-    expect(results[0]).toHaveProperty('lastName');
+    expect(results[0]).toHaveProperty('fullName');
     expect(results[0]).toHaveProperty('phone');
     expect(results[0]).toHaveProperty('email');
   });

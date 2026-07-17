@@ -12,8 +12,13 @@ interface Props {
   query: string;
 }
 
-function initials(firstName: string, lastName: string): string {
-  return (firstName[0] ?? '') + (lastName[0] ?? '');
+function initials(fullName: string): string {
+  return fullName
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(w => w[0].toUpperCase())
+    .join('');
 }
 
 export function SearchResults({ results, query }: Props) {
@@ -60,12 +65,12 @@ export function SearchResults({ results, query }: Props) {
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-full bg-clinic-pink flex items-center justify-center flex-shrink-0">
                     <span className="text-xs font-bold text-clinic-gold">
-                      {initials(customer.firstName, customer.lastName)}
+                      {initials(customer.fullName)}
                     </span>
                   </div>
                   <div className="flex flex-col">
                     <span className="font-semibold text-clinic-text">
-                      {customer.firstName} {customer.lastName}
+                      {customer.fullName}
                     </span>
                     <span className="text-xs text-clinic-muted" dir="ltr">{formatPhone(customer.phone)}</span>
                   </div>

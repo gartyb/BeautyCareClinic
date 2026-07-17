@@ -40,7 +40,7 @@ export function PaymentsTab() {
               <span className="text-clinic-muted">הזמנה {shortOrderId}</span>
               {recorder && (
                 <span className="text-xs text-clinic-muted">
-                  נרשם ע&quot;י {recorder.firstName} {recorder.lastName}
+                  נרשם ע&quot;י {recorder.fullName}
                 </span>
               )}
             </div>

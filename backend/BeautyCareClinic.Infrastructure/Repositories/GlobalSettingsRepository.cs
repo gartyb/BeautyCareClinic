@@ -30,10 +30,18 @@ public class GlobalSettingsRepository : IGlobalSettingsRepository
     public async Task<GlobalSetting> UpdateAsync(GlobalSetting setting)
     {
         var existing = await _context.GlobalSettings
-            .FirstOrDefaultAsync(g => g.Name == setting.Name)
-            ?? throw new KeyNotFoundException($"Setting '{setting.Name}' not found.");
+            .FirstOrDefaultAsync(g => g.Name == setting.Name);
 
-        existing.Value = setting.Value;
+        if (existing is null)
+        {
+            existing = new GlobalSetting { Id = Guid.NewGuid(), Name = setting.Name, Value = setting.Value };
+            _context.GlobalSettings.Add(existing);
+        }
+        else
+        {
+            existing.Value = setting.Value;
+        }
+
         await _context.SaveChangesAsync();
         return existing;
     }

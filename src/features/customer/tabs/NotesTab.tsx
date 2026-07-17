@@ -27,7 +27,7 @@ function NoteModal({ note, onClose }: NoteModalProps) {
       <div className="flex flex-col gap-3 text-sm">
         {author && (
           <div className="flex justify-between">
-            <span className="text-clinic-text">{author.firstName} {author.lastName}</span>
+            <span className="text-clinic-text">{author.fullName}</span>
             <span className="text-clinic-muted">מחברת</span>
           </div>
         )}
@@ -91,7 +91,7 @@ export function NotesTab() {
             <div className="flex flex-col items-end gap-1 flex-1">
               <div className="flex items-center gap-2 text-xs text-clinic-muted">
                 {treatmentType && <span>{treatmentType.name}</span>}
-                {author && <span>{author.firstName} {author.lastName}</span>}
+                {author && <span>{author.fullName}</span>}
                 <span>{formatDate(note.createdDate)}</span>
               </div>
               <p className="text-sm text-clinic-text text-right leading-relaxed">

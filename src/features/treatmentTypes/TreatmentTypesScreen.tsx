@@ -105,7 +105,7 @@ export function TreatmentTypesScreen() {
                               למחוק את <strong>{tt.name}</strong>?
                             </span>
                             <button
-                              onClick={() => { deleteTreatmentType(tt.id); setDeletingId(null); }}
+                              onClick={() => { void deleteTreatmentType(tt.id).then(() => setDeletingId(null)); }}
                               className="px-3 py-1 rounded-lg bg-red-500 text-white hover:bg-red-600 text-sm font-medium"
                             >
                               מחק

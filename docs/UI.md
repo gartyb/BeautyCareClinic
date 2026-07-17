@@ -69,9 +69,15 @@ List, create, and edit package types. Timer-based constraints enforced in UI.
 
 Configure working hours, unavailable dates, and treatment capabilities per therapist.
 
+### Login *(public)*
+
+Route `/login`. Email + password form, RTL Hebrew.
+Error messages: 401 → "כתובת דוא״ל או סיסמה שגויים", 429 → lockout message, network error → "קשר אינו יציב".
+On success: JWT stored in localStorage → redirect to `/search`.
+
 ### Global Settings *(Manager only)*
 
-Set default maximum payment count.
+Set default maximum payment count, calendar start hour, calendar end hour.
 
 ## Component Conventions
 
