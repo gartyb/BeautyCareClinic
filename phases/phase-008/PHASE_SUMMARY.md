@@ -156,7 +156,7 @@ Implementation
 
 ## Status
 
-Approved — Pending Commit
+Completed
 
 ## Implemented
 
@@ -233,8 +233,8 @@ GlobalSettings seed (no migration): `calendar_start_hour = "8"`, `calendar_end_h
 ## Version
 
 - Version: v0.8.0
-- Commit: —
-- Tag: —
+- Commit: 0a58fb5
+- Tag: v0.8.0
 
 ## Lessons Learned
 

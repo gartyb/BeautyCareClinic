@@ -3,14 +3,14 @@
 ## Current State
 
 - Current phase: 008 — Frontend-Backend Integration
-- Phase status: Approved — Pending Commit
+- Phase status: Completed
 - Current branch: feature/phase-008-frontend-api-integration
 - Latest approved version: v0.8.0
-- Latest approved tag: v0.7.0
+- Latest approved tag: v0.8.0
 
 ## Current Activity
 
-Phase 008 אושר על ידי המשתמש לאחר בדיקה ידנית. ממתין לcommit + tag v0.8.0.
+Phase 008 הושלם. מוכן למיזוג ל-main ולהצעת Phase 009.
 
 ## Completed Phases
 
