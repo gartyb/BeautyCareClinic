@@ -2,15 +2,15 @@
 
 ## Current State
 
-- Current phase: 009 — Orders, Series & Payments
+- Current phase: 010 — Treatment Recording & Notes
 - Phase status: Completed
-- Current branch: feature/phase-009-orders-payments
-- Latest approved version: v0.9.0
-- Latest approved tag: v0.9.0
+- Current branch: feature/phase-010-treatment-recording-notes
+- Latest approved version: v0.10.0
+- Latest approved tag: v0.10.0
 
 ## Current Activity
 
-Phase 009 הושלם ואושר. ממתין למיזוג ל-main והצעת Phase 010.
+Phase 010 הושלם ואושר (v0.10.0). מוכן להצעת Phase 011.
 
 ## Completed Phases
 
@@ -25,6 +25,7 @@ Phase 009 הושלם ואושר. ממתין למיזוג ל-main והצעת Phas
 | 007   | Backend Foundation                       | v0.7.0  | Completed |
 | 008   | Frontend-Backend Integration             | v0.8.0  | Completed |
 | 009   | Orders, Series & Payments                | v0.9.0  | Completed |
+| 010   | Treatment Recording & Notes              | v0.10.0 | Completed |
 
 ## Open Change Requests
 
@@ -53,4 +54,4 @@ Phase 009 הושלם ואושר. ממתין למיזוג ל-main והצעת Phas
 
 ## Next Step
 
-Phase 009 הושלם (v0.9.0). מוכן להצעת Phase 010.
+Phase 010 הושלם (v0.10.0). מוכן להצעת Phase 011.

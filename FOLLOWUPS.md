@@ -75,3 +75,52 @@ Priority: High (blocks Phase 009 Users wire-up).
 Source: Phase 008 implementation.
 `CustomersContext`, `TreatmentTypesContext`, and `GlobalSettingsContext` all fire async `useEffect` calls on mount which update state. Test components that render these contexts without wrapping assertions in `act()` produce React act() warnings. All 252 tests pass but the warnings add noise. Wrap relevant test helper `renderWithProviders` in `act()` or migrate context tests to use `waitFor()`.
 Priority: Low.
+
+## FU-010: ActiveSeriesTab still calls mock-data treatment recording functions
+
+Source: Phase 010 implementation.
+`ActiveSeriesTab.tsx` timer ("התחל טיימר") and quantity ("סמן טיפול כבוצע") buttons call
+`recordTimerTreatment` and `recordQuantityTreatment` from `CustomerContext`, which operate
+on in-memory mock data. `treatmentsApi.create` is implemented and available, but wiring it
+requires CustomerContext to be refactored to call the API and then invalidate/re-fetch
+`treatments` and `treatmentSeries`. This is blocked by the broader "CustomerContext API
+integration" task.
+Priority: High (functional gap vs backend).
+
+## FU-011: TreatmentModal.updateTreatmentNote operates on mock data
+
+Source: Phase 010 implementation.
+`TreatmentModal.tsx` calls `updateTreatmentNote(treatmentId, text)` from CustomerContext,
+which patches in-memory state only. There is no backend endpoint for editing treatment notes
+after creation (spec: no PUT on treatments). Treatment-level notes should be passed at
+creation time via `CreateTreatmentRequest.notes`. The inline note editor in TreatmentModal
+should either be removed or converted to a read-only view. The existing Treatment.Notes
+column is writable from the backend at POST time only.
+Priority: Medium.
+
+## FU-012: TreatmentHistoryTab missing delete UI
+
+Source: Phase 010 implementation.
+The backend DELETE /treatments/{id} endpoint is implemented and returns 204. The frontend
+TreatmentHistoryTab displays treatments but has no delete button. To be added in Phase 011
+with role-based visibility (author sees delete; other therapist does not).
+Priority: Medium.
+
+## FU-013: Loading states and toast notifications not yet implemented
+
+Source: Phase 010 implementation.
+NotesTab shows inline error strings (e.g. "שגיאה בשמירת ההערה") but no loading skeleton
+while fetching notes/treatments, and no toast notification system. The spec called for
+"loading skeletons + error toasts בעברית". Deferred to Phase 011 when a shared
+notification context is introduced.
+Priority: Medium.
+
+## FU-014: PackageTypesContext was not wired to API (Phase 009 miss)
+
+Source: Phase 009 acceptance criteria — not completed, not marked deferred.
+`PackageTypesController` and `packageTypesApi.ts` were implemented in Phase 009, but
+`PackageTypesContext` remained in-memory only (seeded from mock data). Changes to package
+types (create/update/delete) from the manager screen were not persisted to the DB.
+Fixed in Phase 010 session: context now calls `packageTypesApi` for all mutations and loads
+from API on mount.
+Priority: Fixed.

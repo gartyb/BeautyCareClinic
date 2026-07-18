@@ -107,8 +107,10 @@ erDiagram
         uuid treatment_type_id FK
         uuid user_id FK
         uuid treatment_series_id FK
-        datetime treatment_date
+        date treatment_date
         integer duration_minutes
+        text notes
+        string performed_by_full_name
     }
 
     TREATMENT_PHOTO {
@@ -152,7 +154,8 @@ erDiagram
         uuid user_id FK
         uuid treatment_type_id FK
         date note_date
-        text content
+        varchar(5000) content
+        string written_by_full_name
     }
 
     GLOBAL_SETTINGS {

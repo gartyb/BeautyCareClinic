@@ -534,3 +534,63 @@
   Documentation updated:
     docs/WORKFLOWS.md — new section "Access Model and Trust Boundary (Phase 009)"
     CHANGE_REQUESTS.md — added CR-026 through CR-030 under Open
+
+2026-07-17 Phase 010 — Treatment Recording & Notes
+  Branch: feature/phase-010-treatment-recording-notes
+  Build: PASS (dotnet build — 0 errors; npm run build — 0 TypeScript errors)
+  Tests: 274 frontend PASS, 0 FAIL; 105 backend PASS (includes 21 new Phase010Tests), 0 FAIL
+
+  Backend changes:
+    Domain entities updated:
+      Treatment.cs — added Notes (string?, nullable), PerformedByFullName (string, snapshot)
+      Note.cs — added WrittenByFullName (string, snapshot)
+    AppDbContext.cs — EF mappings for new columns; Note.Content MaxLength(5000)
+    Migration: Phase010TreatmentNotes — adds notes, performed_by_full_name, written_by_full_name columns;
+      alters Note.Content to varchar(5000)
+    New interfaces:
+      ITreatmentRepository (GetByIdAsync, ListByCustomerAsync, AddAsync, DeleteAsync)
+      INoteRepository (GetByIdAsync, ListByCustomerAsync, AddAsync, UpdateAsync, DeleteAsync)
+    New repositories:
+      TreatmentRepository — eager-loads TreatmentType, orders by TreatmentDate DESC
+      NoteRepository — eager-loads TreatmentType, orders by NoteDate DESC
+    New DTOs:
+      TreatmentDtos.cs — CreateTreatmentRequest, TreatmentDto
+      NoteDtos.cs — CreateNoteRequest, UpdateNoteRequest, NoteDto
+    New controllers:
+      TreatmentsController — 4 endpoints; POST uses SELECT FOR UPDATE on TreatmentSeries;
+        DELETE reverses series counters (clamped >= 0); Author/Manager permission check (RC-2, RC-3)
+      NotesController — 5 endpoints; content validation (non-empty, <= 5000 chars, date <= today);
+        PUT/DELETE: Author/Manager only (403 otherwise)
+    Program.cs — registered ITreatmentRepository and INoteRepository
+    New backend tests (21 in Phase010Tests.cs):
+      Timer series increment, quantity series increment, clamp at cap, standalone treatment,
+      future date validation (422), negative durationMinutes (422),
+      delete reversal (timer and quantity), auth checks (403 wrong author, 204 manager),
+      note create/update/delete, note content validation (empty, >5000, >today),
+      DTO shape verification, edge cases
+
+  Frontend changes:
+    src/types/Treatment.ts — added userId, performedByFullName, treatmentTypeName (backward-compatible)
+    src/types/Note.ts — added content, userId, writtenByFullName, noteDate, treatmentTypeName (backward-compatible)
+    src/api/treatmentsApi.ts — new module: listByCustomer, getById, create, delete
+    src/api/notesApi.ts — new module: listByCustomer, getById, create, update, delete
+    src/api/index.ts — exports for treatmentsApi, notesApi, CreateTreatmentRequest, CreateNoteRequest, UpdateNoteRequest
+    src/features/customer/tabs/TreatmentHistoryTab.tsx — getTherapistName helper (prefers performedByFullName)
+    src/features/customer/tabs/NotesTab.tsx — fully rewritten: NoteModal (add/edit), NoteDetailModal,
+      NoteRow with role-based edit/delete visibility, confirm delete dialog, error handling in Hebrew
+    src/features/treatment/apiTreatmentTests.test.ts — 20 new frontend tests:
+      treatmentsApi.create (2), treatmentsApi.delete (1), treatmentsApi.listByCustomer (1),
+      treatmentsApi.getById (1), notesApi.create (1), notesApi.update (1), notesApi.delete (1),
+      notesApi.listByCustomer (1), Note role visibility (3), Treatment role visibility (3),
+      NoteModal validation (5)
+
+  Architecture decisions enforced:
+    ADR-010-A: SELECT FOR UPDATE on TreatmentSeries for all read-modify-write (RC-2)
+    ADR-010-B: Author-or-Manager pattern — 403 inside action after entity load (RC-3)
+    RC-6: DTO never accepts userId from client — always ICurrentUserService.GetCurrentUserId()
+    RC-7: DateOnly for all date fields (consistent with Phase 009 PaymentDate)
+
+  Documentation updated:
+    docs/API_SPECIFICATION.md — 9 new endpoints for Treatments and Notes
+    docs/DATABASE_SCHEMA.md — Treatment: notes, performed_by_full_name; Note: written_by_full_name, varchar(5000) content
+    phases/phase-010/PHASE_SUMMARY.md — status updated to Implementation

@@ -316,11 +316,96 @@ Returns active series only (quantity: `completedTreatments < totalTreatments`; t
 
 ---
 
-## Planned Endpoints (Phase 10+)
+## Treatments
+
+Auth: JWT.
+
+`userId` / `performedByFullName` are server-derived from JWT — never accepted from client.
+
+### GET /api/v1/customers/{customerId}/treatments
+
+Returns treatments for a customer, sorted by date DESC.
+
+**Response 200:** `TreatmentDto[]`.
+
+### GET /api/v1/treatments/{id}
+
+**Response 200:** `TreatmentDto` | **404**.
+
+### POST /api/v1/customers/{customerId}/treatments
+
+**Request:**
+```json
+{
+  "treatmentTypeId": "<uuid>",
+  "treatmentSeriesId": "<uuid | null>",
+  "treatmentDate": "2026-07-17",
+  "durationMinutes": 60,
+  "notes": "optional note text"
+}
+```
+
+If `treatmentSeriesId` is provided: atomically increments `UsedMinutes` (timer) or `CompletedTreatments` (quantity), clamped at series cap. Uses `SELECT FOR UPDATE` to prevent concurrent lost updates.
+
+**Response 201:** Created `TreatmentDto`. | **422** `durationMinutes < 0` or `treatmentDate > today`. | **404** customer or treatment type not found.
+
+Treatment records are immutable after creation — no PUT endpoint.
+
+### DELETE /api/v1/treatments/{id}
+
+Deletes treatment and reverses series counters (clamped ≥ 0). Requires author or Manager role.
+
+**Response 204** | **403** not author and not Manager | **404**.
+
+---
+
+## Notes
+
+Auth: JWT.
+
+`userId` / `writtenByFullName` are server-derived from JWT — never accepted from client.
+
+### GET /api/v1/customers/{customerId}/notes
+
+Returns notes for a customer, sorted by date DESC.
+
+**Response 200:** `NoteDto[]`.
+
+### GET /api/v1/notes/{id}
+
+**Response 200:** `NoteDto` | **404**.
+
+### POST /api/v1/customers/{customerId}/notes
+
+**Request:**
+```json
+{
+  "treatmentTypeId": "<uuid | null>",
+  "noteDate": "2026-07-17",
+  "content": "note text (max 5000 chars)"
+}
+```
+
+**Response 201:** Created `NoteDto`. | **422** `content` empty or > 5000 chars, or `noteDate > today`. | **404** `treatmentTypeId` provided but not found.
+
+### PUT /api/v1/notes/{id}
+
+Same request body as POST. Requires author or Manager role.
+
+**Response 200:** Updated `NoteDto`. | **403** | **404** | **422**.
+
+### DELETE /api/v1/notes/{id}
+
+Requires author or Manager role.
+
+**Response 204** | **403** | **404**.
+
+---
+
+## Planned Endpoints (Phase 11+)
 
 | Resource             | Planned |
 | -------------------- | ------- |
-| Treatments           | CRUD per customer (Phase 010) |
 | Treatment Photos     | Upload + list (Phase 011) |
 | Appointments         | CRUD + availability (Phase 011) |
 | Working Hours        | Per therapist (Phase 011) |

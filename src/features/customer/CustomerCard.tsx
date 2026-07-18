@@ -19,7 +19,7 @@ interface CustomerCardProps {
 }
 
 const tabItems = [
-  { value: 'series', label: 'סדרות פעילות' },
+  { value: 'series', label: 'חבילות פעילות' },
   { value: 'history', label: 'היסטוריית טיפולים' },
   { value: 'orders', label: 'הזמנות ותשלומים' },
   { value: 'appointments', label: 'תורים' },

@@ -4,25 +4,18 @@ import { CustomerOrder } from '../types/Order';
 import { Payment } from '../types/Payment';
 import { Treatment, TreatmentPhoto } from '../types/Treatment';
 import { Note } from '../types/Note';
-import { TreatmentSeries } from '../types/TreatmentSeries';
+import { TreatmentSeries, SeriesKind } from '../types/TreatmentSeries';
 import { User } from '../types/User';
-import { applyPaymentToOrder } from '../features/payment/paymentService';
-import {
-  toFloorMinutes,
-  buildTimerTreatment,
-  buildQuantityTreatment,
-  applyTimerTreatmentToSeries,
-  applyQuantityTreatmentToSeries,
-} from '../features/treatment/treatmentService';
+import { toFloorMinutes } from '../features/treatment/treatmentService';
 
 import { useCustomers } from './CustomersContext';
 import { usePackageTypes } from './PackageTypesContext';
-import { orders as initialOrders } from '../data/orders';
-import { payments as initialPayments } from '../data/payments';
-import { treatments as initialTreatments } from '../data/treatments';
-import { notes as initialNotes } from '../data/notes';
-import { treatmentSeries as initialSeries } from '../data/series';
-import { newId as generateId } from '../domain/id';
+
+import { treatmentsApi } from '../api/treatmentsApi';
+import { treatmentSeriesApi } from '../api/treatmentSeriesApi';
+import { notesApi } from '../api/notesApi';
+import { customerOrdersApi } from '../api/customerOrdersApi';
+import { paymentsApi } from '../api/paymentsApi';
 
 interface CustomerContextValue {
   activeCustomer: Customer | null;
@@ -33,14 +26,14 @@ interface CustomerContextValue {
   notes: Note[];
   treatmentSeries: TreatmentSeries[];
   allSeries: TreatmentSeries[];
-  addOrder: (order: CustomerOrder, series: TreatmentSeries[]) => void;
-  addPayment: (payment: Payment) => void;
-  recordTimerTreatment: (seriesId: string, elapsedSeconds: number, currentUser: User) => void;
-  recordQuantityTreatment: (seriesId: string, currentUser: User) => void;
-  updateTreatmentNote: (treatmentId: string, notes: string) => void;
+  addOrder: (customerId: string, packageTypeIds: string[], maxPaymentCount?: number) => Promise<void>;
+  addPayment: (orderId: string, amount: number, paymentMethod: string, paymentDate: string) => Promise<void>;
+  recordTimerTreatment: (seriesId: string, elapsedSeconds: number, currentUser: User) => Promise<void>;
+  recordQuantityTreatment: (seriesId: string, currentUser: User) => Promise<void>;
   addTreatmentPhoto: (treatmentId: string, photo: TreatmentPhoto) => void;
   removeTreatmentPhoto: (treatmentId: string, photoId: string) => void;
-  addNote: (note: Note) => void;
+  refreshTreatments: () => Promise<void>;
+  refreshNotes: () => Promise<void>;
 }
 
 const CustomerContext = createContext<CustomerContextValue | null>(null);
@@ -49,15 +42,15 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
   const { customers } = useCustomers();
   const { packageTypes } = usePackageTypes();
   const [activeCustomerId, setActiveCustomerId] = useState<string | null>(null);
-  const [allOrders, setAllOrders] = useState<CustomerOrder[]>(initialOrders);
-  const allOrdersRef = useRef<CustomerOrder[]>(initialOrders);
+  const [allOrders, setAllOrders] = useState<CustomerOrder[]>([]);
+  const allOrdersRef = useRef<CustomerOrder[]>([]);
   useEffect(() => { allOrdersRef.current = allOrders; }, [allOrders]);
-  const [allPayments, setAllPayments] = useState<Payment[]>(initialPayments);
-  const [allSeries, setAllSeries] = useState<TreatmentSeries[]>(initialSeries);
-  const allSeriesRef = useRef<TreatmentSeries[]>(initialSeries);
+  const [allPayments, setAllPayments] = useState<Payment[]>([]);
+  const [allSeries, setAllSeries] = useState<TreatmentSeries[]>([]);
+  const allSeriesRef = useRef<TreatmentSeries[]>([]);
   useEffect(() => { allSeriesRef.current = allSeries; }, [allSeries]);
-  const [allTreatments, setAllTreatments] = useState<Treatment[]>(initialTreatments);
-  const [allNotes, setAllNotes] = useState<Note[]>(initialNotes);
+  const [allTreatments, setAllTreatments] = useState<Treatment[]>([]);
+  const [allNotes, setAllNotes] = useState<Note[]>([]);
 
   const setActiveCustomer = useCallback((customerId: string) => {
     setActiveCustomerId(customerId);
@@ -95,107 +88,121 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
     [activeCustomerId, allSeries]
   );
 
-  const addOrder = useCallback((order: CustomerOrder, seriesList: TreatmentSeries[]) => {
-    setAllOrders(prev => [...prev, order]);
-    setAllSeries(prev => [...prev, ...seriesList]);
+  // ─── Internal helper: refresh all customer data from API ─────────────────
+
+  const refreshForCustomer = useCallback(async (customerId: string) => {
+    const [apiTreatments, apiSeries, apiNotes, apiOrders] = await Promise.all([
+      treatmentsApi.listByCustomer(customerId),
+      treatmentSeriesApi.listActiveByCustomer(customerId),
+      notesApi.listByCustomer(customerId),
+      customerOrdersApi.listByCustomer(customerId),
+    ]);
+
+    const paymentsArrays = await Promise.all(
+      apiOrders.map(o => paymentsApi.listByOrder(o.id).catch(() => [] as Payment[]))
+    );
+    const apiPayments = paymentsArrays.flat();
+
+    const mappedSeries: TreatmentSeries[] = apiSeries.map(s => ({
+      ...s,
+      customerId,
+      seriesKind: (s.isTimerBased ? 'timer' : 'quantity') as SeriesKind,
+    }));
+
+    setAllTreatments(prev => [...prev.filter(t => t.customerId !== customerId), ...apiTreatments]);
+    setAllSeries(prev => [...prev.filter(s => s.customerId !== customerId), ...mappedSeries]);
+    setAllNotes(prev => [...prev.filter(n => n.customerId !== customerId), ...apiNotes]);
+    setAllOrders(prev => [...prev.filter(o => o.customerId !== customerId), ...apiOrders]);
+    setAllPayments(prev => {
+      const orderIdSet = new Set(apiOrders.map(o => o.id));
+      return [...prev.filter(p => !orderIdSet.has(p.orderId ?? p.customerOrderId ?? '')), ...apiPayments];
+    });
   }, []);
 
-  const addPayment = useCallback((payment: Payment) => {
-    // Pre-compute outside setState so DomainError propagates to the caller
-    // before any state mutation occurs (avoids orphaned payment in allPayments)
-    const currentOrder = allOrdersRef.current.find(o => o.id === (payment.orderId ?? payment.customerOrderId));
-    if (!currentOrder) return;
-    const updatedOrder = applyPaymentToOrder(currentOrder, payment); // throws DomainError if guard fails
-    setAllOrders(prev => prev.map(o => o.id === updatedOrder.id ? updatedOrder : o));
-    setAllPayments(prev => [...prev, payment]);
-  }, []);
+  // ─── Load API data when active customer changes ───────────────────────────
+
+  useEffect(() => {
+    if (!activeCustomerId) return;
+    refreshForCustomer(activeCustomerId).catch(console.error);
+  }, [activeCustomerId, refreshForCustomer]);
+
+  // ─── Orders / Payments ────────────────────────────────────────────────────
+
+  const addOrder = useCallback(
+    async (customerId: string, packageTypeIds: string[], maxPaymentCount?: number): Promise<void> => {
+      await customerOrdersApi.create(customerId, {
+        discountPercentage: 0,
+        maxPaymentCount,
+        items: packageTypeIds.map(id => ({ packageTypeId: id })),
+      });
+      await refreshForCustomer(customerId);
+    },
+    [refreshForCustomer]
+  );
+
+  const addPayment = useCallback(
+    async (orderId: string, amount: number, paymentMethod: string, paymentDate: string): Promise<void> => {
+      const order = allOrdersRef.current.find(o => o.id === orderId);
+      if (!order?.customerId) throw new Error('ההזמנה לא נמצאה');
+      await paymentsApi.create(orderId, { amount, paymentMethod, paymentDate });
+      await refreshForCustomer(order.customerId);
+    },
+    [refreshForCustomer]
+  );
+
+  // ─── Treatment recording — calls API then refreshes ───────────────────────
 
   const recordTimerTreatment = useCallback(
-    (seriesId: string, elapsedSeconds: number, currentUser: User) => {
+    async (seriesId: string, elapsedSeconds: number, _currentUser: User): Promise<void> => {
       const series = allSeriesRef.current.find(s => s.id === seriesId);
-      if (!series) return;
+      if (!series || !series.customerId) throw new Error('סדרת הטיפולים לא נמצאה');
 
       const durationMinutes = toFloorMinutes(elapsedSeconds);
-      if (durationMinutes === 0) return;
+      if (durationMinutes === 0) throw new Error('משך הטיפול חייב להיות לפחות דקה אחת');
 
-      const pkg = packageTypes.find(p => p.id === series.packageTypeId);
-      if (!pkg) return;
-      if (!series.customerId) return;
+      const treatmentTypeId = series.treatmentTypeId
+        ?? packageTypes.find(p => p.id === series.packageTypeId)?.treatmentTypeId;
+      if (!treatmentTypeId) throw new Error('סוג הטיפול לא זוהה');
 
-      try {
-        const updatedSeries = applyTimerTreatmentToSeries(series, durationMinutes);
-        const treatment = buildTimerTreatment(
-          {
-            seriesId,
-            customerId: series.customerId,
-            treatmentTypeId: pkg.treatmentTypeId,
-            therapistId: currentUser.id,
-            durationMinutes,
-          },
-          {
-            newId: generateId,
-            now: () => new Date().toISOString().slice(0, 10),
-          }
-        );
-
-        setAllSeries(prev => prev.map(s => s.id === updatedSeries.id ? updatedSeries : s));
-        setAllTreatments(prev => [...prev, treatment]);
-      } catch (e) {
-        console.error('[recordTimerTreatment]', e);
-      }
+      const customerId = series.customerId;
+      await treatmentsApi.create(customerId, {
+        treatmentTypeId,
+        treatmentSeriesId: seriesId,
+        durationMinutes,
+      });
+      await refreshForCustomer(customerId);
     },
-    []
+    [packageTypes, refreshForCustomer]
   );
 
   const recordQuantityTreatment = useCallback(
-    (seriesId: string, currentUser: User) => {
+    async (seriesId: string, _currentUser: User): Promise<void> => {
       const series = allSeriesRef.current.find(s => s.id === seriesId);
-      if (!series) return;
+      if (!series || !series.customerId) throw new Error('סדרת הטיפולים לא נמצאה');
 
-      const pkg = packageTypes.find(p => p.id === series.packageTypeId);
-      if (!pkg) return;
-      if (!series.customerId) return;
+      const treatmentTypeId = series.treatmentTypeId
+        ?? packageTypes.find(p => p.id === series.packageTypeId)?.treatmentTypeId;
+      if (!treatmentTypeId) throw new Error('סוג הטיפול לא זוהה');
 
-      try {
-        const updatedSeries = applyQuantityTreatmentToSeries(series);
-        const treatment = buildQuantityTreatment(
-          {
-            seriesId,
-            customerId: series.customerId,
-            treatmentTypeId: pkg.treatmentTypeId,
-            therapistId: currentUser.id,
-          },
-          {
-            newId: generateId,
-            now: () => new Date().toISOString().slice(0, 10),
-          }
-        );
-
-        setAllSeries(prev => prev.map(s => s.id === updatedSeries.id ? updatedSeries : s));
-        setAllTreatments(prev => [...prev, treatment]);
-      } catch (e) {
-        console.error('[recordQuantityTreatment]', e);
-      }
+      const customerId = series.customerId;
+      await treatmentsApi.create(customerId, {
+        treatmentTypeId,
+        treatmentSeriesId: seriesId,
+        durationMinutes: 0,
+      });
+      await refreshForCustomer(customerId);
     },
-    []
+    [packageTypes, refreshForCustomer]
   );
 
-  const updateTreatmentNote = useCallback(
-    (treatmentId: string, noteText: string) => {
-      // FIX-1: empty string clears the note (maps to undefined on the Treatment)
-      setAllTreatments(prev =>
-        prev.map(t => t.id === treatmentId ? { ...t, notes: noteText || undefined } : t)
-      );
-    },
-    []
-  );
+  // ─── Photos (in-memory only — Phase 011 will add API) ────────────────────
 
   const addTreatmentPhoto = useCallback(
     (treatmentId: string, photo: TreatmentPhoto) => {
       setAllTreatments(prev =>
         prev.map(t =>
           t.id === treatmentId
-            ? { ...t, treatmentPhotos: [...t.treatmentPhotos, photo] }
+            ? { ...t, treatmentPhotos: [...(t.treatmentPhotos ?? []), photo] }
             : t
         )
       );
@@ -208,7 +215,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       setAllTreatments(prev =>
         prev.map(t =>
           t.id === treatmentId
-            ? { ...t, treatmentPhotos: t.treatmentPhotos.filter(p => p.id !== photoId) }
+            ? { ...t, treatmentPhotos: (t.treatmentPhotos ?? []).filter(p => p.id !== photoId) }
             : t
         )
       );
@@ -216,12 +223,17 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
-  const addNote = useCallback(
-    (note: Note) => {
-      setAllNotes(prev => [...prev, note]);
-    },
-    []
-  );
+  // ─── Public refresh functions for child components ────────────────────────
+
+  const refreshTreatments = useCallback(async () => {
+    if (!activeCustomerId) return;
+    await refreshForCustomer(activeCustomerId);
+  }, [activeCustomerId, refreshForCustomer]);
+
+  const refreshNotes = useCallback(async () => {
+    if (!activeCustomerId) return;
+    await refreshForCustomer(activeCustomerId);
+  }, [activeCustomerId, refreshForCustomer]);
 
   const value = useMemo<CustomerContextValue>(
     () => ({
@@ -237,10 +249,10 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       addPayment,
       recordTimerTreatment,
       recordQuantityTreatment,
-      updateTreatmentNote,
       addTreatmentPhoto,
       removeTreatmentPhoto,
-      addNote,
+      refreshTreatments,
+      refreshNotes,
     }),
     [
       activeCustomer,
@@ -255,10 +267,10 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       addPayment,
       recordTimerTreatment,
       recordQuantityTreatment,
-      updateTreatmentNote,
       addTreatmentPhoto,
       removeTreatmentPhoto,
-      addNote,
+      refreshTreatments,
+      refreshNotes,
     ]
   );
 

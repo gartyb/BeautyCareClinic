@@ -3,8 +3,8 @@ import { Modal } from '../../components/shared/Modal';
 import { RoleGuard } from '../../components/shared/RoleGuard';
 import { useCustomer } from '../../contexts/CustomerContext';
 import { useGlobalSettings } from '../../contexts/GlobalSettingsContext';
-import { buildNewOrder } from './orderService';
 import { usePackageTypes } from '../../contexts/PackageTypesContext';
+import { ApiRequestError } from '../../api/apiError';
 import type { User } from '../../types/User';
 
 interface NewOrderModalProps {
@@ -20,6 +20,8 @@ export function NewOrderModal({ open, onClose, customerId, currentUser }: NewOrd
   const { packageTypes } = usePackageTypes();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [maxOverride, setMaxOverride] = useState<number>(defaultMaxPaymentCount);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   function toggle(id: string) {
     setSelected(prev => {
@@ -29,25 +31,27 @@ export function NewOrderModal({ open, onClose, customerId, currentUser }: NewOrd
     });
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (selected.size === 0) return;
     const effectiveMax = currentUser.role === 'Manager' ? maxOverride : undefined;
-    // UX-only — maxPaymentCount override must be re-validated server-side when backend exists (CR-002)
     if (currentUser.role === 'Manager' && (!Number.isInteger(effectiveMax) || (effectiveMax as number) < 1 || (effectiveMax as number) > 24)) {
       return;
     }
-    const { order, series } = buildNewOrder(
-      customerId,
-      [...selected],
-      packageTypes,
-      currentUser,
-      defaultMaxPaymentCount,
-      effectiveMax
-    );
-    addOrder(order, series);
-    setSelected(new Set());
-    setMaxOverride(defaultMaxPaymentCount);
-    onClose();
+    setLoading(true);
+    setError(null);
+    try {
+      await addOrder(customerId, [...selected], effectiveMax);
+      setSelected(new Set());
+      setMaxOverride(defaultMaxPaymentCount);
+      onClose();
+    } catch (e) {
+      const msg = e instanceof ApiRequestError
+        ? e.error.message
+        : e instanceof Error ? e.message : 'שגיאה ביצירת ההזמנה';
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
   }
 
   const selectedPkgs = packageTypes.filter(pt => selected.has(pt.id));
@@ -56,6 +60,9 @@ export function NewOrderModal({ open, onClose, customerId, currentUser }: NewOrd
   return (
     <Modal open={open} onClose={onClose} title="הזמנה חדשה">
       <div className="space-y-3">
+        {packageTypes.length === 0 && (
+          <p className="text-sm text-clinic-muted text-center py-4">טוען חבילות...</p>
+        )}
         {packageTypes.map(pt => (
           <label key={pt.id} className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-clinic-bg">
             <input
@@ -94,16 +101,20 @@ export function NewOrderModal({ open, onClose, customerId, currentUser }: NewOrd
         </div>
       </RoleGuard>
 
+      {error && (
+        <div className="mt-3 text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2 text-right">{error}</div>
+      )}
+
       <div className="mt-6 flex justify-end gap-3">
-        <button onClick={onClose} className="px-4 py-2 text-sm text-clinic-muted hover:text-clinic-text">
+        <button onClick={onClose} disabled={loading} className="px-4 py-2 text-sm text-clinic-muted hover:text-clinic-text disabled:opacity-50">
           ביטול
         </button>
         <button
           onClick={handleSave}
-          disabled={selected.size === 0}
+          disabled={selected.size === 0 || loading}
           className="px-5 py-2 text-sm rounded-lg bg-clinic-gold text-white font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90"
         >
-          שמור הזמנה
+          {loading ? 'שומר...' : 'שמור הזמנה'}
         </button>
       </div>
     </Modal>

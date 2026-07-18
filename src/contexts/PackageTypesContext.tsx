@@ -1,7 +1,6 @@
-import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { PackageType } from '../types/PackageType';
-import { packageTypes as seedPackageTypes } from '../data/packageTypes';
-import { buildPackageType, updatePackageType, deletePackageType } from '../features/packages/packageTypeService';
+import { packageTypesApi } from '../api/packageTypesApi';
 
 interface BuildPackageTypeParams {
   name: string;
@@ -15,28 +14,49 @@ interface BuildPackageTypeParams {
 
 interface PackageTypesContextValue {
   packageTypes: PackageType[];
-  createPackageType: (params: BuildPackageTypeParams) => PackageType;
-  updatePackageType: (id: string, updated: PackageType) => void;
-  deletePackageType: (id: string) => void;
+  createPackageType: (params: BuildPackageTypeParams) => Promise<void>;
+  updatePackageType: (id: string, updated: PackageType) => Promise<void>;
+  deletePackageType: (id: string) => Promise<void>;
 }
 
 const PackageTypesContext = createContext<PackageTypesContextValue | null>(null);
 
 export function PackageTypesProvider({ children }: { children: React.ReactNode }) {
-  const [packageTypes, setPackageTypes] = useState<PackageType[]>(seedPackageTypes);
+  const [packageTypes, setPackageTypes] = useState<PackageType[]>([]);
 
-  const createPackageType = useCallback((params: BuildPackageTypeParams): PackageType => {
-    const newPkg = buildPackageType(params);
-    setPackageTypes(prev => [...prev, newPkg]);
-    return newPkg;
+  useEffect(() => {
+    packageTypesApi.list().then(setPackageTypes).catch(console.error);
   }, []);
 
-  const updatePackageTypeById = useCallback((id: string, updated: PackageType): void => {
-    setPackageTypes(prev => updatePackageType(id, updated, prev));
+  const createPackageType = useCallback(async (params: BuildPackageTypeParams): Promise<void> => {
+    const created = await packageTypesApi.create({
+      name: params.name,
+      treatmentTypeId: params.treatmentTypeId,
+      price: Number(params.price),
+      isSeries: params.isSeries,
+      isTimerBased: params.isTimerBased ?? false,
+      treatmentCount: params.isSeries ? params.treatmentCount : undefined,
+      minutesPerTreatment: params.isTimerBased ? params.minutesPerTreatment : undefined,
+    });
+    setPackageTypes(prev => [...prev, created]);
   }, []);
 
-  const deletePackageTypeById = useCallback((id: string): void => {
-    setPackageTypes(prev => deletePackageType(id, prev));
+  const updatePackageTypeById = useCallback(async (id: string, updated: PackageType): Promise<void> => {
+    const result = await packageTypesApi.update(id, {
+      name: updated.name,
+      treatmentTypeId: updated.treatmentTypeId,
+      price: Number(updated.price),
+      isSeries: updated.isSeries,
+      isTimerBased: updated.isTimerBased,
+      treatmentCount: updated.isSeries ? updated.treatmentCount : undefined,
+      minutesPerTreatment: updated.isTimerBased ? updated.minutesPerTreatment : undefined,
+    });
+    setPackageTypes(prev => prev.map(p => p.id === id ? result : p));
+  }, []);
+
+  const deletePackageTypeById = useCallback(async (id: string): Promise<void> => {
+    await packageTypesApi.delete(id);
+    setPackageTypes(prev => prev.filter(p => p.id !== id));
   }, []);
 
   const value = useMemo<PackageTypesContextValue>(

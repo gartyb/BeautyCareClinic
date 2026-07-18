@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react';
 import { Modal } from '../../components/shared/Modal';
 import { useCustomer } from '../../contexts/CustomerContext';
 import { usePackageTypes } from '../../contexts/PackageTypesContext';
-import { buildPayment } from './paymentService';
 import { toCents } from '../../domain/money';
 import { openOrders } from '../../features/customer/selectors';
+import { ApiRequestError } from '../../api/apiError';
 import type { User } from '../../types/User';
 import type { CustomerOrder, PaymentMethod } from '../../types/Order';
 
@@ -19,6 +19,8 @@ export function RecordPaymentModal({ open, onClose, currentUser, preselectedOrde
   const { orders, addPayment } = useCustomer();
   const { packageTypes } = usePackageTypes();
   const available = openOrders(orders);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   const [selectedOrderId, setSelectedOrderId] = useState<string>(() => {
     if (preselectedOrderId) return preselectedOrderId;
@@ -58,8 +60,8 @@ export function RecordPaymentModal({ open, onClose, currentUser, preselectedOrde
   const step = needsOrderSelection ? 'select-order' : 'payment-form';
 
   function getOrderLabel(order: CustomerOrder): string {
-    const items = (order.orderItems ?? [])
-      .map(oi => packageTypes.find(pt => pt.id === oi.packageTypeId)?.name ?? oi.packageTypeId)
+    const items = (order.items ?? order.orderItems ?? [])
+      .map(oi => oi.packageTypeName ?? packageTypes.find(pt => pt.id === oi.packageTypeId)?.name ?? oi.packageTypeId)
       .join(', ');
     const num = sortedOrders.length - sortedOrders.findIndex(o => o.id === order.id);
     return `הזמנה #${num} — ${items}`;
@@ -79,7 +81,6 @@ export function RecordPaymentModal({ open, onClose, currentUser, preselectedOrde
   }
 
   function handleClose() {
-    // Reset to prop-driven default, not a stale computed value (FIX-7)
     setSelectedOrderId(preselectedOrderId ?? '');
     setAmount('');
     setMethod('Cash');
@@ -87,30 +88,37 @@ export function RecordPaymentModal({ open, onClose, currentUser, preselectedOrde
     setDate(t.toISOString().slice(0, 10));
     setDisplayDate(`${String(t.getDate()).padStart(2, '0')}/${String(t.getMonth() + 1).padStart(2, '0')}/${t.getFullYear()}`);
     setError('');
+    setSaveError('');
     onClose();
   }
 
   const AMOUNT_REGEX = /^\d{1,7}(\.\d{1,2})?$/;
   const isLastPayment = !!selectedOrder && selectedOrder.paymentCount === selectedOrder.maxPaymentCount - 1;
 
-  function handleSave() {
+  async function handleSave() {
     if (!selectedOrder) return;
-    // FIX-12: reject empty and future dates
     if (!date) { setError('יש לבחור תאריך'); return; }
     const today = new Date().toISOString().slice(0, 10);
     if (date > today) { setError('לא ניתן לרשום תשלום בתאריך עתידי'); return; }
-    // FIX-5: strict amount format validation
     if (!AMOUNT_REGEX.test(amount.trim()) || parseFloat(amount) <= 0) { setError('יש להזין סכום תקין'); return; }
-    // FIX-5: use toCents for float-safe overpayment check
     if (toCents(amount.trim()) > toCents(selectedOrder.remainingBalance)) { setError('הסכום גבוה מהיתרה לתשלום'); return; }
-    // Last payment must cover the full remaining balance
     if (isLastPayment && toCents(amount.trim()) < toCents(selectedOrder.remainingBalance)) {
       setError('בתשלום האחרון יש לשלם את כל היתרה');
       return;
     }
-    const payment = buildPayment(selectedOrder.id, parseFloat(amount).toFixed(2), method, date, currentUser);
-    addPayment(payment);
-    handleClose();
+    setSaving(true);
+    setSaveError('');
+    try {
+      await addPayment(selectedOrder.id, parseFloat(amount), method, date);
+      handleClose();
+    } catch (e) {
+      const msg = e instanceof ApiRequestError
+        ? e.error.message
+        : e instanceof Error ? e.message : 'שגיאה בשמירת התשלום';
+      setSaveError(msg);
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -139,12 +147,12 @@ export function RecordPaymentModal({ open, onClose, currentUser, preselectedOrde
               )}
               {/* Package list */}
               <ul className="flex flex-col gap-1">
-                {(selectedOrder.orderItems ?? []).map(oi => {
+                {(selectedOrder.items ?? selectedOrder.orderItems ?? []).map(oi => {
                   const pkg = packageTypes.find(pt => pt.id === oi.packageTypeId);
                   return (
                     <li key={oi.id} className="flex items-center gap-1.5 text-clinic-text">
                       <span className="w-1.5 h-1.5 rounded-full bg-clinic-gold flex-shrink-0" />
-                      {pkg?.name ?? oi.packageTypeId}
+                      {oi.packageTypeName ?? pkg?.name ?? oi.packageTypeId}
                     </li>
                   );
                 })}
@@ -153,7 +161,7 @@ export function RecordPaymentModal({ open, onClose, currentUser, preselectedOrde
               <div className="grid grid-cols-3 gap-2 border-t border-clinic-border pt-3 text-center">
                 <div className="flex flex-col gap-0.5">
                   <span className="text-xs text-clinic-muted">סה&quot;כ</span>
-                  <span className="font-semibold text-clinic-text">₪{parseFloat(String(selectedOrder.totalPrice ?? 0)).toLocaleString('he-IL')}</span>
+                  <span className="font-semibold text-clinic-text">₪{parseFloat(String(selectedOrder.discountedPrice ?? selectedOrder.totalPrice ?? 0)).toLocaleString('he-IL')}</span>
                 </div>
                 <div className="flex flex-col gap-0.5">
                   <span className="text-xs text-clinic-muted">שולם</span>
@@ -216,17 +224,18 @@ export function RecordPaymentModal({ open, onClose, currentUser, preselectedOrde
             />
           </div>
 
-          {error && <p className="text-red-500 text-sm">{error}</p>}
+          {(error || saveError) && <p className="text-red-500 text-sm">{error || saveError}</p>}
 
           <div className="flex justify-end gap-3 pt-2">
-            <button onClick={handleClose} className="px-4 py-2 text-sm text-clinic-muted hover:text-clinic-text">
+            <button onClick={handleClose} disabled={saving} className="px-4 py-2 text-sm text-clinic-muted hover:text-clinic-text disabled:opacity-50">
               ביטול
             </button>
             <button
               onClick={handleSave}
-              className="px-5 py-2 text-sm rounded-lg bg-clinic-gold text-white font-medium hover:opacity-90"
+              disabled={saving}
+              className="px-5 py-2 text-sm rounded-lg bg-clinic-gold text-white font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              שמור תשלום
+              {saving ? 'שומר...' : 'שמור תשלום'}
             </button>
           </div>
         </div>

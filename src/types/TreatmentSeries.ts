@@ -6,6 +6,7 @@ export interface TreatmentSeries {
   // API enrichment fields (present when loaded from real backend; absent in mock data)
   packageTypeName?: string;
   isTimerBased?: boolean;
+  treatmentTypeId?: string;
   // Numeric progress fields (conditionally present depending on seriesKind)
   totalTreatments?: number;
   completedTreatments?: number;

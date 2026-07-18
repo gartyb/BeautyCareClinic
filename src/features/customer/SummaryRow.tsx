@@ -69,7 +69,7 @@ export function SummaryRow() {
       />
       <KpiCard
         icon={<Package size={15} className="text-clinic-gold" />}
-        label="סדרות פעילות"
+        label="חבילות פעילות"
         value={activeCount}
       />
     </div>

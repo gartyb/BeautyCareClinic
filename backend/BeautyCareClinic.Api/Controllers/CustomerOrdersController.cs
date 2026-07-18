@@ -127,31 +127,31 @@ public class CustomerOrdersController : ControllerBase
                 };
                 _context.OrderItems.Add(orderItem);
 
-                if (pt.IsSeries)
+                var series = new TreatmentSeries
                 {
-                    var series = new TreatmentSeries
-                    {
-                        Id          = Guid.NewGuid(),
-                        OrderItemId = orderItem.Id,
-                    };
+                    Id          = Guid.NewGuid(),
+                    OrderItemId = orderItem.Id,
+                    CustomerId  = customerId,
+                };
 
-                    if (!pt.IsTimerBased)
-                    {
-                        series.TotalTreatments     = pt.TreatmentCount ?? 0;
-                        series.CompletedTreatments = 0;
-                        series.TotalMinutes        = 0;
-                        series.UsedMinutes         = 0;
-                    }
-                    else
-                    {
-                        series.TotalTreatments     = 0;
-                        series.CompletedTreatments = 0;
-                        series.TotalMinutes        = (pt.TreatmentCount ?? 0) * (pt.MinutesPerTreatment ?? 0);
-                        series.UsedMinutes         = 0;
-                    }
-
-                    _context.TreatmentSeries.Add(series);
+                if (!pt.IsTimerBased)
+                {
+                    series.TotalTreatments     = pt.IsSeries ? (pt.TreatmentCount ?? 0) : 1;
+                    series.CompletedTreatments = 0;
+                    series.TotalMinutes        = 0;
+                    series.UsedMinutes         = 0;
                 }
+                else
+                {
+                    series.TotalTreatments     = 0;
+                    series.CompletedTreatments = 0;
+                    series.TotalMinutes        = pt.IsSeries
+                        ? (pt.TreatmentCount ?? 0) * (pt.MinutesPerTreatment ?? 0)
+                        : (pt.MinutesPerTreatment ?? 0);
+                    series.UsedMinutes         = 0;
+                }
+
+                _context.TreatmentSeries.Add(series);
             }
 
             await _context.SaveChangesAsync();

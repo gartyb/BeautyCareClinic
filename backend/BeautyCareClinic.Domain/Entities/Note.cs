@@ -8,6 +8,7 @@ public class Note
     public Guid? TreatmentTypeId { get; set; }
     public DateTime NoteDate { get; set; }
     public string Content { get; set; } = string.Empty;
+    public string WrittenByFullName { get; set; } = string.Empty;
 
     public Customer Customer { get; set; } = null!;
     public User User { get; set; } = null!;

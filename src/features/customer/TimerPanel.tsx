@@ -34,7 +34,9 @@ export function TimerPanel({ currentUser }: TimerPanelProps) {
     ? treatmentSeries.find(s => s.id === timer.targetSeriesId)
     : null;
   const activeSeriesName = activeSeries_
-    ? (packageTypes.find(p => p.id === activeSeries_.packageTypeId)?.name ?? activeSeries_.packageTypeId)
+    ? (packageTypes.find(p => p.id === activeSeries_.packageTypeId)?.name
+        ?? activeSeries_.packageTypeName
+        ?? activeSeries_.packageTypeId)
     : null;
 
   const statusLabel = timer.isRunning ? 'פעיל' : timer.isPaused ? 'מושהה' : 'לא פעיל';
