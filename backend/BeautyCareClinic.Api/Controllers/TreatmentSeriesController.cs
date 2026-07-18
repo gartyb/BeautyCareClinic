@@ -49,8 +49,10 @@ public class TreatmentSeriesController : ControllerBase
         ts.OrderItemId,
         ts.OrderItem?.PackageType?.Name ?? string.Empty,
         ts.OrderItem?.PackageType?.IsTimerBased ?? false,
+        ts.OrderItem?.PackageType?.TreatmentTypeId ?? Guid.Empty,
         ts.TotalTreatments,
         ts.CompletedTreatments,
         ts.TotalMinutes,
-        ts.UsedMinutes);
+        ts.UsedMinutes,
+        ts.OrderItem?.PackageType?.MinutesPerTreatment);
 }

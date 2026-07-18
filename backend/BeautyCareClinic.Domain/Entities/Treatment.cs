@@ -9,6 +9,8 @@ public class Treatment
     public Guid? TreatmentSeriesId { get; set; }
     public DateTime TreatmentDate { get; set; }
     public int DurationMinutes { get; set; }
+    public string? Notes { get; set; }
+    public string PerformedByFullName { get; set; } = string.Empty;
 
     public Customer Customer { get; set; } = null!;
     public TreatmentType TreatmentType { get; set; } = null!;

@@ -164,6 +164,8 @@ builder.Services.AddScoped<IPackageTypeRepository, PackageTypeRepository>();
 builder.Services.AddScoped<ICustomerOrderRepository, CustomerOrderRepository>();
 builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
 builder.Services.AddScoped<ITreatmentSeriesRepository, TreatmentSeriesRepository>();
+builder.Services.AddScoped<ITreatmentRepository, TreatmentRepository>();
+builder.Services.AddScoped<INoteRepository, NoteRepository>();
 
 builder.Services.AddControllers();
 

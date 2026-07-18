@@ -5,3 +5,7 @@ export { packageTypesApi } from './packageTypesApi';
 export { customerOrdersApi } from './customerOrdersApi';
 export { paymentsApi } from './paymentsApi';
 export { treatmentSeriesApi } from './treatmentSeriesApi';
+export { treatmentsApi } from './treatmentsApi';
+export type { CreateTreatmentRequest } from './treatmentsApi';
+export { notesApi } from './notesApi';
+export type { CreateNoteRequest, UpdateNoteRequest } from './notesApi';

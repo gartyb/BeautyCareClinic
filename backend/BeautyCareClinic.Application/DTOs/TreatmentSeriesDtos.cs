@@ -5,7 +5,9 @@ public record TreatmentSeriesDto(
     Guid OrderItemId,
     string PackageTypeName,
     bool IsTimerBased,
+    Guid TreatmentTypeId,
     int TotalTreatments,
     int CompletedTreatments,
     int TotalMinutes,
-    int UsedMinutes);
+    int UsedMinutes,
+    int? MinutesPerTreatment);

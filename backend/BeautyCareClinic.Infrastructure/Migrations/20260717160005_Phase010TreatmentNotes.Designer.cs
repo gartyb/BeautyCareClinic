@@ -3,6 +3,7 @@ using System;
 using BeautyCareClinic.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BeautyCareClinic.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260717160005_Phase010TreatmentNotes")]
+    partial class Phase010TreatmentNotes
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -426,9 +429,6 @@ namespace BeautyCareClinic.Infrastructure.Migrations
                     b.Property<int>("CompletedTreatments")
                         .HasColumnType("integer");
 
-                    b.Property<Guid>("CustomerId")
-                        .HasColumnType("uuid");
-
                     b.Property<Guid>("OrderItemId")
                         .HasColumnType("uuid");
 
@@ -442,8 +442,6 @@ namespace BeautyCareClinic.Infrastructure.Migrations
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("CustomerId");
 
                     b.HasIndex("OrderItemId")
                         .IsUnique();
@@ -888,19 +886,11 @@ namespace BeautyCareClinic.Infrastructure.Migrations
 
             modelBuilder.Entity("BeautyCareClinic.Domain.Entities.TreatmentSeries", b =>
                 {
-                    b.HasOne("BeautyCareClinic.Domain.Entities.Customer", "Customer")
-                        .WithMany()
-                        .HasForeignKey("CustomerId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.HasOne("BeautyCareClinic.Domain.Entities.OrderItem", "OrderItem")
                         .WithOne("TreatmentSeries")
                         .HasForeignKey("BeautyCareClinic.Domain.Entities.TreatmentSeries", "OrderItemId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("Customer");
 
                     b.Navigation("OrderItem");
                 });

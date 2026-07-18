@@ -229,6 +229,16 @@ public class AppDbContext : IdentityDbContext<AppUser, IdentityRole<Guid>, Guid>
             .HasForeignKey<TreatmentSeries>(ts => ts.OrderItemId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        // TreatmentSeries.CustomerId — denormalized for fast active-series lookup
+        modelBuilder.Entity<TreatmentSeries>()
+            .HasIndex(ts => ts.CustomerId);
+
+        modelBuilder.Entity<TreatmentSeries>()
+            .HasOne(ts => ts.Customer)
+            .WithMany()
+            .HasForeignKey(ts => ts.CustomerId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         // -----------------------------------------------------------------------
         // Payment
         // -----------------------------------------------------------------------
@@ -245,6 +255,17 @@ public class AppDbContext : IdentityDbContext<AppUser, IdentityRole<Guid>, Guid>
         modelBuilder.Entity<Treatment>()
             .HasIndex(t => t.CustomerId);
 
+        modelBuilder.Entity<Treatment>()
+            .Property(t => t.Notes)
+            .HasColumnName("notes")
+            .HasColumnType("text");
+
+        modelBuilder.Entity<Treatment>()
+            .Property(t => t.PerformedByFullName)
+            .HasColumnName("performed_by_full_name")
+            .IsRequired()
+            .HasDefaultValue(string.Empty);
+
         // Treatment → Photos (Cascade)
         modelBuilder.Entity<Treatment>()
             .HasMany(t => t.Photos)
@@ -257,6 +278,17 @@ public class AppDbContext : IdentityDbContext<AppUser, IdentityRole<Guid>, Guid>
         // -----------------------------------------------------------------------
         modelBuilder.Entity<Note>()
             .HasIndex(n => n.CustomerId);
+
+        modelBuilder.Entity<Note>()
+            .Property(n => n.WrittenByFullName)
+            .HasColumnName("written_by_full_name")
+            .IsRequired()
+            .HasDefaultValue(string.Empty);
+
+        modelBuilder.Entity<Note>()
+            .Property(n => n.Content)
+            .HasMaxLength(5000)
+            .IsRequired();
 
         // -----------------------------------------------------------------------
         // GlobalSetting

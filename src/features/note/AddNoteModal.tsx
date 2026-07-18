@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Modal } from '../../components/shared/Modal';
 import { useCustomer } from '../../contexts/CustomerContext';
-import { buildNote } from './noteService';
+import { notesApi } from '../../api/notesApi';
 import type { User } from '../../types/User';
 
 interface AddNoteModalProps {
@@ -11,18 +11,26 @@ interface AddNoteModalProps {
   currentUser: User;
 }
 
-export function AddNoteModal({ open, onClose, customerId, currentUser }: AddNoteModalProps) {
-  const { addNote } = useCustomer();
+export function AddNoteModal({ open, onClose, customerId }: AddNoteModalProps) {
+  const { refreshNotes } = useCustomer();
   const [text, setText] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   const canSave = text.trim().length > 0;
 
-  function handleSave() {
-    if (!canSave) return;
-    const note = buildNote(customerId, text.trim(), currentUser.id);
-    addNote(note);
-    setText('');
-    onClose();
+  async function handleSave() {
+    if (!canSave || submitting) return;
+    setSubmitting(true);
+    try {
+      await notesApi.create(customerId, { content: text.trim() });
+      await refreshNotes();
+      setText('');
+      onClose();
+    } catch (e) {
+      console.error('[AddNoteModal]', e);
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   function handleClose() {
@@ -35,7 +43,6 @@ export function AddNoteModal({ open, onClose, customerId, currentUser }: AddNote
       <div className="space-y-4">
         <div>
           <label className="block text-sm text-clinic-muted mb-1">תוכן ההערה</label>
-          {/* FIX-10: maxLength prevents oversized note submissions */}
           <textarea
             value={text}
             onChange={e => setText(e.target.value)}
@@ -51,16 +58,17 @@ export function AddNoteModal({ open, onClose, customerId, currentUser }: AddNote
         <div className="flex justify-end gap-3 pt-2">
           <button
             onClick={handleClose}
+            disabled={submitting}
             className="px-4 py-2 text-sm text-clinic-muted hover:text-clinic-text"
           >
             ביטול
           </button>
           <button
             onClick={handleSave}
-            disabled={!canSave}
+            disabled={!canSave || submitting}
             className="px-5 py-2 text-sm rounded-lg bg-clinic-gold text-white font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90"
           >
-            שמור הערה
+            {submitting ? 'שומר...' : 'שמור הערה'}
           </button>
         </div>
       </div>
