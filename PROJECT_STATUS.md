@@ -5,15 +5,20 @@
 - Current phase: 010 — Treatment Recording & Notes
 - Phase status: Completed
 - Current branch: main
-- Latest approved version: v0.10.1
-- Latest approved tag: v0.10.1
+- Latest approved version: v0.10.2
+- Latest approved tag: v0.10.2
 
 ## Current Activity
 
-Phase 010 הושלם ואושר (v0.10.0). Bug-fix patch v0.10.1 (customer/settings/treatment-types/
-package-types data not loading after first login) הוטמע, נבדק (276/276 טסטים עברו), אושר
-בדפדפן ע"י המשתמשת, ובוצע commit+tag על ברנץ fix/auth-gated-data-fetch שמוזג ל-main.
-מוכן להצעת Phase 011.
+Phase 010 הושלם ואושר (v0.10.0). שני bug-fix patches הוטמעו מאז:
+- v0.10.1 — customer/settings/treatment-types/package-types data not loading after first login.
+- v0.10.2 — יצירת הזמנה (POST /customers/{id}/orders) נכשלה תמיד עם 500 עקב migration drift:
+  עמודת TreatmentSeries.CustomerId הייתה קיימת ב-model/snapshot אך מעולם לא נוספה בפועל
+  לטבלה בפוסטגרס. תוקן עם migration חדש (כולל backfill), תוקנה שגיאת קומפילציה שחסמה את
+  פרויקט הטסטים (FU-015), ונוסף טסט אינטגרציה אמיתי מול Postgres (FU-017).
+
+שני התיקונים נבדקו (130/130 טסטי backend, 276/276 טסטי frontend), אושרו בדפדפן ע"י המשתמשת,
+ובוצע commit+tag על ברנצ'ים נפרדים שמוזגו ל-main. מוכן להצעת Phase 011.
 
 ## Completed Phases
 
@@ -57,4 +62,4 @@ package-types data not loading after first login) הוטמע, נבדק (276/276 
 
 ## Next Step
 
-Phase 010 הושלם (v0.10.1 patch applied). מוכן להצעת Phase 011.
+Phase 010 הושלם (v0.10.2 patches applied). מוכן להצעת Phase 011.

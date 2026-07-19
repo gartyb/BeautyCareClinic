@@ -589,7 +589,7 @@ public class Phase010Tests : IDisposable
             TreatmentTypeId: Guid.NewGuid(),
             TreatmentTypeName: "טיפול פנים",
             TreatmentSeriesId: null,
-            TreatmentDate: DateOnly.FromDateTime(DateTime.UtcNow),
+            TreatmentDate: DateTime.UtcNow,
             DurationMinutes: 60,
             Notes: "הערה",
             UserId: Guid.NewGuid(),

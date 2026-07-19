@@ -18,6 +18,7 @@ erDiagram
     CUSTOMER_ORDER ||--|{ ORDER_ITEM : contains
     PACKAGE_TYPE ||--o{ ORDER_ITEM : purchased_as
     ORDER_ITEM ||--o| TREATMENT_SERIES : creates
+    CUSTOMER ||--o{ TREATMENT_SERIES : owns
     CUSTOMER_ORDER ||--o{ PAYMENT : receives
 
     CUSTOMER ||--o{ APPOINTMENT : books
@@ -95,6 +96,7 @@ erDiagram
     TREATMENT_SERIES {
         uuid id PK
         uuid order_item_id FK
+        uuid customer_id FK
         integer total_treatments
         integer completed_treatments
         integer total_minutes
@@ -169,6 +171,9 @@ erDiagram
 
 - `User.role` is `Manager` or `Therapist`. No separate Therapist table.
 - `TreatmentSeries` is created only for `PackageType.is_series = true` packages.
+- `TreatmentSeries.customer_id` is denormalized (copied from `CustomerOrder.customer_id` via
+  `OrderItem` at series-creation time) to support fast active-series lookups per customer
+  without a join through `OrderItem`/`CustomerOrder`. `Restrict` on delete.
 - `completed_treatments` for timer-based series is derived: `floor(used_minutes / minutes_per_treatment)`. Updated after each timer session.
 - `GLOBAL_SETTINGS` is a key-value table. Each setting is a separate row with a unique `name` and a string `value`. Currently defined: `default_max_payment_count`.
 - `PACKAGE_TYPE.price` — catalog price (`decimal(10,2)`). Snapshot copied to `ORDER_ITEM.unit_price` at order creation. Price changes do not affect historical orders.

@@ -652,3 +652,100 @@
     - Clearing stale customers/treatmentTypes/etc. arrays on the !currentUser branch (Low; not
       user-visible since all consumers are behind PrivateRoute).
     - Documenting CustomerContext.tsx (singular) review status in PROGRESS.txt (Low, doc-only).
+
+2026-07-19 Bug fix — POST /api/v1/customers/{customerId}/orders always returned 500
+  Branch: (none — implementation only, not committed by request)
+  Root cause: `TreatmentSeries.CustomerId` was added to the Domain entity, Fluent config
+    (AppDbContext.cs) and the EF model snapshot in the Phase 010 commit (ce37844), but the
+    actual Phase 010 migration file (20260717160005_Phase010TreatmentNotes.cs) never emitted
+    the corresponding AddColumn/CreateIndex/AddForeignKey for it. EF's __EFMigrationsHistory
+    table listed all 5 migrations as applied, so `dotnet ef database update` was a no-op — the
+    live Postgres "TreatmentSeries" table never actually had the column. Every order creation
+    (which inserts a TreatmentSeries row with CustomerId set) threw at the DB layer -> 500.
+    Confirmed via `\d "TreatmentSeries"` on beautycare-postgres (column absent) vs. the model
+    snapshot (column present, indexed).
+  Fix: because the model snapshot already matched the (correct) current code model, a plain
+    `dotnet ef migrations add` would have produced an empty diff. Temporarily reverted the
+    TreatmentSeries.CustomerId property/index/FK block in
+    backend/BeautyCareClinic.Infrastructure/Migrations/AppDbContextModelSnapshot.cs to the
+    pre-Phase-010 state, ran `dotnet ef migrations add AddTreatmentSeriesCustomerId`
+    (--project Infrastructure --startup-project Api, ConnectionStrings__DefaultConnection env
+    var set for the design-time factory), which generated
+    backend/BeautyCareClinic.Infrastructure/Migrations/20260719085129_AddTreatmentSeriesCustomerId.cs
+    and regenerated the snapshot — diffed byte-identical to the pre-edit original, confirming
+    correctness. No backfill needed (`SELECT COUNT(*) FROM "TreatmentSeries"` was 0 before the
+    fix). Applied with `dotnet ef database update` against the live dev DB (backend process on
+    :5000 picked it up on the next request with no restart, per EF's per-request DbContext).
+  Migration (Up): AddColumn<Guid> CustomerId (uuid, not null, default all-zero Guid — table was
+    empty so this is inert) -> CreateIndex IX_TreatmentSeries_CustomerId -> AddForeignKey
+    FK_TreatmentSeries_Customers_CustomerId (Customers.Id, ON DELETE RESTRICT). Down reverses
+    in the opposite order (drop FK, drop index, drop column).
+  Verified end-to-end: logged in as manager@clinic.local, GET /customers and GET /package-types
+    for real IDs, then POST /api/v1/customers/{id}/orders with one item ->
+    HTTP 201, body includes items[0].seriesId; confirmed via SQL that the inserted
+    TreatmentSeries row has the correct CustomerId populated.
+  Frontend: reviewed src/features/order/NewOrderModal.tsx and CustomerContext.tsx addOrder —
+    payload shape (discountPercentage, maxPaymentCount, items[].packageTypeId) already matches
+    CreateOrderRequest exactly. No frontend bug, no frontend changes made.
+  Build: backend Domain/Application/Infrastructure/Api projects build clean.
+    BeautyCareClinic.Tests still fails to compile — pre-existing unrelated error, already
+    logged as FOLLOWUPS.md FU-015 (DateOnly/DateTime mismatch in Phase010Tests.cs:592), not
+    touched per explicit instruction. No regression test added to that project as a result;
+    logged as new followup instead.
+  Files changed:
+    backend/BeautyCareClinic.Infrastructure/Migrations/20260719085129_AddTreatmentSeriesCustomerId.cs (new)
+    backend/BeautyCareClinic.Infrastructure/Migrations/20260719085129_AddTreatmentSeriesCustomerId.Designer.cs (new)
+    backend/BeautyCareClinic.Infrastructure/Migrations/AppDbContextModelSnapshot.cs (regenerated
+      by `dotnet ef migrations add`; content unchanged vs. pre-fix, confirmed via diff)
+    docs/DATABASE_SCHEMA.md — added TREATMENT_SERIES.customer_id FK to the ER diagram/table and
+      a note explaining the denormalization rationale
+  Follow-ups logged:
+    FOLLOWUPS.md FU-017 — regression test for CustomerOrdersController.Create covering
+      TreatmentSeries.CustomerId is blocked by FU-015 (Tests project doesn't compile)
+
+2026-07-19 Bug fix follow-up — code-reviewer findings addressed (still uncommitted)
+  Branch: (none — implementation only, not committed by request)
+  Build: PASS — `dotnet build BeautyCareClinic.sln` succeeds with 0 errors across all 5 projects
+    (Domain/Application/Infrastructure/Api/Tests), a change from the prior session where Tests
+    could not compile.
+  Tests: 130 PASS, 0 FAIL (`dotnet test BeautyCareClinic.Tests/BeautyCareClinic.Tests.csproj`,
+    with ConnectionStrings__DefaultConnection set to the dev Postgres — 129 pre-existing +
+    1 new real-Postgres integration test).
+  Addressed (per code-reviewer + user-approved follow-ups):
+    1. (Medium) Migration lacked a backfill path for pre-existing TreatmentSeries rows.
+       backend/BeautyCareClinic.Infrastructure/Migrations/20260719085129_AddTreatmentSeriesCustomerId.cs
+       — added a migrationBuilder.Sql(...) UPDATE between AddColumn and CreateIndex/AddForeignKey
+       that backfills CustomerId via OrderItems -> CustomerOrders -> CustomerId for any row that
+       already existed. Verified for real: rolled the DB back to the pre-migration schema (there
+       were, by then, 3 real TreatmentSeries rows left over from earlier live verification calls
+       with no CustomerId), reapplied the updated migration, and confirmed via SQL that all 3
+       rows were correctly backfilled to match their order's actual customer. Re-verified a live
+       POST /api/v1/customers/{id}/orders still returns 201 after this change.
+    2. (High) Fixed FOLLOWUPS.md FU-015 — the one compile error blocking the whole Tests
+       project. backend/BeautyCareClinic.Tests/Application/Phase010Tests.cs:592 — changed
+       `TreatmentDate: DateOnly.FromDateTime(DateTime.UtcNow)` to `TreatmentDate: DateTime.UtcNow`,
+       matching TreatmentDto's actual `DateTime TreatmentDate` field and every other
+       TreatmentDate usage already in that file. No other lines touched.
+    3. (High) Added the real-Postgres regression test FOLLOWUPS.md FU-017 called for:
+       backend/BeautyCareClinic.Tests/Integration/CustomerOrdersControllerPostgresTests.cs (new).
+       Opens a real Npgsql AppDbContext (ConnectionStrings__DefaultConnection env var, matching
+       the existing DesignTimeDbContextFactory convention), calls Database.MigrateAsync() to
+       apply real migrations, invokes CustomerOrdersController.Create directly with real
+       repositories against self-contained seed data (a Customer/TreatmentType/PackageType
+       created and torn down by the test itself), and asserts both a 201 CreatedAtActionResult
+       and — via a fresh AsNoTracking() query straight from Postgres — that the persisted
+       TreatmentSeries row has the correct CustomerId. Proved this test actually catches the
+       original bug class: temporarily removed the new migration's .cs/.Designer.cs files from
+       the build and rolled the DB back to the pre-fix schema, re-ran just this test, and it
+       failed with `Npgsql.PostgresException 42703: column "CustomerId" of relation
+       "TreatmentSeries" does not exist` — the identical underlying error to the original
+       production 500. Restored the migration files and DB state (dotnet ef database update)
+       and confirmed the full suite is green again (130/130) and a live POST still returns 201.
+  Files changed:
+    backend/BeautyCareClinic.Infrastructure/Migrations/20260719085129_AddTreatmentSeriesCustomerId.cs
+      — added backfill Sql() step (see #1 above)
+    backend/BeautyCareClinic.Tests/Application/Phase010Tests.cs — one-line DateOnly -> DateTime fix
+    backend/BeautyCareClinic.Tests/Integration/CustomerOrdersControllerPostgresTests.cs (new)
+  FOLLOWUPS.md: FU-015 and FU-017 marked RESOLVED with details of the fix/verification.
+  Not touched: env.development.local, env.example, zipcheck/ (per explicit constraint).
+  Still not committed/tagged, per explicit instruction.

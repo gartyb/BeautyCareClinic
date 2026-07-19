@@ -292,8 +292,7 @@ if (entity.UserId != currentUserId && !isManager) return Forbid(); // 403, לא 
 
 ## Maintenance Patch — v0.10.1 (bug fix, within Phase 010 lineage)
 
-**Status:** Implemented and tested; validated by the user in the browser; commit/tag pending
-direct user confirmation.
+**Status:** Implemented, tested, validated by the user in the browser, committed and tagged.
 
 ### Bug
 
@@ -348,4 +347,72 @@ a `POST /auth/login` mock response and an `afterEach(() => clearToken())` for te
 ### Version
 
 - Version: v0.10.1 (patch — backward-compatible bug fix, no new phase)
-- Tag: v0.10.1 (not yet created — pending direct user commit approval)
+- Tag: v0.10.1 (branch `fix/auth-gated-data-fetch`, merged to `main`)
+
+## Maintenance Patch — v0.10.2 (bug fix, within Phase 010 lineage)
+
+**Status:** Implemented, tested, validated by the user in the browser.
+
+### Bug
+
+`POST /api/v1/customers/{customerId}/orders` (order creation) always failed with HTTP 500,
+regardless of customer or package selected — blocking the "הזמנה חדשה" flow entirely.
+
+### Root cause
+
+Migration drift. `TreatmentSeries.CustomerId` (Domain entity, Fluent config, and the EF model
+snapshot) was added in the Phase 010 commit (`ce37844`) and `CustomerOrdersController.Create`
+actively sets it on every new `TreatmentSeries` row — but the Phase 010 migration
+(`20260717160005_Phase010TreatmentNotes`) never emitted the corresponding `AddColumn` for it.
+`__EFMigrationsHistory` listed all migrations as applied, so EF believed the schema was current
+when the physical Postgres table structurally wasn't — every INSERT into `TreatmentSeries` threw
+`42703: column "CustomerId" of relation "TreatmentSeries" does not exist`. Invisible to the
+existing test suite because all prior tests use the EF InMemory provider, which never touches a
+real schema or runs real migrations.
+
+### Fix
+
+New migration `20260719085129_AddTreatmentSeriesCustomerId`: `AddColumn<Guid> CustomerId`
+(uuid, not null) → backfill via `UPDATE ... FROM "OrderItems" JOIN "CustomerOrders"` (walks
+`OrderItem → CustomerOrder → CustomerId` for any pre-existing rows; a no-op on an empty table) →
+`CreateIndex IX_TreatmentSeries_CustomerId` → `AddForeignKey FK_TreatmentSeries_Customers_CustomerId`
+(`ON DELETE RESTRICT`, consistent with every other Customer-referencing FK in this schema).
+Applied to the dev DB via `dotnet ef database update`; verified via direct SQL that the column,
+index, and FK now exist and that pre-existing rows backfilled correctly.
+
+As a prerequisite for regression coverage, also fixed an unrelated pre-existing compile error
+(`Phase010Tests.cs:592`, `DateOnly`/`DateTime` mismatch, tracked as FU-015) that had been
+blocking the entire `BeautyCareClinic.Tests` project from building.
+
+### Regression test
+
+`backend/BeautyCareClinic.Tests/Integration/CustomerOrdersControllerPostgresTests.cs` (new) —
+opens a real Npgsql `AppDbContext`, runs `Database.MigrateAsync()`, calls
+`CustomerOrdersController.Create` against self-contained seed data, and asserts both a 201
+response and (via an untracked read straight from Postgres) that the persisted
+`TreatmentSeries.CustomerId` is correct. Proven genuine by temporarily reverting the schema and
+confirming the test fails with the same `42703` error class as the original bug, then passes
+again after restoring the fix. Requires a reachable Postgres via the
+`ConnectionStrings__DefaultConnection` env var (same variable used by the EF CLI tooling).
+
+### Files changed
+
+- `backend/BeautyCareClinic.Infrastructure/Migrations/20260719085129_AddTreatmentSeriesCustomerId.cs` (new)
+- `backend/BeautyCareClinic.Infrastructure/Migrations/20260719085129_AddTreatmentSeriesCustomerId.Designer.cs` (new)
+- `backend/BeautyCareClinic.Tests/Application/Phase010Tests.cs` (FU-015 one-line fix)
+- `backend/BeautyCareClinic.Tests/Integration/CustomerOrdersControllerPostgresTests.cs` (new)
+- `docs/DATABASE_SCHEMA.md` (documented the FK + denormalization rationale)
+
+### Verification
+
+- `dotnet build BeautyCareClinic.sln` — 0 errors, 0 warnings, all 5 projects (Tests included,
+  for the first time since the pre-existing FU-015 error was introduced).
+- `dotnet test` — 130/130 passed (129 pre-existing + 1 new).
+- Live `POST /api/v1/customers/{customerId}/orders` — 201, confirmed against multiple different
+  customers, independently re-verified by both the code-reviewer and the orchestrating session.
+- Manual browser validation performed by the user.
+
+### Version
+
+- Version: v0.10.2 (patch — backward-compatible bug fix, no new phase)
+- Tag: v0.10.2 (branch `fix/order-creation-treatmentseries-customerid`, merged to `main`)

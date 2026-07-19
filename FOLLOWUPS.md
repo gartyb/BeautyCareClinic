@@ -125,7 +125,7 @@ Fixed in Phase 010 session: context now calls `packageTypesApi` for all mutation
 from API on mount.
 Priority: Fixed.
 
-## FU-015: BeautyCareClinic.Tests fails to compile — DateOnly/DateTime mismatch in Phase010Tests
+## FU-015: BeautyCareClinic.Tests fails to compile — DateOnly/DateTime mismatch in Phase010Tests — RESOLVED 2026-07-19
 
 Source: found during environment setup (dev-machine install of Node.js/.NET SDK), not tied
 to a specific implementation session.
@@ -139,6 +139,11 @@ Fix: change the test to pass a `DateTime` (or reconcile whichever type `Treatmen
 actually be, if the DTO itself should have moved to `DateOnly`).
 Priority: High (blocks `dotnet build`/`dotnet test` on the whole solution).
 
+Resolved as part of the 2026-07-19 order-creation bug fix follow-up: line 592 changed from
+`DateOnly.FromDateTime(DateTime.UtcNow)` to `DateTime.UtcNow`, matching every other
+`TreatmentDate` usage already in that file (lines 180, 266, 300, 329, 392, 415-416). Confirmed
+`dotnet build BeautyCareClinic.sln` now succeeds with 0 errors across all five projects.
+
 ## FU-016: Frontend `tsc -b` fails — unused `currentUser` param in RecordPaymentModal
 
 Source: found while verifying the "customer search shows error on first login" bug fix
@@ -151,3 +156,37 @@ Source: found while verifying the "customer search shows error on first login" b
 Fix: either use `currentUser` (e.g. to attribute the payment to the recording user, if that's
 a real requirement) or drop it from the destructure/prop type if it's genuinely unused.
 Priority: Medium (blocks `npm run build`, does not block dev server or tests).
+
+## FU-017: No backend regression test for order creation covering TreatmentSeries.CustomerId — RESOLVED 2026-07-19
+
+Source: 2026-07-19 bug fix — POST /api/v1/customers/{customerId}/orders always returned 500.
+Root cause was a migration-authoring gap: `TreatmentSeries.CustomerId` was added to the domain
+entity, Fluent config, and EF model snapshot in the Phase 010 commit (ce37844), but the actual
+Phase 010 migration file (`20260717160005_Phase010TreatmentNotes.cs`) never contained the
+corresponding `AddColumn`/`CreateIndex`/`AddForeignKey` operations for it — so the DB table
+never got the column even though EF's migration history and model snapshot both claimed it was
+already applied. Fixed via a new migration,
+`backend/BeautyCareClinic.Infrastructure/Migrations/20260719085129_AddTreatmentSeriesCustomerId.cs`.
+An integration/regression test for `CustomerOrdersController.Create` that exercises a real
+`TreatmentSeries` insert (e.g. via `WebApplicationFactory` + a real/test Postgres) would have
+caught this immediately, since the Fluent/entity model already matched — only the physical
+schema was wrong. Adding that test is currently blocked by FU-015 (the whole
+`BeautyCareClinic.Tests` project fails to compile due to an unrelated `DateOnly`/`DateTime`
+mismatch in `Phase010Tests.cs:592`), so no such test could be added without also fixing FU-015
+first (out of scope for this bug fix, per explicit instruction).
+Priority: High (this exact class of bug — model/snapshot updated without a matching migration —
+has no automated guard right now; recommend fixing FU-015 first, then adding this test).
+
+Resolved as part of the 2026-07-19 order-creation bug fix follow-up (after FU-015 was fixed):
+added `backend/BeautyCareClinic.Tests/Integration/CustomerOrdersControllerPostgresTests.cs`.
+This test opens a real Npgsql-backed `AppDbContext` (via the `ConnectionStrings__DefaultConnection`
+env var, matching the existing `DesignTimeDbContextFactory` convention), calls
+`Database.MigrateAsync()` to apply real migrations, invokes `CustomerOrdersController.Create`
+directly with real repositories, and asserts both a 201 `CreatedAtActionResult` and — read back
+from Postgres via a fresh untracked query — that the persisted `TreatmentSeries` row has the
+correct `CustomerId`. Verified this test genuinely catches the original bug class: temporarily
+removed the new migration's `.cs`/`.Designer.cs` files from the build and reverted the DB to the
+pre-fix schema, re-ran the test, and it failed with
+`Npgsql.PostgresException 42703: column "CustomerId" of relation "TreatmentSeries" does not
+exist` — the same underlying error as the original production bug. Restored the migration files
+and DB state, re-ran the full suite: 130/130 passing (129 pre-existing + this one).
