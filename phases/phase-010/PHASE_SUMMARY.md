@@ -289,3 +289,63 @@ if (entity.UserId != currentUserId && !isManager) return Forbid(); // 403, לא 
 - FU-011: TreatmentModal — updateTreatmentNote עדיין mock
 - FU-012: TreatmentHistoryTab — חסר כפתור מחיקה
 - FU-013: Loading skeletons + toast notifications
+
+## Maintenance Patch — v0.10.1 (bug fix, within Phase 010 lineage)
+
+**Status:** Implemented and tested; validated by the user in the browser; commit/tag pending
+direct user confirmation.
+
+### Bug
+
+On first login, the customer search screen ("חיפוש לקוחה") showed a stuck error banner
+("שגיאה בטעינת הנתונים. נסה שוב.") even though the backend had valid data and the API worked
+correctly. Root cause: `CustomersProvider`, `TreatmentTypesProvider`, `PackageTypesProvider`,
+and `GlobalSettingsProvider` each fired their initial data fetch unconditionally on mount
+(`useEffect(() => { fetchX(); }, [fetchX])`), before `AuthProvider` had restored a session or
+before login had completed. The resulting 401 was captured as a permanent `error` state that
+never re-cleared after a successful login, because the fetch effect had no dependency on auth
+state. (`TherapistDataContext`, `TherapistsContext`, and `AppointmentsContext` were checked for
+the same pattern and confirmed unaffected — they use local seed data only, no API fetch.)
+
+### Fix
+
+Each of the four affected providers now calls `useAuth()` and gates its fetch effect on
+`currentUser`: while unauthenticated the effect skips the fetch (and clears `isLoading`); once
+`currentUser` transitions from `null` to a real user — covering both session-restore-on-reload
+and fresh login — the effect (re)fires. A `cancelled`-flag guard (matching the pattern already
+used in `GlobalSettingsContext`) was added to all four providers' gated effects so a stale
+in-flight request from a prior auth state (e.g. logout → re-login) cannot resolve late and
+clobber newer state.
+
+### Regression test
+
+`src/contexts/authGatedFetch.test.tsx` (new) renders `CustomersProvider` and
+`TreatmentTypesProvider` unauthenticated, asserts zero `fetch` calls and no error state while
+logged out, then drives a real `AuthContext.login()` transition and asserts the fetch fires and
+real data loads with no error — exercising the actual race that was broken rather than only the
+already-authenticated path. `src/test/renderWithProviders.tsx` gained an `authenticated?: boolean`
+option (default `true`, existing callers unaffected) to support this; `src/test/setup.ts` gained
+a `POST /auth/login` mock response and an `afterEach(() => clearToken())` for test isolation.
+
+### Files changed
+
+- `src/contexts/CustomersContext.tsx`
+- `src/contexts/TreatmentTypesContext.tsx`
+- `src/contexts/PackageTypesContext.tsx`
+- `src/contexts/GlobalSettingsContext.tsx`
+- `src/test/renderWithProviders.tsx`
+- `src/test/setup.ts`
+- `src/contexts/authGatedFetch.test.tsx` (new)
+
+### Verification
+
+- `npx vitest run --config vitest.config.ts` — 276 passed, 0 failed (274 baseline + 2 new).
+- `npm run build` / `npx tsc -b --noEmit` — one pre-existing, unrelated error
+  (`RecordPaymentModal.tsx` unused `currentUser` param, logged as `FOLLOWUPS.md` FU-016);
+  no new errors introduced.
+- Manual browser validation performed by the user.
+
+### Version
+
+- Version: v0.10.1 (patch — backward-compatible bug fix, no new phase)
+- Tag: v0.10.1 (not yet created — pending direct user commit approval)

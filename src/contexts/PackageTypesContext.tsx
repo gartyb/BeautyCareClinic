@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { PackageType } from '../types/PackageType';
 import { packageTypesApi } from '../api/packageTypesApi';
+import { useAuth } from './AuthContext';
 
 interface BuildPackageTypeParams {
   name: string;
@@ -22,11 +23,20 @@ interface PackageTypesContextValue {
 const PackageTypesContext = createContext<PackageTypesContextValue | null>(null);
 
 export function PackageTypesProvider({ children }: { children: React.ReactNode }) {
+  const { currentUser } = useAuth();
   const [packageTypes, setPackageTypes] = useState<PackageType[]>([]);
 
+  // Load once the user is authenticated (covers both session restore and fresh login).
+  // Guard against a stale in-flight fetch from a previous auth state (e.g. logout → re-login)
+  // resolving after a newer effect run and clobbering state with outdated data.
   useEffect(() => {
-    packageTypesApi.list().then(setPackageTypes).catch(console.error);
-  }, []);
+    if (!currentUser) return;
+    let cancelled = false;
+    packageTypesApi.list()
+      .then(data => { if (!cancelled) setPackageTypes(data); })
+      .catch(err => { if (!cancelled) console.error(err); });
+    return () => { cancelled = true; };
+  }, [currentUser]);
 
   const createPackageType = useCallback(async (params: BuildPackageTypeParams): Promise<void> => {
     const created = await packageTypesApi.create({
