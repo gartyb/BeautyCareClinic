@@ -7,6 +7,7 @@ import {
   deleteTreatmentType as apiDelete,
 } from '../api/treatmentTypesApi';
 import { ApiRequestError } from '../api/apiError';
+import { useAuth } from './AuthContext';
 
 interface TreatmentTypesContextValue {
   treatmentTypes: TreatmentType[];
@@ -20,29 +21,43 @@ interface TreatmentTypesContextValue {
 const TreatmentTypesContext = createContext<TreatmentTypesContextValue | null>(null);
 
 export function TreatmentTypesProvider({ children }: { children: React.ReactNode }) {
+  const { currentUser } = useAuth();
   const [treatmentTypes, setTreatmentTypes] = useState<TreatmentType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchAll = useCallback(async () => {
+  const fetchAll = useCallback(async (isCancelled?: () => boolean) => {
     setIsLoading(true);
     setError(null);
     try {
       const dtos = await getTreatmentTypes();
+      if (isCancelled?.()) return;
       setTreatmentTypes(dtos.map(dto => ({
         id: dto.id,
         name: dto.name,
         defaultDurationMinutes: dto.defaultDurationMinutes ?? 60,
       })));
     } catch (e) {
+      if (isCancelled?.()) return;
       const msg = e instanceof ApiRequestError ? e.message : 'שגיאה בטעינת סוגי טיפולים';
       setError(msg);
     } finally {
-      setIsLoading(false);
+      if (!isCancelled?.()) setIsLoading(false);
     }
   }, []);
 
-  useEffect(() => { fetchAll(); }, [fetchAll]);
+  // Load once the user is authenticated (covers both session restore and fresh login).
+  // Guard against a stale in-flight fetch from a previous auth state (e.g. logout → re-login)
+  // resolving after a newer effect run and clobbering state with outdated data.
+  useEffect(() => {
+    if (!currentUser) {
+      setIsLoading(false);
+      return;
+    }
+    let cancelled = false;
+    fetchAll(() => cancelled);
+    return () => { cancelled = true; };
+  }, [currentUser, fetchAll]);
 
   const createTreatmentType = useCallback(async (name: string, defaultDurationMinutes: number): Promise<TreatmentType> => {
     const dto = await apiCreate({ name, defaultDurationMinutes });

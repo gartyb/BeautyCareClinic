@@ -124,3 +124,30 @@ types (create/update/delete) from the manager screen were not persisted to the D
 Fixed in Phase 010 session: context now calls `packageTypesApi` for all mutations and loads
 from API on mount.
 Priority: Fixed.
+
+## FU-015: BeautyCareClinic.Tests fails to compile — DateOnly/DateTime mismatch in Phase010Tests
+
+Source: found during environment setup (dev-machine install of Node.js/.NET SDK), not tied
+to a specific implementation session.
+`backend/BeautyCareClinic.Tests/Application/Phase010Tests.cs:592`, test
+`TreatmentDto_HasExpectedFields`, constructs a `TreatmentDto` passing
+`TreatmentDate: DateOnly.FromDateTime(DateTime.UtcNow)`. The DTO's actual field
+(`BeautyCareClinic.Application/DTOs/TreatmentDtos.cs:20`) is `DateTime TreatmentDate`, not
+`DateOnly` — the test doesn't match the DTO signature, so the whole Tests project fails to
+compile (`dotnet build` on the solution fails; the four non-test projects build fine).
+Fix: change the test to pass a `DateTime` (or reconcile whichever type `TreatmentDate` should
+actually be, if the DTO itself should have moved to `DateOnly`).
+Priority: High (blocks `dotnet build`/`dotnet test` on the whole solution).
+
+## FU-016: Frontend `tsc -b` fails — unused `currentUser` param in RecordPaymentModal
+
+Source: found while verifying the "customer search shows error on first login" bug fix
+(unrelated pre-existing issue, confirmed present on `main` before this session's changes via
+`git stash` + `npx tsc -b`).
+`src/features/payment/RecordPaymentModal.tsx:18` destructures `currentUser` from
+`RecordPaymentModalProps` but never reads it in the component body, which trips
+`noUnusedParameters` in `tsconfig` and fails `npm run build` (`tsc -b && vite build`).
+`vitest`/`vite dev` are unaffected since they don't run the full project type-check.
+Fix: either use `currentUser` (e.g. to attribute the payment to the recording user, if that's
+a real requirement) or drop it from the destructure/prop type if it's genuinely unused.
+Priority: Medium (blocks `npm run build`, does not block dev server or tests).

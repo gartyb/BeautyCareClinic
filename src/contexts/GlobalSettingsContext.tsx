@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { getSettings, updateSetting as apiUpdateSetting } from '../api/globalSettingsApi';
 import { ApiRequestError } from '../api/apiError';
+import { useAuth } from './AuthContext';
 
 interface GlobalSettingsContextValue {
   defaultMaxPaymentCount: number;
@@ -22,13 +23,20 @@ const DEFAULTS = {
 const GlobalSettingsContext = createContext<GlobalSettingsContextValue | null>(null);
 
 export function GlobalSettingsProvider({ children }: { children: React.ReactNode }) {
+  const { currentUser } = useAuth();
   const [defaultMaxPaymentCount, setMaxCount] = useState<number>(DEFAULTS.defaultMaxPaymentCount);
   const [calendarStartHour, setCalendarStartHour] = useState<number>(DEFAULTS.calendarStartHour);
   const [calendarEndHour, setCalendarEndHour] = useState<number>(DEFAULTS.calendarEndHour);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Load once the user is authenticated (covers both session restore and fresh login)
   useEffect(() => {
+    if (!currentUser) {
+      setIsLoading(false);
+      return;
+    }
+
     let cancelled = false;
     async function loadSettings() {
       setIsLoading(true);
@@ -51,7 +59,7 @@ export function GlobalSettingsProvider({ children }: { children: React.ReactNode
     }
     loadSettings();
     return () => { cancelled = true; };
-  }, []);
+  }, [currentUser]);
 
   const setDefaultMaxPaymentCount = useCallback(async (n: number) => {
     await apiUpdateSetting('default_max_payment_count', String(n));

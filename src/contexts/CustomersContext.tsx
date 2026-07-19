@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import { Customer } from '../types/Customer';
 import { getCustomers, createCustomer as apiCreateCustomer } from '../api/customersApi';
 import { ApiRequestError } from '../api/apiError';
+import { useAuth } from './AuthContext';
 
 interface CustomersContextValue {
   customers: Customer[];
@@ -14,15 +15,17 @@ interface CustomersContextValue {
 const CustomersContext = createContext<CustomersContextValue | null>(null);
 
 export function CustomersProvider({ children }: { children: React.ReactNode }) {
+  const { currentUser } = useAuth();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchCustomers = useCallback(async (search?: string) => {
+  const fetchCustomers = useCallback(async (search?: string, isCancelled?: () => boolean) => {
     setIsLoading(true);
     setError(null);
     try {
       const dtos = await getCustomers(search);
+      if (isCancelled?.()) return;
       setCustomers(dtos.map(dto => ({
         id: dto.id,
         fullName: dto.fullName,
@@ -31,17 +34,26 @@ export function CustomersProvider({ children }: { children: React.ReactNode }) {
         createdDate: dto.createdAt ? dto.createdAt.slice(0, 10) : '',
       })));
     } catch (e) {
+      if (isCancelled?.()) return;
       const msg = e instanceof ApiRequestError ? e.message : 'שגיאה בטעינת הנתונים';
       setError(msg);
     } finally {
-      setIsLoading(false);
+      if (!isCancelled?.()) setIsLoading(false);
     }
   }, []);
 
-  // Load on mount
+  // Load once the user is authenticated (covers both session restore and fresh login).
+  // Guard against a stale in-flight fetch from a previous auth state (e.g. logout → re-login)
+  // resolving after a newer effect run and clobbering state with outdated data.
   useEffect(() => {
-    fetchCustomers();
-  }, [fetchCustomers]);
+    if (!currentUser) {
+      setIsLoading(false);
+      return;
+    }
+    let cancelled = false;
+    fetchCustomers(undefined, () => cancelled);
+    return () => { cancelled = true; };
+  }, [currentUser, fetchCustomers]);
 
   const createCustomer = useCallback(async (fullName: string, phone: string, email?: string): Promise<Customer> => {
     const dto = await apiCreateCustomer({ fullName, phone, email: email || undefined });

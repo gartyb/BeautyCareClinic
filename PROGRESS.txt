@@ -594,3 +594,61 @@
     docs/API_SPECIFICATION.md — 9 new endpoints for Treatments and Notes
     docs/DATABASE_SCHEMA.md — Treatment: notes, performed_by_full_name; Note: written_by_full_name, varchar(5000) content
     phases/phase-010/PHASE_SUMMARY.md — status updated to Implementation
+
+2026-07-19 Bug fix — customer search shows "שגיאה בטעינת הנתונים" on first login
+  Branch: (none — implementation only, not committed by request)
+  Build: FAIL — pre-existing unrelated error: src/features/payment/RecordPaymentModal.tsx(18,53)
+    TS6133 'currentUser' declared but never read (confirmed present on main before this fix
+    via git stash + npx tsc -b; logged as FOLLOWUPS.md FU-016). No new build errors introduced.
+  Tests: 274 PASS, 0 FAIL (npx vitest run --config vitest.config.ts) — all pre-existing tests
+    still green, including src/features/search/SearchScreen.test.tsx (6 tests).
+  Root cause: CustomersProvider, TreatmentTypesProvider, PackageTypesProvider and
+    GlobalSettingsProvider each fired their API fetch unconditionally on mount
+    (useEffect(() => { fetchX(); }, [fetchX])), before AuthProvider had a chance to restore
+    a session / before login completed. The resulting 401 was captured as a permanent error
+    state that never cleared after a successful login, because the effect had no dependency
+    on auth state. TherapistDataContext, TherapistsContext and AppointmentsContext use local
+    seed data only (no API calls), so they were not affected despite being named in the bug
+    report as "check for the same pattern."
+  Files updated:
+    src/contexts/CustomersContext.tsx — fetch effect now gated on useAuth().currentUser;
+      skips fetch (and clears isLoading) while unauthenticated, fetches once currentUser
+      becomes non-null (covers both session-restore-on-reload and fresh-login)
+    src/contexts/TreatmentTypesContext.tsx — same currentUser-gated fetch effect
+    src/contexts/PackageTypesContext.tsx — same currentUser-gated fetch effect
+    src/contexts/GlobalSettingsContext.tsx — same currentUser-gated fetch effect
+    src/test/renderWithProviders.tsx — seeds a valid auth token (tokenManager.setToken) before
+      render so AuthProvider restores an authenticated session in tests, matching the new
+      gated-fetch behavior of the four providers above (setup.ts already mocks GET /auth/me)
+  Not touched (by design — no API-fetching useEffect present):
+    src/contexts/TherapistDataContext.tsx, TherapistsContext.tsx, AppointmentsContext.tsx
+  Follow-ups logged:
+    FOLLOWUPS.md FU-016 — pre-existing unrelated `npm run build` failure
+      (RecordPaymentModal.tsx unused currentUser param), found while verifying this fix
+
+2026-07-19 Bug fix follow-up — code-reviewer findings addressed (still uncommitted)
+  Build: FAIL — same pre-existing unrelated TS6133 in RecordPaymentModal.tsx (FU-016), no new errors.
+  Tests: 276 PASS, 0 FAIL (274 baseline + 2 new regression tests).
+  Addressed:
+    1. (High) Added a real regression test that exercises the fixed race directly, instead of
+       only testing the "already authenticated" path:
+       src/contexts/authGatedFetch.test.tsx — renders CustomersProvider / TreatmentTypesProvider
+       trees unauthenticated (renderWithProviders(ui, { authenticated: false })), asserts zero
+       fetch() calls to /customers /treatment-types and no error state while logged out, then
+       drives a real AuthContext.login() transition and asserts the fetch fires and real data
+       loads with no error afterward.
+    2. (Medium) Added the same cancelled-flag guard GlobalSettingsContext already had to the
+       other three auth-gated fetch effects, so a stale in-flight request from a prior auth
+       state (e.g. logout -> re-login) can't resolve late and clobber newer state:
+       src/contexts/CustomersContext.tsx (fetchCustomers takes an optional isCancelled check),
+       src/contexts/TreatmentTypesContext.tsx (fetchAll takes an optional isCancelled check),
+       src/contexts/PackageTypesContext.tsx (inline cancelled flag, matches GlobalSettingsContext).
+    3. (Medium, test isolation) src/test/setup.ts — added afterEach(() => clearToken()) so seeded
+       tokens don't bleed across tests; added a POST /auth/login mock response (MOCK_LOGIN_RESPONSE)
+       so tests can drive a real login() call.
+       src/test/renderWithProviders.tsx — added an `authenticated?: boolean` option (default true,
+       so all existing callers are unaffected) that skips the setToken seeding when false.
+  Deferred (per explicit instruction, not done):
+    - Clearing stale customers/treatmentTypes/etc. arrays on the !currentUser branch (Low; not
+      user-visible since all consumers are behind PrivateRoute).
+    - Documenting CustomerContext.tsx (singular) review status in PROGRESS.txt (Low, doc-only).

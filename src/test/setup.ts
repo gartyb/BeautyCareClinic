@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom';
-import { vi } from 'vitest';
+import { afterEach, vi } from 'vitest';
+import { clearToken } from '../api/tokenManager';
 
 // Default mock responses for the API endpoints used in tests.
 // These correspond to the same seed data that was previously in the mock data files,
@@ -31,6 +32,12 @@ const MOCK_ME_RESPONSE = {
   role: 'Manager',
 };
 
+const MOCK_LOGIN_RESPONSE = {
+  accessToken: 'test-token',
+  expiresIn: 3600,
+  user: MOCK_ME_RESPONSE,
+};
+
 function buildResponse(data: unknown, status = 200): Response {
   return {
     ok: status >= 200 && status < 300,
@@ -44,6 +51,7 @@ vi.stubGlobal(
   'fetch',
   vi.fn(async (url: string) => {
     const u = String(url);
+    if (u.includes('/auth/login'))     return buildResponse(MOCK_LOGIN_RESPONSE);
     if (u.includes('/auth/me'))        return buildResponse(MOCK_ME_RESPONSE);
     if (u.includes('/customers'))      return buildResponse(MOCK_CUSTOMERS);
     if (u.includes('/treatment-types')) return buildResponse(MOCK_TREATMENT_TYPES);
@@ -53,3 +61,8 @@ vi.stubGlobal(
     return buildResponse({ code: 'NOT_FOUND', message: 'Not found' }, 404);
   })
 );
+
+// Prevent auth tokens seeded by one test (e.g. renderWithProviders) from bleeding into the next.
+afterEach(() => {
+  clearToken();
+});
