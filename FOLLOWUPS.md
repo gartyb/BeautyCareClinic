@@ -190,3 +190,18 @@ pre-fix schema, re-ran the test, and it failed with
 `Npgsql.PostgresException 42703: column "CustomerId" of relation "TreatmentSeries" does not
 exist` — the same underlying error as the original production bug. Restored the migration files
 and DB state, re-ran the full suite: 130/130 passing (129 pre-existing + this one).
+
+## FU-018: `docs/API_SPECIFICATION.md` order item example uses wrong field name for the series link
+
+Source: found while implementing CR-031 (2026-07-19).
+The `GET /api/v1/orders/{id}` example response JSON (`docs/API_SPECIFICATION.md`, "Orders"
+section) shows `"treatmentSeriesId": "<uuid>"` inside each order item. The real
+`OrderItemDto` field (`backend/BeautyCareClinic.Application/DTOs/OrderDtos.cs`) is `SeriesId`,
+which serializes as `seriesId`, not `treatmentSeriesId` — confirmed live via
+`GET /api/v1/customers/{id}/orders` against the running dev backend, which returns `seriesId`.
+`treatmentSeriesId` appears to be a leftover from an earlier frontend-only field name (see
+`src/types/Order.ts`'s legacy `treatmentSeriesId` compatibility field) that never matched the
+actual backend DTO. Left uncorrected here since fixing unrelated doc drift is out of scope for
+CR-031 — only `packageNumber` was added to that same example line.
+Priority: Low (documentation accuracy only; the real API and frontend types are already
+correct/consistent — the frontend maps `seriesId ?? treatmentSeriesId` defensively).

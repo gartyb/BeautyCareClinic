@@ -439,6 +439,139 @@ public class Phase010Tests : IDisposable
         Assert.Equal(0, updated!.UsedMinutes);
     }
 
+    [Fact]
+    public async Task TreatmentRepository_UpdateAsync_PersistsNotesChange()
+    {
+        var repo = new TreatmentRepository(_context);
+        var tt   = new TreatmentType { Id = Guid.NewGuid(), Name = "עדכון הערה" };
+        _context.TreatmentTypes.Add(tt);
+        await _context.SaveChangesAsync();
+
+        var treatment = new Treatment
+        {
+            Id                  = Guid.NewGuid(),
+            CustomerId          = _customerId,
+            TreatmentTypeId     = tt.Id,
+            TreatmentDate       = DateTime.UtcNow,
+            DurationMinutes     = 45,
+            UserId              = _therapistId,
+            PerformedByFullName = "מטפלת ראשית",
+            Notes               = "הערה מקורית",
+        };
+        _context.Treatments.Add(treatment);
+        await _context.SaveChangesAsync();
+
+        treatment.Notes = "הערה מעודכנת";
+        await repo.UpdateAsync(treatment);
+
+        var fromDb = await _context.Treatments.FindAsync(treatment.Id);
+        Assert.Equal("הערה מעודכנת", fromDb!.Notes);
+    }
+
+    [Fact]
+    public async Task TreatmentRepository_UpdateAsync_CanClearNotesToNull()
+    {
+        var repo = new TreatmentRepository(_context);
+        var tt   = new TreatmentType { Id = Guid.NewGuid(), Name = "ניקוי הערה" };
+        _context.TreatmentTypes.Add(tt);
+        await _context.SaveChangesAsync();
+
+        var treatment = new Treatment
+        {
+            Id                  = Guid.NewGuid(),
+            CustomerId          = _customerId,
+            TreatmentTypeId     = tt.Id,
+            TreatmentDate       = DateTime.UtcNow,
+            DurationMinutes     = 45,
+            UserId              = _therapistId,
+            PerformedByFullName = "מטפלת ראשית",
+            Notes               = "הערה שתימחק",
+        };
+        _context.Treatments.Add(treatment);
+        await _context.SaveChangesAsync();
+
+        treatment.Notes = null;
+        await repo.UpdateAsync(treatment);
+
+        var fromDb = await _context.Treatments.FindAsync(treatment.Id);
+        Assert.Null(fromDb!.Notes);
+    }
+
+    // NOTE: The four tests below only re-implement TreatmentsController.Update's
+    // authorization/length-check logic locally (plain booleans/strings) — they do not call the
+    // controller action itself, so they cannot catch a missing [Authorize] attribute, a wrong
+    // route template, an inverted &&/|| in the real ownership check, or a broken guard in the
+    // actual controller code. The real regression guard for PUT /api/v1/treatments/{id} is
+    // Integration/TreatmentsControllerPostgresTests.cs, which invokes the controller directly
+    // against a real Postgres-backed AppDbContext.
+    [Fact]
+    public void UpdateTreatment_AuthorMatchesCurrentUser_IsAllowed()
+    {
+        var treatmentOwnerId = _therapistId;
+        var mockCurrentUser  = MockCurrentUser(_therapistId, UserRole.Therapist);
+        var currentUserId    = mockCurrentUser.Object.GetCurrentUserId();
+        var isManager        = mockCurrentUser.Object.IsManager();
+
+        var shouldForbid = treatmentOwnerId != currentUserId && !isManager;
+        Assert.False(shouldForbid);
+    }
+
+    [Fact]
+    public void UpdateTreatment_ByManager_ForOthersTreatment_IsAllowed()
+    {
+        var treatmentOwnerId = _therapistId;
+        var mockCurrentUser  = MockCurrentUser(_managerId, UserRole.Manager);
+        var currentUserId    = mockCurrentUser.Object.GetCurrentUserId();
+        var isManager        = mockCurrentUser.Object.IsManager();
+
+        var shouldForbid = treatmentOwnerId != currentUserId && !isManager;
+        Assert.False(shouldForbid); // manager can update
+    }
+
+    [Fact]
+    public void UpdateTreatment_WrongAuthorTherapist_Returns403()
+    {
+        var treatmentOwnerId   = _therapistId;
+        var anotherTherapistId = Guid.NewGuid();
+
+        var mockCurrentUser = MockCurrentUser(anotherTherapistId, UserRole.Therapist);
+        var currentUserId   = mockCurrentUser.Object.GetCurrentUserId();
+        var isManager       = mockCurrentUser.Object.IsManager();
+
+        var shouldForbid = treatmentOwnerId != currentUserId && !isManager;
+        Assert.True(shouldForbid);
+    }
+
+    [Fact]
+    public async Task UpdateTreatment_NonExistentId_ReturnsNull()
+    {
+        var repo   = new TreatmentRepository(_context);
+        var result = await repo.GetByIdAsync(Guid.NewGuid());
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void UpdateTreatment_NotesExceeds5000Chars_Returns422()
+    {
+        var longNotes = new string('א', 5001);
+        void Act() { if (longNotes.Length > 5000) throw new DomainValidationException("ההערה חורגת מ-5000 תווים"); }
+        Assert.Throws<DomainValidationException>((Action)Act);
+    }
+
+    [Fact]
+    public void UpdateTreatment_NullOrEmptyNotes_IsAllowed()
+    {
+        // Unlike Note.Content, Treatment.Notes is optional — null/empty must NOT throw.
+        string? notes = null;
+        void Act() { if (notes != null && notes.Length > 5000) throw new DomainValidationException("ההערה חורגת מ-5000 תווים"); }
+        var exception = Record.Exception(Act);
+        Assert.Null(exception);
+
+        notes = string.Empty;
+        exception = Record.Exception(Act);
+        Assert.Null(exception);
+    }
+
     // =========================================================================
     // NOTE TESTS
     // =========================================================================

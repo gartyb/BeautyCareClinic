@@ -222,6 +222,13 @@ public class AppDbContext : IdentityDbContext<AppUser, IdentityRole<Guid>, Guid>
             .Property(oi => oi.UnitPrice)
             .HasColumnType("decimal(10,2)");
 
+        // PackageNumber — stable per-customer package number (CR-031). No unique index: RC-1's
+        // row-level lock on the Customer row during order creation makes numbering race-free
+        // without needing a DB constraint (RC-2).
+        modelBuilder.Entity<OrderItem>()
+            .Property(oi => oi.PackageNumber)
+            .IsRequired();
+
         // OrderItem → TreatmentSeries (1:1, Cascade: series belongs to item)
         modelBuilder.Entity<OrderItem>()
             .HasOne(oi => oi.TreatmentSeries)

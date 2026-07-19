@@ -180,6 +180,31 @@ public class TreatmentsController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = treatment.Id }, ToDto(saved!));
     }
 
+    /// <summary>PUT /api/v1/treatments/{id} — Both roles. Only author or Manager may update. Updates Notes only.</summary>
+    [HttpPut("api/v1/treatments/{id:guid}")]
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateTreatmentRequest request)
+    {
+        var treatment = await _treatmentRepository.GetByIdAsync(id);
+        if (treatment == null)
+            return NotFound(new ErrorResponse(ErrorCodes.NotFound, "הטיפול לא נמצא.", DateTime.UtcNow, HttpContext.TraceIdentifier));
+
+        var currentUserId = _currentUserService.GetCurrentUserId();
+        var isManager     = _currentUserService.IsManager();
+
+        if (treatment.UserId != currentUserId && !isManager)
+            return StatusCode(403, new ErrorResponse(ErrorCodes.Forbidden, "אין הרשאה לעדכן טיפול זה.", DateTime.UtcNow, HttpContext.TraceIdentifier));
+
+        if (request.Notes != null && request.Notes.Length > 5000)
+            throw new DomainValidationException("ההערה חורגת מ-5000 תווים");
+
+        treatment.Notes = request.Notes;
+
+        await _treatmentRepository.UpdateAsync(treatment);
+
+        var updated = await _treatmentRepository.GetByIdAsync(treatment.Id);
+        return Ok(ToDto(updated!));
+    }
+
     /// <summary>
     /// DELETE /api/v1/treatments/{id} — Both roles.
     /// Only the author or a Manager may delete a treatment.

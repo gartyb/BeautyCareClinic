@@ -416,3 +416,85 @@ again after restoring the fix. Requires a reachable Postgres via the
 
 - Version: v0.10.2 (patch — backward-compatible bug fix, no new phase)
 - Tag: v0.10.2 (branch `fix/order-creation-treatmentseries-customerid`, merged to `main`)
+
+## Maintenance Release — v0.11.0 (CR-031 + 4 fixes/enhancements, within Phase 010 lineage)
+
+**Status:** Implemented, tested, validated by the user in the browser.
+
+### Scope
+
+Bundled into a single release at the user's explicit request (multiple items validated together
+in one browser session):
+
+**CR-031 — Stable per-customer package numbering.** `OrderItem.PackageNumber`, assigned once per
+customer at order-creation time (row-locked via `SELECT ... FOR UPDATE` on the Customer row,
+ADR-010-A pattern), backfilled via a deterministic `ROW_NUMBER()` migration. `ActiveSeriesTab` and
+`TreatmentHistoryTab` now both read `packageNumber` instead of independently computing an index,
+so the same package shows the same `#N` in both tabs. See `CHANGE_REQUESTS.md` (closed 2026-07-19).
+
+**Bug: payment recording / note creation always failed (500).** `PaymentsController.Create` and
+`NotesController.Create`/`Update` converted a `DateOnly` to `DateTime` via
+`.ToDateTime(TimeOnly.MinValue)` with no `DateTimeKind` — Npgsql rejects `Kind=Unspecified` for a
+`timestamp with time zone` column. Fixed by adding `DateTimeKind.Utc`, matching the pattern already
+used in `TreatmentsController`. New Postgres integration tests
+(`PaymentsControllerPostgresTests.cs`, `NotesControllerPostgresTests.cs`) prove the fix — reverting
+it reproduces the original crash.
+
+**Bug: Orders & Payments tab showed no package name, a garbled date, and ₪0 total.**
+`OrdersTab.tsx` read legacy mock-data field names (`order.createdDate`, `order.orderItems`,
+`order.totalPrice`) that don't exist in the real API response (`orderDate`, `items`,
+`discountedPrice`/`originalPrice`). Fixed to prefer the real API fields with a legacy fallback,
+matching the pattern already used correctly in `RecordPaymentModal.tsx`/`TreatmentHistoryTab.tsx`.
+New test: `OrdersTab.test.tsx`.
+
+**UI fix: package index position in Treatment History.** Repositioned so the package name and its
+`#N` badge render in the same order as the equivalent badge in `ActiveSeriesTab.tsx`.
+
+**New capability: edit treatment-level notes.** `Treatment.Notes` was a persisted column with no
+way to set it after creation and no UI to set it at all (the record-treatment flows never sent a
+note). Added `PUT /api/v1/treatments/{id}` (author-or-manager only, 5000-char cap, only `Notes` is
+mutable) and an edit affordance in `TreatmentModal.tsx` (the same modal where photos are added),
+gated to the treatment's author or a Manager. Treatment Photos remain explicitly out of scope,
+deferred to Phase 011 (in-memory only, no persistence — unchanged from Phase 010).
+
+### Files changed
+
+Backend: `PaymentsController.cs`, `NotesController.cs`, `TreatmentsController.cs`,
+`TreatmentDtos.cs`, `ITreatmentRepository.cs`, `TreatmentRepository.cs`,
+`CustomerOrdersController.cs`, `TreatmentSeriesController.cs`, `OrderDtos.cs`,
+`TreatmentSeriesDtos.cs`, `OrderItem.cs` (Domain), `AppDbContext.cs`,
+`AppDbContextModelSnapshot.cs`, migration `20260719105258_AddPackageNumberToOrderItems`,
+`Phase010Tests.cs`, `CustomerOrdersControllerPostgresTests.cs` (extended); new:
+`PaymentsControllerPostgresTests.cs`, `NotesControllerPostgresTests.cs`,
+`TreatmentsControllerPostgresTests.cs`.
+
+Frontend: `OrdersTab.tsx`, `TreatmentHistoryTab.tsx`, `TreatmentModal.tsx`, `ActiveSeriesTab.tsx`,
+`treatmentsApi.ts`, `api/index.ts`, `types/Order.ts`, `types/TreatmentSeries.ts`; new:
+`OrdersTab.test.tsx`, `TreatmentModal.test.tsx`.
+
+Docs: `API_SPECIFICATION.md` (new `PUT /treatments/{id}`, corrected stale "immutable" note),
+`DATABASE_SCHEMA.md`, `DOMAIN_MODEL.md` (CR-031 column + numbering rules).
+
+### Automated Tests
+
+| Test Type | Passed | Failed | Notes |
+|---|---:|---:|---|
+| Backend (xUnit) | 149 | 0 | 130 baseline (v0.10.2) + 19 new across CR-031, payment/notes fix, and treatment-notes feature |
+| Frontend (Vitest) | 284 | 0 | 276 baseline (v0.10.2) + 8 new across OrdersTab and TreatmentModal |
+
+### Manual Validation
+
+- כל הפריטים נבדקו בדפדפן על ידי המשתמשת ואושרו לביצוע commit יחיד.
+
+### Code Review / Security Review
+
+- כל תיקון עבר code-reviewer; ה-endpoint החדש (PUT /treatments/{id}) עבר גם security-reviewer —
+  ללא ממצאי Critical/High/Medium.
+- ממצאי code-review (תיעוד לא מסונכרן, טסטים שלא בדקו את ה-controller בפועל, טסט frontend
+  שלא תרגל את מסלול הדחייה) תוקנו לפני האישור.
+
+### Version
+
+- Version: v0.11.0 (minor — bundles a backward-compatible feature (CR-031, treatment-note editing)
+  with backward-compatible bug fixes)
+- Tag: v0.11.0

@@ -95,7 +95,7 @@ public class NotesController : ControllerBase
             CustomerId        = customerId,
             UserId            = currentUserId,
             TreatmentTypeId   = request.TreatmentTypeId,
-            NoteDate          = noteDate.ToDateTime(TimeOnly.MinValue),
+            NoteDate          = noteDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc),
             Content           = request.Content,
             WrittenByFullName = writtenBy,
         };
@@ -143,7 +143,7 @@ public class NotesController : ControllerBase
         }
 
         note.TreatmentTypeId = request.TreatmentTypeId;
-        note.NoteDate        = noteDate.ToDateTime(TimeOnly.MinValue);
+        note.NoteDate        = noteDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
         note.Content         = request.Content;
 
         await _noteRepository.UpdateAsync(note);

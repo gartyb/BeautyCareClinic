@@ -6,6 +6,9 @@ export interface OrderItem {
   packageTypeName?: string;
   unitPrice?: number;
   seriesId?: string;
+  // Stable per-customer package number (CR-031), assigned once at order-creation time.
+  // Optional since older/mock data may lack it.
+  packageNumber?: number;
   // Legacy field preserved for mock-data compatibility
   treatmentSeriesId?: string;
 }

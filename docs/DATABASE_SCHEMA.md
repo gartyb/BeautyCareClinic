@@ -81,6 +81,7 @@ erDiagram
         uuid order_id FK
         uuid package_type_id FK
         decimal unit_price
+        integer package_number
     }
 
     PAYMENT {
@@ -177,6 +178,7 @@ erDiagram
 - `completed_treatments` for timer-based series is derived: `floor(used_minutes / minutes_per_treatment)`. Updated after each timer session.
 - `GLOBAL_SETTINGS` is a key-value table. Each setting is a separate row with a unique `name` and a string `value`. Currently defined: `default_max_payment_count`.
 - `PACKAGE_TYPE.price` — catalog price (`decimal(10,2)`). Snapshot copied to `ORDER_ITEM.unit_price` at order creation. Price changes do not affect historical orders.
+- `ORDER_ITEM.package_number` — stable per-customer package number (int, not null), assigned once at order-creation time in purchase order (1, 2, 3, ...) and never reassigned; gaps are expected when a package completes or its order is deleted. Assignment locks the owning `Customer` row (`SELECT ... FOR UPDATE`) before computing `MAX(package_number) + 1` across all of the customer's order items, preventing races under concurrent order creation. No unique constraint is needed — the row lock alone makes numbering race-free. `TreatmentSeries` does not duplicate this value; it is read through `TreatmentSeries.OrderItem.PackageNumber`.
 - `CUSTOMER_ORDER.remaining_balance` — PostgreSQL `GENERATED ALWAYS AS (discounted_price - amount_paid) STORED`. Never written from application code.
 - `PAYMENT.recorded_by_user_id` / `recorded_by_full_name` — server-derived from the authenticated JWT at payment creation. Client never supplies these values.
 - Money columns: `decimal(10,2)` throughout.

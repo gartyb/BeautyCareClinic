@@ -32,7 +32,7 @@ export function OrdersTab({ currentUser }: OrdersTabProps) {
   const { packageTypes } = usePackageTypes();
   const [paymentModalOrderId, setPaymentModalOrderId] = useState<string | null>(null);
 
-  const sorted = [...orders].sort((a, b) => (b.createdDate ?? '').localeCompare(a.createdDate ?? ''));
+  const sorted = [...orders].sort((a, b) => (b.orderDate ?? b.createdDate ?? '').localeCompare(a.orderDate ?? a.createdDate ?? ''));
 
   if (sorted.length === 0) {
     return (
@@ -71,18 +71,18 @@ export function OrdersTab({ currentUser }: OrdersTabProps) {
                   <span className="text-sm font-medium text-clinic-text">
                     הזמנה #{sorted.length - index}
                   </span>
-                  <span className="text-xs text-clinic-muted">{formatDate(order.createdDate ?? '')}</span>
+                  <span className="text-xs text-clinic-muted">{formatDate(order.orderDate ?? order.createdDate ?? '')}</span>
                 </div>
               </div>
 
               {/* Package items */}
               <ul dir="rtl" className="px-4 py-2 border-b border-clinic-border flex flex-col gap-1">
-                {(order.orderItems ?? []).map(item => {
+                {(order.items ?? order.orderItems ?? []).map(item => {
                   const pkg = packageTypes.find(p => p.id === item.packageTypeId);
                   return (
                     <li key={item.id} className="flex items-center gap-1.5 text-sm text-clinic-text">
                       <span className="w-1.5 h-1.5 rounded-full bg-clinic-gold flex-shrink-0" />
-                      {pkg?.name ?? item.packageTypeId}
+                      {item.packageTypeName ?? pkg?.name ?? item.packageTypeId}
                     </li>
                   );
                 })}
@@ -93,7 +93,7 @@ export function OrdersTab({ currentUser }: OrdersTabProps) {
                 <div className="flex flex-col items-center gap-0.5">
                   <span className="text-xs text-clinic-muted">סה&quot;כ</span>
                   <span className="font-semibold text-clinic-text">
-                    ₪{parseFloat(String(order.totalPrice ?? 0)).toLocaleString('he-IL')}
+                    ₪{parseFloat(String(order.discountedPrice ?? order.totalPrice ?? order.originalPrice ?? 0)).toLocaleString('he-IL')}
                   </span>
                 </div>
                 <div className="flex flex-col items-center gap-0.5">

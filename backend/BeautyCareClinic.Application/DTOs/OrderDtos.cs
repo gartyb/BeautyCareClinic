@@ -5,7 +5,8 @@ public record OrderItemDto(
     Guid PackageTypeId,
     string PackageTypeName,
     decimal UnitPrice,
-    Guid? SeriesId);
+    Guid? SeriesId,
+    int PackageNumber);
 
 public record OrderDto(
     Guid Id,

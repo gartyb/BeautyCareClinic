@@ -9,7 +9,7 @@
 | **TreatmentType**            | Named category of treatment (e.g. facial, laser). Used across packages, appointments, treatments, and notes. |
 | **PackageType**              | Clinic-defined package. Can be a quantity-based series, a timer-based series, or neither.            |
 | **CustomerOrder**            | Customer purchase. Contains one or more order items. Tracks payments and balance.                    |
-| **OrderItem**                | One package type within an order. Creates a `TreatmentSeries` when the package is a series.         |
+| **OrderItem**                | One package type within an order. Creates a `TreatmentSeries` when the package is a series. Carries a stable per-customer `package_number`. |
 | **TreatmentSeries**          | Tracks usage of a series package. Either quantity-based or timer-based.                              |
 | **Payment**                  | Payment toward an order. Method and date recorded.                                                   |
 | **Appointment**              | Scheduled treatment slot. Must not conflict with therapist availability.                             |
@@ -36,6 +36,13 @@
 - Payments can be added until the order reaches its `max_payment_count`.
 - `amount_paid` and `remaining_balance` are updated after each payment.
 - Therapists cannot edit payments after saving.
+
+### Package numbering (CR-031)
+- Every `OrderItem` carries a `package_number`, unique per customer and assigned once at order-creation time in purchase order (1, 2, 3, ...).
+- Numbers are never reassigned: when a package completes or its order is deleted, its number is retired — gaps in the sequence are expected and correct.
+- Assignment is race-free under concurrent order creation because it locks the owning `Customer` row (`SELECT ... FOR UPDATE`) before computing the next number.
+- `TreatmentSeries` does not store its own copy of the number; it is read through `TreatmentSeries.OrderItem.PackageNumber`.
+- This is the single source of truth for the "#N" package badge shown on both the Active Series tab and the Treatment History tab of the Customer Card, so the same package always shows the same number in both places.
 
 ### Appointments
 - Availability = working hours ∩ no unavailable dates ∩ no existing appointments ∩ therapist capability for the treatment type.

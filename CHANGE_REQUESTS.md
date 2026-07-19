@@ -289,3 +289,4 @@ None.
 ### CR-018 — Closed Phase 009. `remaining_balance` as PostgreSQL GENERATED STORED column. Service layer reloads entity post-save.
 ### CR-021 — Closed Phase 009. `DomainConflictException` in Domain layer; middleware catches explicitly.
 ### CR-025 (partial) — Items (a) and (d) closed Phase 009: `globalSettingsApi.updateSetting` return type fixed; `AuthController`/`UsersController` use `ICurrentUserService`.
+### CR-031 — Closed 2026-07-19. `OrderItem.PackageNumber` (row-locked assignment, deterministic backfill migration); `ActiveSeriesTab`/`TreatmentHistoryTab` now show the same package number.

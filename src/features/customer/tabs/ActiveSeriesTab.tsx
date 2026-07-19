@@ -120,7 +120,7 @@ export function ActiveSeriesTab({ currentUser }: ActiveSeriesTabProps) {
                     <h3 className="font-semibold text-clinic-text">
                       {pkg?.name ?? s.packageTypeName ?? s.packageTypeId ?? ''}
                     </h3>
-                    <span className="text-sm text-clinic-muted font-medium">#{idx + 1}</span>
+                    <span className="text-sm text-clinic-muted font-medium">#{s.packageNumber ?? idx + 1}</span>
                   </div>
                   {treatmentType && (
                     <span className="text-base text-clinic-muted">{treatmentType.name}</span>
@@ -170,7 +170,7 @@ export function ActiveSeriesTab({ currentUser }: ActiveSeriesTabProps) {
                   <h3 className="font-semibold text-clinic-text">
                     {pkg?.name ?? s.packageTypeName ?? s.packageTypeId ?? ''}
                   </h3>
-                  <span className="text-sm text-clinic-muted font-medium">#{idx + 1}</span>
+                  <span className="text-sm text-clinic-muted font-medium">#{s.packageNumber ?? idx + 1}</span>
                 </div>
                 {treatmentType && (
                   <span className="text-base text-clinic-muted">{treatmentType.name}</span>

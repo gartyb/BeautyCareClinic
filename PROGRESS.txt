@@ -749,3 +749,268 @@
   FOLLOWUPS.md: FU-015 and FU-017 marked RESOLVED with details of the fix/verification.
   Not touched: env.development.local, env.example, zipcheck/ (per explicit constraint).
   Still not committed/tagged, per explicit instruction.
+
+2026-07-19 CR-031 — Stable per-customer package numbering
+  Type: Feature (approved via pm-spec + architect-review with 5 corrections RC-1..RC-5, all applied)
+  Scope: Add a persistent OrderItem.PackageNumber, assigned once per customer at order-creation
+  time in purchase order, so ActiveSeriesTab and TreatmentHistoryTab on the Customer Card show
+  the same "#N" for the same package instead of each tab computing its own idx+1.
+  Build: PASS — dotnet build BeautyCareClinic.sln (5 projects, 0 errors, 0 warnings).
+  Backend tests: PASS — dotnet test BeautyCareClinic.sln with ConnectionStrings__DefaultConnection
+    set to the dev Postgres — 131/131 (129 pre-existing + 2 new, one extending
+    CustomerOrdersControllerPostgresTests.cs for multi-item + multi-order numbering).
+  Frontend: npx tsc -b --noEmit — 1 pre-existing unrelated error (RecordPaymentModal.tsx unused
+    currentUser param, already tracked as FOLLOWUPS.md FU-016, confirmed present on main via
+    git stash before this change). npx vitest run --config vitest.config.ts — 276/276 passing,
+    0 failures (no regressions).
+  Design (per architect-review corrections):
+    RC-1 — Concurrency: CustomerOrdersController.Create now takes a row-level lock on the
+      Customer row (SELECT "Id" FROM "Customers" WHERE "Id" = {0} FOR UPDATE) inside the existing
+      transaction before computing COALESCE(MAX(oi."PackageNumber"),0) across the customer's
+      OrderItems (joined through CustomerOrders), then assigns base+1, base+2, ... across the
+      request's item loop. Matches the exact SqlQueryRaw FOR UPDATE pattern already used by
+      PaymentsController (ADR-010-A). Live-verified: 5 concurrent POSTs for the same customer
+      returned distinct sequential numbers (4,5,6,7,8) with zero collisions.
+    RC-2 — No unique index added (can't go on OrderItems — no CustomerId column there — and is
+      unnecessary once the row lock serializes assignment).
+    RC-3/RC-4 — Migration 20260719105258_AddPackageNumberToOrderItems.cs: (1) AddColumn as
+      NULLABLE, (2) Sql(...) backfill using ROW_NUMBER() OVER (PARTITION BY co."CustomerId"
+      ORDER BY co."OrderDate", co."Id", oi2."Id") for full determinism (multiple items in one
+      order share OrderDate), (3) AlterColumn to NOT NULL. Verified against real Postgres: 3
+      pre-existing OrderItems (2 sharing an OrderDate) backfilled to 1,2,3 in the correct tiebreak
+      order. This is the exact sequencing v0.10.2 got wrong — confirmed both the migration's
+      Up() and AppDbContextModelSnapshot.cs changed together.
+    RC-5 — No new column on TreatmentSeries. TreatmentSeriesController.ToDto reads
+      ts.OrderItem?.PackageNumber directly; confirmed .Include(ts => ts.OrderItem) was already
+      present in both TreatmentSeriesRepository.GetActiveByCustomerIdAsync and GetByIdAsync.
+  Files changed:
+    backend/BeautyCareClinic.Domain/Entities/OrderItem.cs — PackageNumber property.
+    backend/BeautyCareClinic.Infrastructure/Data/AppDbContext.cs — Fluent config (required, no index).
+    backend/BeautyCareClinic.Infrastructure/Migrations/20260719105258_AddPackageNumberToOrderItems.cs
+      (+ .Designer.cs) — new migration (RC-3/RC-4).
+    backend/BeautyCareClinic.Infrastructure/Migrations/AppDbContextModelSnapshot.cs — PackageNumber
+      added to the OrderItem block.
+    backend/BeautyCareClinic.Api/Controllers/CustomerOrdersController.cs — RC-1 row lock + base
+      query + per-item PackageNumber assignment + OrderItemDto construction.
+    backend/BeautyCareClinic.Api/Controllers/TreatmentSeriesController.cs — ToDto reads
+      ts.OrderItem?.PackageNumber (RC-5).
+    backend/BeautyCareClinic.Application/DTOs/OrderDtos.cs — OrderItemDto.PackageNumber.
+    backend/BeautyCareClinic.Application/DTOs/TreatmentSeriesDtos.cs — TreatmentSeriesDto.PackageNumber.
+    backend/BeautyCareClinic.Tests/Integration/CustomerOrdersControllerPostgresTests.cs — new test
+      asserting PackageNumber increments correctly across multi-item single order and separate
+      sequential orders, read back from real Postgres.
+    src/types/Order.ts, src/types/TreatmentSeries.ts — optional packageNumber field.
+    src/features/customer/tabs/ActiveSeriesTab.tsx — #{s.packageNumber ?? idx + 1} (both quantity
+      and timer series badges).
+    src/features/customer/tabs/TreatmentHistoryTab.tsx — packageIndex={item.packageNumber ?? idx + 1}.
+    docs/DATABASE_SCHEMA.md, docs/DOMAIN_MODEL.md, docs/API_SPECIFICATION.md — documented the new
+      column/fields, numbering rules, and concurrency strategy.
+    CHANGE_REQUESTS.md — CR-031 moved from Planned to Completed.
+    FOLLOWUPS.md — FU-018 added (pre-existing, unrelated doc drift found in the same
+      API_SPECIFICATION.md line: example uses "treatmentSeriesId" but the real DTO field is
+      "seriesId" — not fixed, out of CR-031 scope).
+  Live verification against running backend (:5000, restarted to load the rebuilt binary) +
+  real Postgres:
+    - GET /customers/{id}/orders and GET /customers/{id}/treatment-series for the same customer
+      returned matching packageNumber values (2 and 3) for the same underlying package
+      (orderItemId <-> seriesId pairs), confirming the two tabs will now agree.
+    - POST a new order for that customer returned packageNumber 4 (continuing the max correctly);
+      deleted afterward to restore state.
+    - Fired 5 concurrent POSTs for the same customer: got 4,5,6,7,8 with no duplicates (RC-1 row
+      lock verified under real concurrency); deleted afterward. Final DB state confirmed back to
+      the original 3 rows numbered 1,2,3.
+  Not touched: env.development.local, env.example, zipcheck/ (per explicit constraint).
+  Not committed/tagged, per explicit instruction — implementation only, ready for code-reviewer.
+
+2026-07-19 CR-031 correction — timer-series badge was missed in first pass
+  Coordinator independently verified the CR-031 implementation before sending to code-reviewer
+  and caught a real gap: src/features/customer/tabs/ActiveSeriesTab.tsx line 123 (quantity-series
+  badge) was correctly updated to #{s.packageNumber ?? idx + 1}, but line 173 (timer-series badge)
+  was left as the old #{idx + 1} — despite an earlier replace_all Edit call reporting "All
+  occurrences were successfully replaced" for both. Confirmed via git diff that only one of the
+  two occurrences had actually changed. This mattered specifically because the original user
+  report that motivated CR-031 was about a timer-based package showing an inconsistent index, so
+  the unfixed branch meant the feature did not actually resolve the reported symptom.
+  Fix: line 173 changed to #{s.packageNumber ?? idx + 1}, matching line 123.
+  Re-verified:
+    - npx tsc -b --noEmit — same single pre-existing unrelated error (FU-016, RecordPaymentModal.tsx).
+    - npx vitest run --config vitest.config.ts — 276/276 passing, no regressions.
+    - Live check against the running backend (:5000) + real Postgres: the customer's existing
+      timer-based series (orderItemId 6639ccf5-..., isTimerBased: true) returns packageNumber: 2
+      from both GET /customers/{id}/treatment-series (ActiveSeriesTab's data source, both
+      quantity- and timer-series branches now read s.packageNumber) and GET /customers/{id}/orders
+      (TreatmentHistoryTab's data source) for the same item — confirmed consistent end-to-end.
+  Files changed: src/features/customer/tabs/ActiveSeriesTab.tsx (one line).
+  Not committed/tagged, per explicit instruction.
+
+2026-07-19 CR-031 correction — added automated concurrency test for RC-1 (code-reviewer Medium finding)
+  code-reviewer's full pass on CR-031 found no Critical/High issues (RC-1..RC-5 all confirmed
+  correct, both ActiveSeriesTab badge fixes confirmed present) but flagged one Medium: the RC-1
+  row-lock guarantee (no duplicate PackageNumbers under concurrent order creation for the same
+  customer) had zero automated regression coverage — only manually/live verified earlier.
+  Added: backend/BeautyCareClinic.Tests/Integration/CustomerOrdersControllerPostgresTests.cs —
+  new test Create_ConcurrentRequestsForSameCustomer_AssignUniqueSequentialPackageNumbers. Fires 5
+  truly parallel CustomerOrdersController.Create calls for the same customer via Task.WhenAll,
+  each on its own AppDbContext (DbContext is not thread-safe — never shared across the parallel
+  calls, matching the class's InitializeAsync connection setup), asserts the resulting
+  PackageNumber set is exactly {1..5} with no duplicates/gaps, and re-verifies via a fresh
+  untracked read straight from Postgres.
+  Regression-proof: temporarily removed the "SELECT ... FOR UPDATE" row lock from
+  CustomerOrdersController.Create and re-ran this test 3x — failed reliably all 3 times
+  (Assert.Equal() Expected: 5 distinct values, Actual: 1 — all 5 concurrent calls read the same
+  MAX(PackageNumber)=0 and collided on PackageNumber=1), proving the test genuinely exercises
+  RC-1's guarantee rather than passing vacuously. Restored the lock (diff against the prior
+  version of CustomerOrdersController.cs confirmed byte-identical to before this exercise).
+  Flakiness check: ran the new test alone 5x and the full suite 3x with the lock restored — 5/5
+  and 3/3 green (132/132 total), no flakes observed.
+  Files changed:
+    backend/BeautyCareClinic.Tests/Integration/CustomerOrdersControllerPostgresTests.cs — new
+      test + _connectionString field (was a local var in InitializeAsync, promoted to a field so
+      the new test can build additional per-call AppDbContext instances).
+  Not committed/tagged, per explicit instruction.
+
+2026-07-19 Code-review follow-up — added missing NotesController.Update regression coverage
+  Code review of the payment/notes DateTime-Kind bug fix (PaymentsController.cs, NotesController.cs
+  — both already fixed with DateTimeKind.Utc added to their ToDateTime calls) found a gap:
+  NotesControllerPostgresTests.cs only regression-tested NotesController.Create. The Update action
+  (~line 146) had the identical fix applied but zero coverage, so a future regression there
+  (e.g. someone "simplifying" noteDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc) back to the
+  2-arg overload) would not be caught by the suite.
+  Added: Update_WritesNoteDateToRealPostgres_AndReturns200 in NotesControllerPostgresTests.cs.
+  Creates a note via the controller's own Create path, then calls Update against the real Postgres
+  AppDbContext with a new noteDate, asserts 200 OkObjectResult with the updated NoteDto, and reads
+  the row back via a fresh AsNoTracking() query to prove the timestamptz column persisted the new
+  value — same pattern as the existing Create test and CustomerOrdersControllerPostgresTests.cs.
+  Also removed two dead Mock stubs flagged as P3 nits: currentUserMock.Setup(s =>
+  s.GetCurrentUserRole()) in both PaymentsControllerPostgresTests.cs and
+  NotesControllerPostgresTests.cs — neither PaymentsController nor NotesController calls
+  GetCurrentUserRole() (confirmed via grep), only GetCurrentUserId()/IsManager().
+  Files changed:
+    backend/BeautyCareClinic.Tests/Integration/NotesControllerPostgresTests.cs — new Update test,
+      removed dead GetCurrentUserRole() stub from the existing Create test.
+    backend/BeautyCareClinic.Tests/Integration/PaymentsControllerPostgresTests.cs — removed dead
+      GetCurrentUserRole() stub.
+  Verified: dotnet build — 0 errors, 0 warnings. dotnet test (ConnectionStrings__DefaultConnection
+  pointed at the dev Postgres via /home/runner/.microsoft/usersecrets/.../secrets.json,
+  ASPNETCORE_ENVIRONMENT=Development) — 135/135 passing (134 pre-existing + 1 new).
+  Not committed, per explicit instruction.
+
+2026-07-19 Feature — editable Treatment.Notes via new PUT /api/v1/treatments/{id}
+  Treatment.Notes was a real, persisted column with no way to set it after creation: no UI to
+  enter one at record time, and TreatmentsController had no update endpoint at all (GET list, GET
+  by id, POST create, DELETE only). Added the ability to add/edit a treatment's note from the
+  Treatment History tab, at the same place photos are added (TreatmentModal.tsx), gated to the
+  treatment's author or a Manager — mirroring the existing delete-treatment permission rule and
+  the existing NotesController.Update pattern for the separate Note entity.
+  Backend:
+    - UpdateTreatmentRequest(string? Notes) added to TreatmentDtos.cs.
+    - TreatmentsController.Update (PUT /api/v1/treatments/{id}): 404 if not found; 403 if caller
+      is neither the treatment's author nor a Manager; 422 if Notes.Length > 5000. Unlike
+      Note.Content, Treatment.Notes is optional — null/empty is explicitly allowed (clears the
+      note) and does NOT throw, unlike NotesController's empty-content rejection. Only Notes is
+      editable; TreatmentDate/DurationMinutes/TreatmentTypeId/TreatmentSeriesId are untouched.
+    - ITreatmentRepository/TreatmentRepository gained UpdateAsync (previously only Note had one),
+      following the exact NoteRepository.UpdateAsync style (_context.Treatments.Update +
+      SaveChangesAsync).
+  Frontend:
+    - treatmentsApi.update(id, { notes }) + UpdateTreatmentRequest type added to treatmentsApi.ts
+      and re-exported from api/index.ts, mirroring notesApi.update.
+    - TreatmentModal.tsx: replaced the read-only note block with an editable one. Computes
+      canEditNote from useAuth()'s currentUser vs treatment.userId/therapistId (author) or
+      role === 'Manager', pulled directly via the useAuth() context hook (no prop drilling
+      needed — TreatmentModal already renders inside the same provider tree as
+      TreatmentHistoryTab, which already uses useAuth() the same way for its per-row delete
+      button). Shows "הוסף הערה"/"ערוך הערה" only for author-or-manager; a plain read-only note
+      (or nothing, if none) for everyone else. Edit reveals a <textarea> (maxLength=5000,
+      styled like RecordPaymentModal.tsx's inputs) with שמור/ביטול; save calls
+      treatmentsApi.update, then awaits useCustomer()'s refreshTreatments() (same mechanism
+      TreatmentHistoryTab already uses after treatment delete) so the modal's treatment prop
+      picks up the new note once the parent's treatments list refreshes. Errors use the same
+      ApiRequestError → Hebrew-message / generic-fallback pattern as RecordPaymentModal.tsx.
+  Tests:
+    - Backend: 8 new cases in Phase010Tests.cs (existing InMemory-provider convention — auth
+      checks simulated the same way DeleteTreatment_*/UpdateNote_* tests already do, plus direct
+      TreatmentRepository.UpdateAsync persistence tests): author update persists, manager update
+      persists, wrong-author 403 check, non-existent id (GetByIdAsync returns null), >5000 chars
+      throws DomainValidationException, and null/empty notes do NOT throw (clearing is allowed).
+    - Frontend: new TreatmentModal.test.tsx (mocks useCustomer/useAuth/treatmentsApi, following
+      OrdersTab.test.tsx's hook-mocking convention) — 6 cases: edit affordance shown for author,
+      shown for Manager on another therapist's treatment, hidden for a different non-manager
+      therapist (note still shown read-only), "הוסף הערה" vs read-only-nothing when no note
+      exists, save flow calls the API with the right payload and triggers refreshTreatments,
+      5000-char client-side cap wired to the textarea.
+  Verified:
+    - dotnet build BeautyCareClinic.sln — 0 errors, 0 warnings.
+    - dotnet test BeautyCareClinic.sln (ConnectionStrings__DefaultConnection + Development) —
+      143/143 passing (135 pre-existing + 8 new).
+    - npx tsc -b --noEmit — no new errors (only the known pre-existing FU-016
+      RecordPaymentModal.tsx unused `currentUser` warning).
+    - npx vitest run --config vitest.config.ts — 284/284 passing, 17 files (278 pre-existing + 6
+      new in TreatmentModal.test.tsx).
+    - Live-verified against the running dev stack (backend restarted on :5000 after the build,
+      real Postgres): created a treatment as therapist1, then via real PUT calls confirmed
+      author-update 200 (notes persisted in the response), a different therapist's update 403
+      FORBIDDEN, manager-update-of-another's-treatment 200, non-existent id 404 NOT_FOUND,
+      >5000-char notes 422 VALIDATION_FAILED, and clearing notes to null 200 with notes:null in
+      the response. Deleted the scratch treatment afterward to leave the dev DB clean.
+  Deferred / out of scope (per explicit instruction, not touched): Treatment Photos editing
+  (already deferred to Phase 011 per the phase summary). No new follow-ups or backlog items
+  identified — the feature closes the gap reported by the user cleanly within the ADR's stated
+  scope.
+  Not committed, per explicit instruction.
+
+- Code-review follow-up fixes for the "edit treatment note" feature (PUT /api/v1/treatments/{id}),
+  addressing 3 findings from the code-review pass:
+  Finding 1 (High, docs/API_SPECIFICATION.md): Removed the stale "Treatment records are immutable
+  after creation — no PUT endpoint" sentence (now false) and added a proper
+  "### PUT /api/v1/treatments/{id}" section between POST and DELETE, matching the file's existing
+  format (request shape `{ notes? }`, note that only `notes` is mutable, response codes
+  200/403/404/422) — mirroring how `PUT /api/v1/notes/{id}` is documented in the same file.
+  Finding 2 (High, missing real controller coverage): The 4 auth/length tests in Phase010Tests.cs
+  (lines ~501-566) only re-implemented TreatmentsController.Update's logic locally as booleans —
+  they never called the controller, so a missing [Authorize], wrong route, inverted &&/||, or
+  broken guard in the real code would slip through. Added
+  backend/BeautyCareClinic.Tests/Integration/TreatmentsControllerPostgresTests.cs, following the
+  exact NotesControllerPostgresTests.cs / PaymentsControllerPostgresTests.cs pattern (real Npgsql
+  AppDbContext, Database.MigrateAsync, self-contained seed/teardown, controller invoked directly
+  with a Mock<ICurrentUserService>, AsNoTracking() read-back after each write). 6 cases: author
+  updates own treatment (200, persisted), Manager updates another's (200, persisted), a different
+  non-manager therapist attempts another's treatment (403 via the real ownership check, note NOT
+  persisted), notes >5000 chars (DomainValidationException thrown, note NOT persisted), null notes
+  clears an existing note (200, persisted as null), non-existent id (404). Had to attach a
+  DefaultHttpContext via ControllerContext to each built controller — without it,
+  ControllerBase.HttpContext is null and the controller's NotFound/403 branches NRE on
+  HttpContext.TraceIdentifier when the action is called directly outside the ASP.NET pipeline (the
+  existing Postgres test files never hit those branches, so this gap hadn't surfaced before).
+  Added a comment above the 4 shallow Phase010Tests.cs tests pointing at the new integration file
+  as the real regression guard; left the shallow tests in place per the finding's discretion.
+  Finding 3 (Medium, TreatmentModal.test.tsx): The ">5000 chars" test only asserted
+  `textarea.maxLength === 5000`, never actually got a >5000-char value into noteDraft or asserted
+  the API wasn't called. Rewrote it to fireEvent.change the textarea to a 5001-char string
+  (JSDOM doesn't enforce the maxLength attribute on programmatic changes), click "שמור", then
+  assert the visible Hebrew error message ("ההערה חורגת מ-5000 תווים", the exact string
+  handleSaveNote's length guard sets via setNoteError) renders and mockUpdate (treatmentsApi.update)
+  was never called.
+  Genuineness proof (same rigor as prior fixes this session): temporarily broke
+  TreatmentsController.Update's ownership check (`&& !isManager` → `&& isManager`) — confirmed
+  Update_ByManager_ForAnotherTherapistsTreatment_UpdatesNotes_AndPersists and
+  Update_ByDifferentNonManagerTherapist_Returns403_AndDoesNotPersist both failed, then restored and
+  confirmed all 6 new integration tests pass. Separately, temporarily disabled
+  TreatmentModal.tsx's length guard (`if (false && noteDraft.length > NOTES_MAX_LENGTH)`) —
+  confirmed the rewritten frontend test failed (error message never appeared), then restored and
+  confirmed all 6 TreatmentModal.test.tsx cases pass.
+  Verified:
+    - dotnet build BeautyCareClinic.sln — 0 errors, 0 warnings.
+    - dotnet test BeautyCareClinic.sln (ConnectionStrings__DefaultConnection + Development) —
+      149/149 passing (143 baseline + 6 new in TreatmentsControllerPostgresTests.cs).
+    - npx tsc -b --noEmit — no new errors; same 2 pre-existing errors as on main before this
+      session's changes (FU-016 RecordPaymentModal.tsx unused `currentUser`, and a pre-existing
+      TreatmentModal.test.tsx `treatmentPhotos` typing gap in the base Treatment fixture — both
+      confirmed present via `git stash` before touching anything, so neither is a regression from
+      this fix pass).
+    - npx vitest run --config vitest.config.ts — 284/284 passing, 17 files (test count unchanged —
+      the "rejects notes over 5000 characters" test was rewritten in place, not added).
+  Deferred / out of scope: none identified beyond the ADR's stated scope. Did not touch Treatment
+  Photos, NotesController.cs/PaymentsController.cs, OrdersTab.tsx, or the CR-031 packageNumber
+  work, per explicit instruction.
+  Not committed, per explicit instruction.

@@ -5,20 +5,32 @@
 - Current phase: 010 — Treatment Recording & Notes
 - Phase status: Completed
 - Current branch: main
-- Latest approved version: v0.10.2
-- Latest approved tag: v0.10.2
+- Latest approved version: v0.11.0
+- Latest approved tag: v0.11.0
 
 ## Current Activity
 
-Phase 010 הושלם ואושר (v0.10.0). שני bug-fix patches הוטמעו מאז:
+Phase 010 הושלם ואושר (v0.10.0). מאז הוטמעו:
 - v0.10.1 — customer/settings/treatment-types/package-types data not loading after first login.
 - v0.10.2 — יצירת הזמנה (POST /customers/{id}/orders) נכשלה תמיד עם 500 עקב migration drift:
   עמודת TreatmentSeries.CustomerId הייתה קיימת ב-model/snapshot אך מעולם לא נוספה בפועל
   לטבלה בפוסטגרס. תוקן עם migration חדש (כולל backfill), תוקנה שגיאת קומפילציה שחסמה את
   פרויקט הטסטים (FU-015), ונוסף טסט אינטגרציה אמיתי מול Postgres (FU-017).
+- v0.11.0 — bundle של CR-031 + ארבעה תיקונים/שיפורים:
+  - CR-031: מספור חבילה קבוע (`OrderItem.PackageNumber`) — ActiveSeriesTab/TreatmentHistoryTab
+    מציגים אותו #N לאותה חבילה.
+  - תיקון: רישום תשלום והוספת/עריכת הערת-לקוח נכשלו תמיד עם 500 (DateTime Kind=Unspecified
+    מול עמודת timestamptz) — PaymentsController + NotesController.
+  - תיקון: טאב הזמנות ותשלומים לא הציג שם חבילה/תאריך/סכום כולל (התאמת שדות legacy מול
+    ה-API האמיתי: orderItems→items, createdDate→orderDate, totalPrice→discountedPrice).
+  - תיקון UI: מיקום האינדקס (#N) ליד שם החבילה בטאב היסטוריית טיפולים, מיושר לתבנית הקיימת
+    ב-ActiveSeriesTab.
+  - פיצ'ר חדש: עריכת הערה ברמת טיפול מטאב היסטוריית טיפולים (PUT /api/v1/treatments/{id}),
+    מורשה למבצע הטיפול או Manager בלבד. תמונות ברמת טיפול נשארות out of scope ל-Phase 011
+    (in-memory בלבד, ללא API).
 
-שני התיקונים נבדקו (130/130 טסטי backend, 276/276 טסטי frontend), אושרו בדפדפן ע"י המשתמשת,
-ובוצע commit+tag על ברנצ'ים נפרדים שמוזגו ל-main. מוכן להצעת Phase 011.
+כל התיקונים נבדקו (ראה טבלת טסטים בהמשך), אושרו בדפדפן ע"י המשתמשת, ובוצע commit+tag יחיד
+ל-main. מוכן להצעת Phase 011 (תמונות טיפול + Appointments backend + CR-019/CR-012 וכו').
 
 ## Completed Phases
 

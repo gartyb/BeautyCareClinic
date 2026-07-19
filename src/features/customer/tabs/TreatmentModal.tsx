@@ -1,11 +1,14 @@
 import { useRef, useState } from 'react';
 import ReactDOM from 'react-dom';
-import { Camera, X } from 'lucide-react';
+import { Camera, Pencil, X } from 'lucide-react';
 import { Modal } from '../../../components/shared/Modal';
 import { useCustomer } from '../../../contexts/CustomerContext';
+import { useAuth } from '../../../contexts/AuthContext';
 import { buildTreatmentPhoto } from '../../treatment/treatmentService';
 import { treatmentTypes } from '../../../data/treatmentTypes';
 import { therapists } from '../../../data/therapists';
+import { treatmentsApi } from '../../../api/treatmentsApi';
+import { ApiRequestError } from '../../../api/apiError';
 import { Treatment, TreatmentPhoto } from '../../../types/Treatment';
 import { formatDate } from '../../../utils/date';
 
@@ -17,14 +20,59 @@ interface TreatmentModalProps {
 // FIX-8: Strict allowlist — reject anything not in this set
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
+const NOTES_MAX_LENGTH = 5000;
+
 export function TreatmentModal({ treatment, onClose }: TreatmentModalProps) {
-  const { addTreatmentPhoto, removeTreatmentPhoto } = useCustomer();
+  const { addTreatmentPhoto, removeTreatmentPhoto, refreshTreatments } = useCustomer();
+  const { currentUser } = useAuth();
 
   // Photo lightbox
   const [selectedPhoto, setSelectedPhoto] = useState<TreatmentPhoto | null>(null);
 
   // Photo upload
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Note editing — only the treatment's author or a Manager may edit/add a note
+  const authorId = treatment.userId ?? treatment.therapistId;
+  const isManager = currentUser?.role === 'Manager';
+  const canEditNote = !!currentUser && (authorId === currentUser.id || isManager);
+  const [isEditingNote, setIsEditingNote] = useState(false);
+  const [noteDraft, setNoteDraft] = useState(treatment.notes ?? '');
+  const [savingNote, setSavingNote] = useState(false);
+  const [noteError, setNoteError] = useState('');
+
+  function handleStartEditNote() {
+    setNoteDraft(treatment.notes ?? '');
+    setNoteError('');
+    setIsEditingNote(true);
+  }
+
+  function handleCancelEditNote() {
+    setNoteDraft(treatment.notes ?? '');
+    setNoteError('');
+    setIsEditingNote(false);
+  }
+
+  async function handleSaveNote() {
+    if (noteDraft.length > NOTES_MAX_LENGTH) {
+      setNoteError(`ההערה חורגת מ-${NOTES_MAX_LENGTH} תווים`);
+      return;
+    }
+    setSavingNote(true);
+    setNoteError('');
+    try {
+      await treatmentsApi.update(treatment.id, { notes: noteDraft.trim() ? noteDraft : undefined });
+      await refreshTreatments();
+      setIsEditingNote(false);
+    } catch (e) {
+      const msg = e instanceof ApiRequestError
+        ? e.error.message
+        : e instanceof Error ? e.message : 'שגיאה בשמירת ההערה';
+      setNoteError(msg);
+    } finally {
+      setSavingNote(false);
+    }
+  }
 
   const typeName =
     treatmentTypes.find(t => t.id === treatment.treatmentTypeId)?.name
@@ -110,13 +158,58 @@ export function TreatmentModal({ treatment, onClose }: TreatmentModalProps) {
           </div>
         )}
 
-        {/* Note — read-only (set at record time, no API for updating after creation) */}
-        {treatment.notes && (
-          <div className="mt-2">
-            <p className="text-clinic-muted text-sm mb-1">הערות</p>
-            <p className="text-clinic-text bg-clinic-blush rounded-lg p-3">{treatment.notes}</p>
-          </div>
-        )}
+        {/* Note — editable by the treatment's author or a Manager */}
+        <div className="mt-2">
+          {isEditingNote ? (
+            <div dir="rtl">
+              <p className="text-clinic-muted text-sm mb-1">הערות</p>
+              <textarea
+                value={noteDraft}
+                onChange={e => { setNoteDraft(e.target.value); setNoteError(''); }}
+                maxLength={NOTES_MAX_LENGTH}
+                rows={4}
+                autoFocus
+                className="w-full border border-clinic-border rounded-lg px-3 py-2 text-sm resize-none"
+                placeholder="הוסיפי הערה לטיפול..."
+              />
+              {noteError && <p className="text-red-500 text-sm mt-1">{noteError}</p>}
+              <div className="flex justify-end gap-3 mt-2">
+                <button
+                  onClick={handleCancelEditNote}
+                  disabled={savingNote}
+                  className="px-4 py-1.5 text-sm text-clinic-muted hover:text-clinic-text disabled:opacity-50"
+                >
+                  ביטול
+                </button>
+                <button
+                  onClick={handleSaveNote}
+                  disabled={savingNote}
+                  className="px-4 py-1.5 text-sm rounded-lg bg-clinic-gold text-white font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {savingNote ? 'שומר...' : 'שמור'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {treatment.notes && (
+                <>
+                  <p className="text-clinic-muted text-sm mb-1">הערות</p>
+                  <p className="text-clinic-text bg-clinic-blush rounded-lg p-3">{treatment.notes}</p>
+                </>
+              )}
+              {canEditNote && (
+                <button
+                  onClick={handleStartEditNote}
+                  className="flex items-center gap-1.5 mt-2 px-3 py-1.5 border border-clinic-gold text-clinic-gold rounded-lg text-xs font-medium hover:bg-clinic-blush transition-colors"
+                >
+                  <Pencil size={13} />
+                  <span>{treatment.notes ? 'ערוך הערה' : 'הוסף הערה'}</span>
+                </button>
+              )}
+            </>
+          )}
+        </div>
 
         {/* Photo button */}
         <div className="flex gap-2 mt-2">

@@ -9,6 +9,10 @@ export interface CreateTreatmentRequest {
   notes?: string;
 }
 
+export interface UpdateTreatmentRequest {
+  notes?: string;
+}
+
 export const treatmentsApi = {
   listByCustomer: (customerId: string) =>
     apiClient.get<Treatment[]>(`/customers/${customerId}/treatments`),
@@ -18,6 +22,9 @@ export const treatmentsApi = {
 
   create: (customerId: string, data: CreateTreatmentRequest) =>
     apiClient.post<Treatment>(`/customers/${customerId}/treatments`, data),
+
+  update: (id: string, data: UpdateTreatmentRequest) =>
+    apiClient.put<Treatment>(`/treatments/${id}`, data),
 
   delete: (id: string) =>
     apiClient.delete<void>(`/treatments/${id}`),

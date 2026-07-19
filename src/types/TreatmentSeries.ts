@@ -12,6 +12,9 @@ export interface TreatmentSeries {
   completedTreatments?: number;
   totalMinutes?: number;
   usedMinutes?: number;
+  // Stable per-customer package number (CR-031), read through OrderItem. Optional since older/
+  // mock data may lack it.
+  packageNumber?: number;
   // Legacy fields preserved for mock-data and Phase < 010 compatibility
   packageTypeId?: string;
   customerId?: string;

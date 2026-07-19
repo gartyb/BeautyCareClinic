@@ -56,7 +56,6 @@ function PackageRow({ item, orderDate, packageIndex, seriesTreatments, currentUs
           {hasTreatments && (
             expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />
           )}
-          <span className="font-medium text-clinic-muted">#{packageIndex}</span>
           <span>{formatDate(orderDate)}</span>
           {hasTreatments && (
             <span className="text-sm bg-clinic-blush text-clinic-gold border border-clinic-gold/30 px-2 py-0.5 rounded-full">
@@ -65,7 +64,10 @@ function PackageRow({ item, orderDate, packageIndex, seriesTreatments, currentUs
           )}
         </div>
         <div className="flex flex-col items-end gap-0.5">
-          <span className="font-semibold text-clinic-text text-base">{pkg?.name ?? item.packageTypeId}</span>
+          <div className="flex items-center gap-1.5">
+            <span className="font-semibold text-clinic-text text-base">{pkg?.name ?? item.packageTypeId}</span>
+            <span className="font-medium text-clinic-muted text-sm">#{packageIndex}</span>
+          </div>
           {treatmentType && (
             <span className="text-sm text-clinic-muted">{treatmentType.name}</span>
           )}
@@ -201,7 +203,7 @@ export function TreatmentHistoryTab() {
             key={item.id}
             item={item}
             orderDate={orderDate}
-            packageIndex={idx + 1}
+            packageIndex={item.packageNumber ?? idx + 1}
             seriesTreatments={seriesTreatments}
             currentUserId={currentUser?.id}
             isManager={isManager}

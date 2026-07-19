@@ -249,7 +249,7 @@ Auth: JWT. Write endpoints require Manager role unless noted.
   "originalPrice": "1000.00", "discountedPrice": "900.00", "discountPercentage": "10.00",
   "maxPaymentCount": 3, "amountPaid": "450.00", "remainingBalance": "450.00",
   "paymentCount": 1,
-  "items": [{ "id": "<uuid>", "packageTypeId": "<uuid>", "unitPrice": "200.00", "treatmentSeriesId": "<uuid>" }],
+  "items": [{ "id": "<uuid>", "packageTypeId": "<uuid>", "unitPrice": "200.00", "treatmentSeriesId": "<uuid>", "packageNumber": 1 }],
   "payments": [{ "id": "<uuid>", "amount": "450.00", "paymentMethod": "Cash", "paymentDate": "2026-07-17", "recordedByFullName": "..." }]
 }
 ```
@@ -308,7 +308,7 @@ Auth: JWT. Read-only — created automatically from orders.
 
 Returns active series only (quantity: `completedTreatments < totalTreatments`; timer: `usedMinutes < totalMinutes`).
 
-**Response 200:** `TreatmentSeries[]`.
+**Response 200:** `TreatmentSeries[]`. Each series includes `packageNumber` (int) — the stable per-customer package number read through the series' `OrderItem`. This is the same value returned as `packageNumber` on the corresponding item in `GET /api/v1/customers/{customerId}/orders`, so the "#N" badge is consistent between the Active Series and Treatment History views on the Customer Card.
 
 ### GET /api/v1/treatment-series/{id}
 
@@ -349,7 +349,18 @@ If `treatmentSeriesId` is provided: atomically increments `UsedMinutes` (timer) 
 
 **Response 201:** Created `TreatmentDto`. | **422** `durationMinutes < 0` or `treatmentDate > today`. | **404** customer or treatment type not found.
 
-Treatment records are immutable after creation — no PUT endpoint.
+### PUT /api/v1/treatments/{id}
+
+**Request:**
+```json
+{
+  "notes": "optional note text"
+}
+```
+
+Only `notes` is mutable via this endpoint — all other treatment fields (type, series, date, duration) are immutable after creation. Requires author or Manager role.
+
+**Response 200:** Updated `TreatmentDto`. | **403** not author and not Manager. | **404** not found. | **422** `notes` > 5000 chars.
 
 ### DELETE /api/v1/treatments/{id}
 

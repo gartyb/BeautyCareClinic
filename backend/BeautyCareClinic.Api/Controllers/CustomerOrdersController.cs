@@ -101,6 +101,19 @@ public class CustomerOrdersController : ControllerBase
         await using var transaction = await _context.Database.BeginTransactionAsync();
         try
         {
+            // Row-level lock on the customer row — serializes concurrent order creation for the
+            // same customer so per-customer PackageNumber assignment below (base+1, base+2, ...)
+            // cannot race (CR-031 / RC-1, same pattern as PaymentsController's order-row lock).
+            await _context.Database.SqlQueryRaw<Guid>(
+                "SELECT \"Id\" FROM \"Customers\" WHERE \"Id\" = {0} FOR UPDATE",
+                customerId).ToListAsync();
+
+            var packageNumberBase = await _context.Database.SqlQueryRaw<int>(
+                "SELECT COALESCE(MAX(oi.\"PackageNumber\"),0) AS \"Value\" " +
+                "FROM \"OrderItems\" oi JOIN \"CustomerOrders\" co ON co.\"Id\" = oi.\"OrderId\" " +
+                "WHERE co.\"CustomerId\" = {0}",
+                customerId).SingleAsync();
+
             var order = new CustomerOrder
             {
                 Id                 = Guid.NewGuid(),
@@ -124,6 +137,7 @@ public class CustomerOrdersController : ControllerBase
                     OrderId       = order.Id,
                     PackageTypeId = pt.Id,
                     UnitPrice     = pt.Price,
+                    PackageNumber = packageNumberBase + i + 1,
                 };
                 _context.OrderItems.Add(orderItem);
 
@@ -239,5 +253,6 @@ public class CustomerOrdersController : ControllerBase
             i.PackageTypeId,
             i.PackageType?.Name ?? string.Empty,
             i.UnitPrice,
-            i.TreatmentSeries?.Id)).ToList());
+            i.TreatmentSeries?.Id,
+            i.PackageNumber)).ToList());
 }

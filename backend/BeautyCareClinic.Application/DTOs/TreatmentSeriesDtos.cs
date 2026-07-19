@@ -10,4 +10,5 @@ public record TreatmentSeriesDto(
     int CompletedTreatments,
     int TotalMinutes,
     int UsedMinutes,
-    int? MinutesPerTreatment);
+    int? MinutesPerTreatment,
+    int PackageNumber);

@@ -107,7 +107,7 @@ public class PaymentsController : ControllerBase
                 OrderId             = orderId,
                 Amount              = request.Amount,
                 PaymentMethod       = request.PaymentMethod,
-                PaymentDate         = request.PaymentDate.ToDateTime(TimeOnly.MinValue),
+                PaymentDate         = request.PaymentDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc),
                 RecordedByUserId    = currentUserId,
                 RecordedByFullName  = recorderName,
             };

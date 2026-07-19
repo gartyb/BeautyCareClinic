@@ -54,5 +54,6 @@ public class TreatmentSeriesController : ControllerBase
         ts.CompletedTreatments,
         ts.TotalMinutes,
         ts.UsedMinutes,
-        ts.OrderItem?.PackageType?.MinutesPerTreatment);
+        ts.OrderItem?.PackageType?.MinutesPerTreatment,
+        ts.OrderItem?.PackageNumber ?? 0);
 }

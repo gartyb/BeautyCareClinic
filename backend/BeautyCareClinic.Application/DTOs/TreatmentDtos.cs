@@ -11,6 +11,8 @@ public record CreateTreatmentRequest(
     int DurationMinutes,
     string? Notes);
 
+public record UpdateTreatmentRequest(string? Notes);
+
 public record TreatmentDto(
     Guid Id,
     Guid CustomerId,
