@@ -5,19 +5,15 @@
 - Current phase: 010 — Treatment Recording & Notes
 - Phase status: Completed
 - Current branch: main
-- Latest approved version: v0.10.0
-- Latest approved tag: v0.10.0
-- Pending patch: v0.10.1 — auth-gated data-fetch bug fix (see below); implemented, tested, and
-  validated by the user in the browser; **not yet committed/tagged** — awaiting explicit commit
-  approval from the user directly (per this repo's Git Safety Protocol, an agent relaying "the
-  user approved" is not sufficient authorization for a commit).
+- Latest approved version: v0.10.1
+- Latest approved tag: v0.10.1
 
 ## Current Activity
 
 Phase 010 הושלם ואושר (v0.10.0). Bug-fix patch v0.10.1 (customer/settings/treatment-types/
-package-types data not loading after first login) implemented, tested (276/276 frontend tests
-pass) and validated in the browser — ready to commit/tag as v0.10.1 once the user directly
-confirms. מוכן להצעת Phase 011 לאחר מכן.
+package-types data not loading after first login) הוטמע, נבדק (276/276 טסטים עברו), אושר
+בדפדפן ע"י המשתמשת, ובוצע commit+tag על ברנץ fix/auth-gated-data-fetch שמוזג ל-main.
+מוכן להצעת Phase 011.
 
 ## Completed Phases
 
@@ -61,6 +57,4 @@ confirms. מוכן להצעת Phase 011 לאחר מכן.
 
 ## Next Step
 
-1. Get direct user confirmation to commit + tag v0.10.1 (bug-fix patch, already validated in
-   browser — see "Pending patch" above).
-2. Phase 010 הושלם (v0.10.0). מוכן להצעת Phase 011 לאחר אישור ה-patch.
+Phase 010 הושלם (v0.10.1 patch applied). מוכן להצעת Phase 011.
