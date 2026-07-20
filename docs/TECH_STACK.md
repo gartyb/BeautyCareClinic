@@ -40,13 +40,17 @@
 | API docs     | Swagger / OpenAPI (Development only)             |
 | Tests        | xUnit (~60 tests: unit + InMemory integration)  |
 
-## Deployment (Phase 11)
+## Deployment (Phase 013 — interim; see `docs/ARCHITECTURE.md` "Deployment Topology")
 
-| Layer          | Technology                                    |
-| -------------- | --------------------------------------------- |
-| Server         | Ubuntu VPS                                    |
-| Reverse proxy  | Nginx via aaPanel (SSL + domains)             |
-| Containers     | Docker Compose (api + frontend + postgres)    |
+| Layer          | Technology                                                          |
+| -------------- | -------------------------------------------------------------------- |
+| Server         | Contabo VPS, Ubuntu 24.04, aaPanel installed                         |
+| Reverse proxy  | aaPanel's nginx — sole public entry (80/443)                         |
+| TLS            | Let's Encrypt via certbot, hostname `<ip>.sslip.io` (no domain owned) |
+| Frontend/API   | Still dev-mode (Vite dev server, `dotnet run` Development) — reached only through the nginx proxy, not directly |
+| Database       | PostgreSQL 17 in Docker, published to `127.0.0.1:5432` only          |
+
+Production-build frontend + `ASPNETCORE_ENVIRONMENT=Production` backend are deferred to a future phase — this table describes the current interim state, not the eventual target.
 
 ## Architecture Pattern
 

@@ -2,9 +2,9 @@
 
 ## Current State
 
-- Current phase: 012 — Therapist Management Backend Integration
-- Phase status: Completed
-- Current branch: main
+- Current phase: 013 — Nginx Reverse Proxy + HTTPS Access
+- Phase status: Approved — Pending Commit
+- Current branch: feature/phase-013-nginx-https-access
 - Latest approved version: v0.13.0
 - Latest approved tag: v0.13.0
 
@@ -122,5 +122,18 @@ context-ים א-סינכרוניים נפרדים):
 
 ## Next Step
 
-Phase 012 מאושרת ע"י המשתמשת לאחר בדיקה בדפדפן. ממתינה ל-commit + tag (v0.13.0) + merge
-ל-main + push ל-origin/main. לאחר מכן — הצעת הפאזה הבאה.
+הערת תיקון: Phase 012 היא בעצם **הושלמה במלואה** — commit (`a944cb7`) ו-tag (`v0.13.0`) כבר
+בוצעו, וסוכם ב-`a604bac`. ה"ממתין ל-commit" שהופיע כאן קודם היה מיושן.
+
+Phase 013 (Nginx Reverse Proxy + HTTPS Access) הוצעה ואושרה ע"י המשתמשת. תוך הבירור התגלה
+שה"שרת Contabo" (169.58.26.157) הוא בעצם אותה מכונה שעליה רצה סביבת הפיתוח, עם ה-frontend
+(Vite, פורט 5174) וה-backend (`dotnet run` Development, פורט 5000) חשופים ישירות לאינטרנט
+ללא HTTPS — וגם Postgres (5432) נמצא חשוף בטעות. המטרה: aaPanel's nginx (כבר מותקן בשרת)
+יהפוך לנקודת הכניסה היחידה עם HTTPS אמיתי (hostname חינמי מסוג sslip.io + Let's Encrypt,
+בלי לקנות דומיין), בלי לשנות את מצב ה-dev של האפליקציה. עבר pm-spec, architecture review
+(ADR-013-A, 4 תיקונים נדרשים — RC-1 עד RC-4, כולם שולבו), מימוש מלא, code review ו-security
+review (ראה `phases/phase-013/PHASE_SUMMARY.md`).
+
+המשתמשת אימתה בדפדפן האישי שלה (2026-07-20) — כולל גישה גם דרך ה-hostname (sslip.io) וגם
+דרך ה-IP הגולמי; הגישה דרך ה-IP הראתה אזהרת אי-התאמת תעודה כצפוי (תועד כ-CR-035, לא חוסם).
+**הפאזה אושרה** — ממתין ל-commit + tag (v0.14.0).

@@ -281,6 +281,33 @@
 - Description: Booking rule — a customer may only be booked for a `TreatmentType` they hold an active `TreatmentSeries` for — is documented in `docs/DOMAIN_MODEL.md` and enforced only client-side in `BookAppointmentModal.tsx` (`filteredTreatmentTypes`). `POST /api/v1/customers/{customerId}/appointments` performs no such check, so a direct API call can create an appointment for a customer with no active package. Add the same eligibility check server-side (422 with a Hebrew reason on violation), consistent with how availability is already enforced server-side.
 - Status: Open
 
+### CR-033 — Raise HSTS max-age after burn-in period
+
+- Type: Technical Debt / Security
+- Priority: Medium
+- Source: Architecture review — Phase 013 (RC-3)
+- Related phase: Phase 013
+- Description: `beautycare.conf` ships `Strict-Transport-Security: max-age=300` deliberately, to limit the blast radius of an early cert/config mistake while the sslip.io + Let's Encrypt setup is freshly deployed. Once the deployment has run stably for a few days (cert renewal confirmed working, no config issues), raise `max-age` to a long-lived value (e.g. `31536000`). Do not add `preload`; reconsider `includeSubDomains` given the shared sslip.io suffix.
+- Status: Open
+
+### CR-034 — Production-build migration (frontend build + backend Production environment)
+
+- Type: Feature
+- Priority: Medium
+- Source: Phase 013 planning — explicitly deferred by the user
+- Related phase: Future
+- Description: Phase 013 put nginx + real HTTPS in front of the app but deliberately left the frontend on the raw Vite dev server and the backend on `ASPNETCORE_ENVIRONMENT=Development` (`dotnet run`), per explicit user decision to keep this phase infra-only. A future phase should switch to a production frontend build and `ASPNETCORE_ENVIRONMENT=Production` backend, and reassess whether Swagger/HMR/dev-only conveniences should be removed from the public-facing path at that point.
+- Status: Open
+
+### CR-035 — Reject HTTPS requests to the raw server IP (no matching default_server)
+
+- Type: Technical Debt / Security
+- Priority: Low
+- Source: User manual validation of Phase 013 (2026-07-20) — accessing `https://169.58.26.157/login` directly (raw IP, not the sslip.io hostname) served the application, with a certificate-mismatch warning as the only barrier (cert CN is `169-58-26-157.sslip.io`, not the IP).
+- Related phase: Phase 013
+- Description: aaPanel's nginx has a single HTTPS vhost for `beautycare.conf`, so it also answers for requests where the Host/SNI doesn't match the configured hostname (e.g. the raw IP), falling back to serving the app instead of rejecting the connection. This isn't a bypass of any real access control (HTTPS still encrypts, JWT auth still applies, and the cert-mismatch warning correctly signals something is off) — the sslip.io hostname was never meant as a secrecy boundary, only a way to get a valid cert without buying a domain. But it does mean the app is reachable by anyone scanning the raw IP, guarded only by a browser warning users can click through. Consider adding a minimal `default_server` block that rejects (e.g. 444/close, or a plain error page) connections with a Host/SNI that doesn't match `169-58-26-157.sslip.io`.
+- Status: Open
+
 ## Planned
 
 None.

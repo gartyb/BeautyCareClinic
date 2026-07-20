@@ -83,6 +83,20 @@ backend/
 - `SecurityHeadersMiddleware` — X-Content-Type-Options, X-Frame-Options, Referrer-Policy
 - `ExceptionHandlingMiddleware` — structured JSON errors, no internal details to client, traceId included
 
+## Deployment Topology (Phase 013 — interim, see ADR-013-A in `phases/phase-013/PHASE_SUMMARY.md`)
+
+The server (Contabo VPS, Ubuntu 24.04) runs aaPanel with its own nginx (`/www/server/nginx`, **not** the systemd `nginx.service` unit — that one is unused). aaPanel's nginx is the sole public entry point on ports 80/443.
+
+- **Public hostname:** `169-58-26-157.sslip.io` (free wildcard-DNS-to-IP service — no domain purchased). If the server's public IP ever changes, this hostname, its certificate, and any bookmarks must all be updated together.
+- **Vhost config:** `/www/server/panel/vhost/nginx/beautycare.conf` — port 80 redirects to 443 (except `/.well-known/acme-challenge/`, needed for cert renewal); port 443 terminates TLS and reverse-proxies:
+  - `/` → `http://127.0.0.1:5174` (the Vite dev server — includes WebSocket upgrade headers for Vite HMR; Vite's own `server.proxy` then forwards `/api` to the backend, so browser API calls are same-origin).
+  - `/swagger` → `http://127.0.0.1:5000` directly, gated by HTTP Basic Auth (`/www/beautycare-secrets/swagger_htpasswd` — deliberately outside any web-servable root, so no vhost could ever accidentally serve the hash file itself) — lets Postman/Swagger UI reach the backend for testing without exposing port 5000 itself.
+- **TLS certificate:** Let's Encrypt via `certbot` (webroot method, webroot `/www/wwwroot/acme-challenge`), auto-renewed by `certbot.timer` with a deploy-hook (`/etc/letsencrypt/renewal-hooks/deploy/reload-aapanel-nginx.sh`) that reloads aaPanel's nginx specifically (not the unused systemd unit).
+- **HSTS:** shipped with a short `max-age=300` for the initial burn-in period (RC-3) — deliberately **not yet raised** to a long-lived value; raise it in `beautycare.conf` once the deployment has run stably for a few days.
+- **Firewall (ufw):** only `22` (SSH), `80`, `443` are externally reachable. The Vite (5174) and Kestrel (5000) ports are no longer directly reachable from outside — verified from a genuinely external client, not from the server itself (same-host tests are misleading here: traffic to the server's own public IP from itself is delivered via loopback and does not reflect real firewall behavior).
+- **Postgres:** container `beautycare-postgres` publishes `127.0.0.1:5432:5432` only (not `0.0.0.0`) — Docker's own iptables rules for published ports bypass ufw's default-deny, so the fix had to be at the Docker layer, not just the firewall. Configuration captured in `docker-compose.yml` (see `.env.docker.example`) so it survives a container recreation.
+- **Frontend/backend remain in dev mode** (`vite` dev server, `dotnet run` with `ASPNETCORE_ENVIRONMENT=Development`) — this phase changed only the network path to reach them, not their runtime mode. A production-build migration is a candidate for a future phase.
+
 ## State Management
 
 React Context only. No Redux.
