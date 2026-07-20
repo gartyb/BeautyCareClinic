@@ -4,14 +4,13 @@
 
 - Current phase: 013 — Nginx Reverse Proxy + HTTPS Access
 - Phase status: Completed
-- Current branch: fix/search-active-series-balance (bug-fix branch off main @ 949aa2e) — Awaiting User Validation
-- Latest approved version: v0.14.0
-- Latest approved tag: v0.14.0
+- Current branch: main (merged from fix/search-active-series-balance, fast-forward)
+- Latest approved version: v0.14.1
+- Latest approved tag: v0.14.1
 
 ## Current Activity
 
-**Bug fixes in progress (2026-07-20), bundled on branch `fix/search-active-series-balance`
-(not yet merged, awaiting one combined user browser validation):**
+**Bug fixes completed (2026-07-20), bundled and released as v0.14.1:**
 
 1. "חיפוש לקוח" screen — "סדרות פעילות" column showed no data (and "יתרת חוב" silently showed
    "שולם" even with a real debt) because `SearchResults.tsx` read unused Phase-1 mock arrays
@@ -30,8 +29,8 @@
 
 All three: code-reviewed clean (no Critical/High; Low findings from fix #1 applied). Security
 review (fix #1 only, the one touching a financial field) also clean. Backend 238/238, frontend
-344/344. **User validated in browser and approved.** Proceeding to commit + tag as a patch
-release (v0.14.1) on branch `fix/search-active-series-balance`.
+344/344. User validated in browser and approved. Commit `b618efb`, tag `v0.14.1`, merged to
+`main` (fast-forward, `b618efb`) and pushed to `origin` (branch + tag).
 
 Phase 010 הושלם ואושר (v0.10.0). מאז הוטמעו:
 - v0.10.1 — customer/settings/treatment-types/package-types data not loading after first login.
