@@ -3,10 +3,10 @@
 ## Current State
 
 - Current phase: 012 — Therapist Management Backend Integration
-- Phase status: Approved — Pending Commit
-- Current branch: feature/phase-012-therapist-management
-- Latest approved version: v0.12.0
-- Latest approved tag: v0.12.0
+- Phase status: Completed
+- Current branch: main
+- Latest approved version: v0.13.0
+- Latest approved tag: v0.13.0
 
 ## Current Activity
 
@@ -90,6 +90,7 @@ context-ים א-סינכרוניים נפרדים):
 | 009   | Orders, Series & Payments                | v0.9.0  | Completed |
 | 010   | Treatment Recording & Notes              | v0.10.0 | Completed |
 | 011   | Appointments Backend Integration         | v0.12.0 | Completed |
+| 012   | Therapist Management Backend Integration | v0.13.0 | Completed |
 
 ## Open Change Requests
 

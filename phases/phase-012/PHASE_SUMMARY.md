@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved — Pending Commit
+Completed
 
 ## Architecture Review
 
@@ -270,9 +270,9 @@ Not separately re-run for this phase. The login-gate addition (Decision 6/RC-4) 
 
 ## Version
 
-- Version: v0.13.0 (proposed — new backward-compatible feature, Minor per project versioning guidelines)
-- Commit: pending
-- Tag: pending
+- Version: v0.13.0 (new backward-compatible feature, Minor per project versioning guidelines)
+- Commit: a944cb762aff76470c3d31ef5e7a0918e4569fa9
+- Tag: v0.13.0 (confirmed)
 
 ## Lessons Learned
 
