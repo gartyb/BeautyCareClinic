@@ -60,4 +60,11 @@ public class UserRepository : IUserRepository
         _context.Users.Remove(user);
         await _context.SaveChangesAsync();
     }
+
+    public async Task<bool> HasRelatedDataAsync(Guid id)
+    {
+        return await _context.Appointments.AnyAsync(a => a.UserId == id)
+            || await _context.Treatments.AnyAsync(t => t.UserId == id)
+            || await _context.Notes.AnyAsync(n => n.UserId == id);
+    }
 }

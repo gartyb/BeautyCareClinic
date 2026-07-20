@@ -6,6 +6,7 @@ export interface UserApiDto {
   email: string;
   role: string;
   phone?: string;
+  isActive: boolean;
 }
 
 export interface CreateUserApiRequest {
@@ -21,9 +22,13 @@ export interface UpdateUserApiRequest {
   phone?: string;
 }
 
-export function getUsers(role?: string): Promise<UserApiDto[]> {
-  const path = role ? `/users?role=${encodeURIComponent(role)}` : '/users';
-  return apiClient.get<UserApiDto[]>(path);
+/** Phase 012 — `includeInactive` (default false) excludes deactivated users when omitted/false. */
+export function getUsers(role?: string, includeInactive = false): Promise<UserApiDto[]> {
+  const params = new URLSearchParams();
+  if (role) params.set('role', role);
+  if (includeInactive) params.set('includeInactive', 'true');
+  const query = params.toString();
+  return apiClient.get<UserApiDto[]>(query ? `/users?${query}` : '/users');
 }
 
 export function getUser(id: string): Promise<UserApiDto> {
@@ -36,6 +41,11 @@ export function createUser(data: CreateUserApiRequest): Promise<UserApiDto> {
 
 export function updateUser(id: string, data: UpdateUserApiRequest): Promise<UserApiDto> {
   return apiClient.put<UserApiDto>(`/users/${id}`, data);
+}
+
+/** Phase 012 — soft-deactivation (PUT .../deactivate), distinct from deleteUser (hard-delete). */
+export function deactivateUser(id: string): Promise<UserApiDto> {
+  return apiClient.put<UserApiDto>(`/users/${id}/deactivate`, {});
 }
 
 export function deleteUser(id: string): Promise<void> {

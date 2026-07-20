@@ -1511,3 +1511,157 @@ Bugfix (branch feature/phase-011-appointments-backend): therapist picker 403 for
       verification requirement was scoped to Fix 1 specifically.
 
   Not committed, per explicit instruction.
+
+--------------------------------------------------------------------------------
+2026-07-20 Phase 012 — Therapist Management Backend Integration (branch feature/phase-012-therapist-management)
+--------------------------------------------------------------------------------
+
+Implemented the approved Phase 012 plan (phases/phase-012/PHASE_SUMMARY.md, all RC-1..RC-6 and
+Decisions 1-6 from architecture review). Not committed — awaiting manual validation and approval.
+
+Backend:
+  - User.IsActive (bool, default true) added via migration
+    20260720101832_AddIsActiveToUsers.cs (ALTER TABLE ADD COLUMN ... DEFAULT true NOT NULL —
+    backfills existing rows automatically). AppDbContext HasDefaultValue(true) added for the same
+    invariant at the EF model level.
+  - UsersController: GET /users?role=&includeInactive= (default false, filters out inactive);
+    PUT /users/{id}/deactivate (Manager-only, 422 for non-Therapist target or already-inactive,
+    200 with isActive:false); DELETE /users/{id} now proactively checks
+    IUserRepository.HasRelatedDataAsync (Appointments/Treatments/Notes) BEFORE attempting the
+    delete, throwing DomainConflictException (clean Hebrew 409) instead of letting a raw Postgres
+    FK-violation DbUpdateException reach the client as a 500 — matches the existing
+    CustomersController.Delete/HasRelatedDataAsync convention exactly, confirmed via a real
+    integration test (UsersControllerPostgresTests.Delete_UserWithAppointmentHistory_...).
+  - AuthController.Login (Decision 6/RC-4): rejects a User.IsActive=false login with the SAME 401
+    shape as an unknown-email/wrong-password login (no distinct "deactivated" signal) — verified
+    against a real ASP.NET Identity UserManager<AppUser> stack (password genuinely correct, only
+    the IsActive gate blocks it) in AuthControllerPostgresTests.cs.
+  - TherapistAvailabilityController (RC-1): extended (not moved to UsersController) with full
+    CRUD for working-hours/capabilities/unavailable-dates under
+    /api/v1/therapists/{userId}/... — GET both-roles (class-level [Authorize]),
+    POST/PUT/DELETE per-action [Authorize(Policy="Manager")], matching PackageTypesController's
+    established mixed-authorization pattern. No new service class or repository interfaces (RC-2)
+    — inline controller validation directly against AppDbContext, matching this controller's own
+    pre-existing style. GET /therapists now always active-only (no param); GET
+    /therapists/availability supports ?includeInactive= (default false).
+  - RC-3: POST .../unavailable-dates persists DateTime.SpecifyKind(date, DateTimeKind.Utc),
+    date-only — matching AvailabilityService's existing query convention and DbSeeder's writes.
+    Verified via a round-trip test asserting Kind and TimeOfDay==0 after a real Postgres write.
+  - AvailabilityService.CheckAvailabilityAsync: added a Step-0 IsActive check on the target
+    therapist. DESIGN NOTE / discrepancy resolved during implementation: the approved plan's
+    Acceptance Criteria explicitly says inactive-therapist booking/reschedule rejection must be
+    422 ("Appointment create/reschedule reject an inactive therapist with 422 + Hebrew reason"),
+    but RC-2 explicitly says this check belongs inside AvailabilityService, and every existing
+    AvailabilityCheckResult failure from that service is thrown as a 409 DomainConflictException
+    by the calling controller — a direct conflict between the plan's own two requirements as
+    literally written. Resolved by adding an `IsValidationFailure` flag to
+    AvailabilityCheckResult (default false, unused by every pre-existing check) and having
+    AppointmentsController.Create/Update branch on it: true -> DomainValidationException (422,
+    matching the pre-existing inline Role check's status class), false -> DomainConflictException
+    (409, unchanged for every other check). Keeps AvailabilityService as the sole owner of the
+    check (RC-2's intent) while producing the plan's explicitly required 422 (not silently
+    dropping either requirement). Flagged in the implementation report as worth the calling
+    session/architect knowing about, per the task's "flag it back rather than silently choosing
+    differently" instruction.
+  - ADR-011-A note (per plan's exact required wording): appended to AppointmentsController.Create's
+    XML doc comment and docs/DATABASE_SCHEMA.md's ADR-011-A paragraph — schedule edits
+    (working hours/capabilities/unavailable dates) intentionally do not take the therapist's
+    User-row lock and do not retroactively validate existing appointments (same accepted-risk
+    class as the deactivation-orphaned-appointments risk).
+  - RC-6 verified against actual code (not assumed): POST /api/v1/users' existing shape was
+    already exactly { fullName, email, password, phone } with no role field (Phase 007/008,
+    UsersController.cs/CreateUserRequest) — no discrepancy found, plan's correction was already
+    accurate.
+
+  New/changed files:
+    backend/BeautyCareClinic.Domain/Entities/User.cs (IsActive property)
+    backend/BeautyCareClinic.Infrastructure/Data/AppDbContext.cs (IsActive default value)
+    backend/BeautyCareClinic.Infrastructure/Migrations/20260720101832_AddIsActiveToUsers.cs(+.Designer.cs)
+    backend/BeautyCareClinic.Application/DTOs/AuthDtos.cs (UserDto.IsActive)
+    backend/BeautyCareClinic.Application/DTOs/TherapistAvailabilityDtos.cs (3 new write DTOs)
+    backend/BeautyCareClinic.Application/Interfaces/IUserRepository.cs (+HasRelatedDataAsync)
+    backend/BeautyCareClinic.Application/Interfaces/IAvailabilityService.cs (+IsValidationFailure)
+    backend/BeautyCareClinic.Infrastructure/Repositories/UserRepository.cs (+HasRelatedDataAsync)
+    backend/BeautyCareClinic.Infrastructure/Services/AvailabilityService.cs (Step-0 IsActive check)
+    backend/BeautyCareClinic.Api/Controllers/UsersController.cs (deactivate, includeInactive, FK-restrict 409)
+    backend/BeautyCareClinic.Api/Controllers/AuthController.cs (login rejection)
+    backend/BeautyCareClinic.Api/Controllers/TherapistAvailabilityController.cs (full CRUD extension)
+    backend/BeautyCareClinic.Api/Controllers/AppointmentsController.cs (422 vs 409 branch, ADR-011-A note)
+
+  New backend tests:
+    backend/BeautyCareClinic.Tests/Integration/UsersControllerPostgresTests.cs (8 tests — deactivate,
+      includeInactive filter, FK-restrict 409, clean delete, self-delete 400)
+    backend/BeautyCareClinic.Tests/Integration/AuthControllerPostgresTests.cs (3 tests — active login,
+      inactive login rejected same-shape, inactive+wrong-password same-shape)
+    backend/BeautyCareClinic.Tests/Integration/TherapistAvailabilityControllerPostgresTests.cs
+      (extended from 2 to 21 tests — full CRUD cycles for all 3 resources, active-filtering on
+      GET /therapists and GET /therapists/availability?includeInactive, duplicate/invalid-input
+      rejections, RC-3 Kind=Utc round-trip)
+    backend/BeautyCareClinic.Tests/Integration/AppointmentsControllerPostgresTests.cs (+2 tests —
+      Create/Update reject an inactive therapist target with the exact Hebrew reason)
+
+  Backend test result: dotnet build — 0 warnings/errors. dotnet test — 232/232 passing (baseline
+  200 + 32 new), against live Postgres.
+
+Frontend:
+  - types/User.ts: isActive?: boolean added (optional, not required — undefined treated as active;
+    only an explicit false means deactivated, to avoid a wide required-field blast radius across
+    every unrelated User-typed test fixture in the codebase).
+  - New API modules: src/api/therapistWorkingHoursApi.ts, therapistCapabilityApi.ts,
+    therapistUnavailableDatesApi.ts (all call /api/v1/therapists/{userId}/... per RC-1).
+  - src/api/usersApi.ts: UserApiDto.isActive; getUsers(role, includeInactive); deactivateUser().
+  - src/contexts/therapistRefreshBus.ts (new, small): RC-5's dual-context-refresh coordination.
+    TherapistDataProvider is mounted as an ancestor of TherapistsProvider (main.tsx), so
+    TherapistsContext's mutations call useTherapistData().refresh() directly; the reverse
+    direction (TherapistDataContext's schedule mutations refreshing TherapistsContext) can't use a
+    context hook the same way since TherapistDataProvider isn't a descendant of TherapistsProvider
+    — this tiny registration bus (register/trigger, no React context, no provider restructuring)
+    closes that one remaining direction without merging the two contexts.
+  - TherapistsContext: createTherapist/updateTherapist/deleteTherapist wired to the real API
+    (closes FU-008); createTherapist takes a new password param (RC-6 shape); new
+    deactivateTherapist(id). Client-side Hebrew pre-validation kept (fail-fast UX) — see FU-020 for
+    the one gap this surfaces (English messages from a genuine server-side validation failure).
+    fetchTherapists now requests includeInactive=true (Manager-only management screen must still
+    show a deactivated therapist so a Manager can navigate to their detail page, read-only).
+  - TherapistDataContext: saveTherapistWorkingHours/addTherapistUnavailableDate/
+    removeTherapistUnavailableDate/addTherapistCapability/removeTherapistCapability now persist to
+    the real API (replacing saveTherapistCapabilities' bulk-replace with granular
+    add/remove-single, matching the backend's actual atomic POST/DELETE endpoints).
+    saveTherapistWorkingHours fans out to 7 parallel PUT (upsert) calls via Promise.allSettled and
+    reports which specific day(s) failed by Hebrew name (plan's "Batch frontend saves" risk).
+  - TherapistModal: password field added, async handleSave with loading state.
+  - TherapistDetail: all four sections (contact/hours/dates/capabilities) wired to real API calls
+    with per-section loading/Hebrew-error state; "בטל פעילות" action (Manager-only screen, visible
+    only while active, confirm-before-calling); every edit control disabled when the therapist is
+    inactive (isActive===false); "לא פעילה" badge.
+  - TherapistsScreen: delete flow made async (deleteTherapist is now a real hard-delete that can
+    409) — local schedule-state cleanup only fires after a confirmed-successful delete, not
+    optimistically; Hebrew error surfaced inline on 409; "לא פעילה" badge in the list.
+  - Booking/reschedule pickers: no code change needed — GET /api/v1/therapists is already
+    active-only server-side (verified via TherapistDataContext's existing test coverage).
+  - src/data/therapists.ts: isActive:true added to the 2 mock entries (still consumed by
+    TreatmentModal/PaymentsTab/TreatmentHistoryTab — pre-existing, unrelated gap, not touched
+    otherwise).
+
+  New frontend tests:
+    src/api/therapistWorkingHoursApi.test.ts (4), therapistCapabilityApi.test.ts (3),
+    therapistUnavailableDatesApi.test.ts (3), usersApi.test.ts (9 — new file, RC-6 shape +
+    includeInactive + deactivateUser)
+    src/features/therapists/TherapistModal.test.tsx (4 — password field, validation gating,
+    success/error flows)
+    src/features/therapists/TherapistDetail.test.tsx (8 — deactivate action visibility/confirm/
+    error, read-only-when-inactive across all 4 sections, contact save, capability toggle,
+    unavailable-date add)
+
+  Frontend verification: npx tsc -b --noEmit — only the known pre-existing FU-016 error, no new
+  ones. npx vitest run — 337/337 passing (baseline 306 + 31 new).
+
+Out of scope (per plan, not implemented): reactivation endpoint, therapist self-service,
+soft-delete audit trail, bulk operations, notifications, orphaned-appointments dashboard,
+cascading auto-cancellation on deactivation.
+
+Opened FOLLOWUPS.md FU-020 (UsersController's pre-existing English validation messages, now
+user-visible via this phase's real wiring — Medium priority, not fixed, out of this phase's
+approved scope).
+
+Not committed, per explicit instruction — awaiting user browser validation and approval.

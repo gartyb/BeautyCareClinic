@@ -250,3 +250,21 @@ within the Israel/UTC offset window as past/future. Fixed by reusing `appointmen
 the UTC/Israel-local boundary" test cases for the regression coverage. The backend
 Treatment/Payment/Note instances cataloged above remain open — this update covers only the
 frontend `selectors.ts` occurrence.
+
+## FU-020: `UsersController.Create`/`Update` validation messages are in English, now user-visible
+
+Source: found while implementing Phase 012 (Therapist Management Backend Integration), 2026-07-20.
+`UsersController.Create`/`Update`'s inline validation (`"FullName is required."`,
+`"Email is required."`, `"Email is not valid."`, `"Password is required."`, `"A user with this
+email already exists."`, `"Email is already in use by another user."`) is in English, unlike
+every other controller in this codebase, which returns Hebrew validation/conflict messages. This
+predates Phase 012 (the endpoints are from Phase 007/008), but was never user-visible until this
+phase: `TherapistsContext.createTherapist`/`updateTherapist` were 100% local/mock before Phase 012
+and never actually called `POST`/`PUT /api/v1/users`. Now that `TherapistModal`/`TherapistDetail`
+call the real API, a genuine server-side validation failure (e.g. duplicate email) surfaces this
+English text directly in the Hebrew UI. Not fixed in Phase 012 — `UsersController` was intentionally
+left untouched outside the two additions the approved plan specified (`includeInactive` filter,
+`PUT .../deactivate`); translating its pre-existing validation messages is a broader consistency
+fix outside that scope.
+Priority: Medium (real UX inconsistency, now reachable via a normal Manager workflow — duplicate
+email during therapist creation — not just a theoretical gap).

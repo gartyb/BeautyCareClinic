@@ -39,6 +39,7 @@ erDiagram
         string full_name
         string email
         enum role
+        boolean is_active
     }
 
     CUSTOMER {
@@ -203,10 +204,23 @@ erDiagram
   (a naive row lock on existing rows would not block a concurrent phantom insert under READ
   COMMITTED). A reschedule that changes therapist locks both the old and new `USER` rows in
   ascending-GUID order to avoid deadlock. Any future code path that inserts/moves an `APPOINTMENT`
-  must take this same lock first.
-- `THERAPIST_WORKING_HOURS` / `THERAPIST_UNAVAILABLE_DATE` / `THERAPIST_CAPABILITY` are seed-data
-  only as of Phase 011 — keyed to real `USER.id` GUIDs (seeded in `DbSeeder.cs`), exposed read-only
-  via `GET /api/v1/therapists/availability`. No write/management API exists yet for these tables.
+  must take this same lock first. Phase 012 note on scope: schedule edits (working hours /
+  capabilities / unavailable dates) intentionally do not take this same `USER`-row lock and do not
+  retroactively validate existing appointments; narrowing a therapist's availability can leave
+  already-booked appointments outside the new constraints — same accepted-risk class as the
+  deactivation-orphaned-appointments risk below.
+- `USER.is_active` (Phase 012) — boolean, not null, default `true`. `false` means the therapist has
+  left the clinic: excluded from `GET /api/v1/therapists`, from the default
+  `GET /api/v1/therapists/availability` response, and login is rejected (`AuthController.Login`,
+  same 401 shape as an unknown/wrong-password login). Existing `Appointment`/`Treatment`/`Note`
+  rows referencing an inactive user remain fully valid and queryable — deactivation is not a
+  cascading operation and does not retroactively touch history. No index — `Users` is too small a
+  table to benefit (confirmed by architecture review).
+- `THERAPIST_WORKING_HOURS` / `THERAPIST_UNAVAILABLE_DATE` / `THERAPIST_CAPABILITY` (Phase 012) —
+  full CRUD via `/api/v1/therapists/{userId}/working-hours|capabilities|unavailable-dates`
+  (Manager-only writes, both-roles reads), superseding Phase 011's seed-only/read-only status. All
+  three still require the target `userId` to resolve to an existing, active `Therapist`-role
+  `User` for any write.
 - `THERAPIST_WORKING_HOURS.weekday` is stored as text (enum-as-string, e.g. `"Sunday"`), not an
   integer column — declaration order is `Sunday=0 .. Saturday=6`, matching both .NET's
   `DateTime.DayOfWeek` and the frontend's `Date.getDay()`. Caution: casting the enum to `int`

@@ -14,11 +14,24 @@ export function TherapistsScreen() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  function handleConfirmDelete(user: User) {
-    cleanupTherapist(user.id);
-    deleteTherapist(user.id);
-    setDeletingId(null);
+  async function handleConfirmDelete(user: User) {
+    setDeleteError(null);
+    setIsDeleting(true);
+    try {
+      await deleteTherapist(user.id);
+      // Only clean up local schedule state after the hard-delete actually succeeds — deleteTherapist
+      // is now a real DELETE /api/v1/users/{id} call that can 409 (FK-restrict) if the therapist
+      // has appointment/treatment/note history, in which case nothing was actually deleted.
+      cleanupTherapist(user.id);
+      setDeletingId(null);
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : 'שגיאה לא צפויה');
+    } finally {
+      setIsDeleting(false);
+    }
   }
 
   return (
@@ -48,8 +61,13 @@ export function TherapistsScreen() {
                   className="flex flex-col gap-0.5 flex-1 cursor-pointer"
                   onClick={() => navigate(`/therapists/${user.id}`)}
                 >
-                  <span className="font-semibold text-clinic-text">
+                  <span className="font-semibold text-clinic-text flex items-center gap-2">
                     {user.fullName}
+                    {user.isActive === false && (
+                      <span className="text-xs font-medium bg-red-100 text-red-600 rounded-full px-2 py-0.5">
+                        לא פעילה
+                      </span>
+                    )}
                   </span>
                   <span className="text-sm text-clinic-muted" dir="ltr">{user.email}</span>
                   {user.phone && (
@@ -72,22 +90,29 @@ export function TherapistsScreen() {
                 </div>
               </div>
               {deletingId === user.id && (
-                <div className="flex items-center gap-4 px-6 py-3 bg-red-50 border-b border-clinic-border text-sm" dir="rtl">
-                  <span className="text-clinic-text">
-                    למחוק את <strong>{user.fullName}</strong>? שעות עבודה, תאריכים ויכולות יימחקו.
-                  </span>
-                  <button
-                    onClick={() => handleConfirmDelete(user)}
-                    className="px-3 py-1 rounded-lg bg-red-500 text-white hover:bg-red-600 text-sm font-medium"
-                  >
-                    מחק
-                  </button>
-                  <button
-                    onClick={() => setDeletingId(null)}
-                    className="px-3 py-1 rounded-lg text-clinic-muted hover:text-clinic-text text-sm"
-                  >
-                    ביטול
-                  </button>
+                <div className="flex flex-col gap-2 px-6 py-3 bg-red-50 border-b border-clinic-border text-sm" dir="rtl">
+                  <div className="flex items-center gap-4">
+                    <span className="text-clinic-text">
+                      למחוק את <strong>{user.fullName}</strong>? שעות עבודה, תאריכים ויכולות יימחקו.
+                      מחיקה תיחסם אם קיימים תורים, טיפולים או הערות המשויכים למטפלת — במקרה זה יש
+                      להשתמש בכפתור "בטל פעילות" בעמוד המטפלת.
+                    </span>
+                    <button
+                      onClick={() => handleConfirmDelete(user)}
+                      disabled={isDeleting}
+                      className="px-3 py-1 rounded-lg bg-red-500 text-white hover:bg-red-600 text-sm font-medium disabled:opacity-40"
+                    >
+                      {isDeleting ? 'מוחק...' : 'מחק'}
+                    </button>
+                    <button
+                      onClick={() => { setDeletingId(null); setDeleteError(null); }}
+                      disabled={isDeleting}
+                      className="px-3 py-1 rounded-lg text-clinic-muted hover:text-clinic-text text-sm disabled:opacity-40"
+                    >
+                      ביטול
+                    </button>
+                  </div>
+                  {deleteError && <span className="text-red-600">{deleteError}</span>}
                 </div>
               )}
             </div>

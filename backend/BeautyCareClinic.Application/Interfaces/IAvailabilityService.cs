@@ -1,8 +1,13 @@
 namespace BeautyCareClinic.Application.Interfaces;
 
 /// <summary>Result of an appointment availability check. Reason is a Hebrew message for the
-/// first rejection reason found, intended to surface directly as a 409 error message.</summary>
-public record AvailabilityCheckResult(bool IsAvailable, string? Reason);
+/// first rejection reason found. <see cref="IsValidationFailure"/> distinguishes a request-level
+/// validation problem (the target therapist is deactivated — HTTP 422, same status class as the
+/// pre-existing Role check in AppointmentsController) from a genuine scheduling conflict (working
+/// hours / unavailable date / capability / overlap — HTTP 409, the pre-existing default). Callers
+/// (AppointmentsController) should throw DomainValidationException when true, DomainConflictException
+/// otherwise.</summary>
+public record AvailabilityCheckResult(bool IsAvailable, string? Reason, bool IsValidationFailure = false);
 
 /// <summary>
 /// Phase 011 — Application-layer availability checking (Architecture Review: business logic must

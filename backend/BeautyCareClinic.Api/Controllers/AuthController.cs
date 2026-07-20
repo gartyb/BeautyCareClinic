@@ -77,10 +77,20 @@ public class AuthController : ControllerBase
         if (domainUser == null)
             return Unauthorized(new ErrorResponse(ErrorCodes.Unauthorized, "User account is incomplete.", DateTime.UtcNow, HttpContext.TraceIdentifier));
 
+        // Phase 012 Decision 6 / RC-4 — a deactivated user (IsActive=false) is rejected here, with
+        // the SAME 401 shape as an unknown-email/wrong-password login. Deliberately not a distinct
+        // error code/message: that would leak "this email exists but the account is deactivated"
+        // to an unauthenticated caller, a real account-status disclosure (consistent with CR-022's
+        // login-timing concern, though CR-022 itself stays out of scope here). The Identity
+        // (AppUser) record and password remain valid/unchanged — only the domain-level IsActive
+        // flag blocks the session from being issued.
+        if (!domainUser.IsActive)
+            return Unauthorized(new ErrorResponse(ErrorCodes.Unauthorized, "Invalid credentials.", DateTime.UtcNow, HttpContext.TraceIdentifier));
+
         var token     = _jwtService.GenerateToken(domainUser);
         var expiresIn = _configuration.GetValue<int>("Jwt:ExpiresInHours", 24) * 3600;
 
-        var userDto = new UserDto(domainUser.Id, domainUser.FullName, domainUser.Email, domainUser.Role.ToString(), domainUser.Phone);
+        var userDto = new UserDto(domainUser.Id, domainUser.FullName, domainUser.Email, domainUser.Role.ToString(), domainUser.Phone, domainUser.IsActive);
         return Ok(new LoginResponse(token, expiresIn, userDto));
     }
 
@@ -104,6 +114,6 @@ public class AuthController : ControllerBase
         if (domainUser == null)
             return NotFound(new ErrorResponse(ErrorCodes.NotFound, "User not found.", DateTime.UtcNow, HttpContext.TraceIdentifier));
 
-        return Ok(new UserDto(domainUser.Id, domainUser.FullName, domainUser.Email, domainUser.Role.ToString(), domainUser.Phone));
+        return Ok(new UserDto(domainUser.Id, domainUser.FullName, domainUser.Email, domainUser.Role.ToString(), domainUser.Phone, domainUser.IsActive));
     }
 }

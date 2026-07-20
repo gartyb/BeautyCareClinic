@@ -4,7 +4,7 @@
 
 | Entity                       | Purpose                                                                                              |
 | ---------------------------- | ---------------------------------------------------------------------------------------------------- |
-| **User**                     | System user with role `Manager` or `Therapist`. Role determines all permissions.                    |
+| **User**                     | System user with role `Manager` or `Therapist`. Role determines all permissions. `IsActive` (Phase 012) — soft-deactivation flag for staff who left the clinic. |
 | **Customer**                 | Clinic customer. Has orders, appointments, treatments, and notes.                                    |
 | **TreatmentType**            | Named category of treatment (e.g. facial, laser). Used across packages, appointments, treatments, and notes. |
 | **PackageType**              | Clinic-defined package. Can be a quantity-based series, a timer-based series, or neither.            |
@@ -52,12 +52,20 @@
 - Create: any authenticated user. Reschedule/cancel: the appointment's assigned therapist (author) or a Manager — same author-or-Manager pattern as `Treatment`/`Note`.
 - Reschedule is blocked for every role, including Manager, if the appointment is not currently `Scheduled` or its current start time has already passed — no exception.
 - Double-booking prevention invariant (ADR-011-A): any code that inserts or moves an `Appointment` must first lock the target therapist's `User` row (`SELECT ... FOR UPDATE`) within the same transaction, as a serialization mutex — not by locking `Appointment` rows, since the conflicting row may not exist yet at lock time.
-- `TherapistWorkingHours`/`TherapistUnavailableDate`/`TherapistCapability` are seed data only as of Phase 011, keyed to real `User.Id`; exposed read-only via `GET /api/v1/therapists/availability`. No management API yet.
+- `TherapistWorkingHours`/`TherapistUnavailableDate`/`TherapistCapability` (Phase 012) have full CRUD via `/api/v1/therapists/{userId}/working-hours|capabilities|unavailable-dates` (Manager-only writes, both-roles reads) — superseding Phase 011's seed-only status. Availability rejects a booking/reschedule against an inactive therapist (see below).
+
+### Therapist Management and Deactivation (Phase 012)
+- `User.IsActive` (default `true`) marks whether a therapist is still at the clinic. Setting it to `false` (`PUT /api/v1/users/{id}/deactivate`, Manager-only) is a soft-delete: it does not cascade to appointments/treatments/notes, which remain fully valid and queryable, snapshotted with the therapist's name as before. It is distinct from `DELETE /api/v1/users/{id}` (true hard-delete, still blocked by existing history via FK-restrict — a 409, not a 500).
+- Deactivation deliberately does not auto-cancel or flag the therapist's future `Scheduled` appointments — left to manager judgment (accepted risk, not a defect; same accepted-risk class as the ADR-011-A note on schedule edits below).
+- Effects of deactivation: excluded from `GET /api/v1/therapists` (always active-only) and from the default `GET /api/v1/therapists/availability` response (`?includeInactive=true` is a Manager-oriented escape hatch); rejected at login (`AuthController.Login`, same 401 shape as an unknown/wrong-password login — no distinct "deactivated" signal); rejected as a booking/reschedule target (`POST /customers/{customerId}/appointments`, `PUT /appointments/{id}`) with a 422 Hebrew reason ("המטפלת המבוקשת לא פעילה"), checked inside `AvailabilityService.CheckAvailabilityAsync`.
+- Working-hours/capability/unavailable-date writes require the target `userId` to resolve to an existing, active `Therapist`-role `User` — editing an inactive therapist's schedule is rejected (422), matching the frontend's read-only presentation for an inactive therapist's detail screen.
+- ADR-011-A scope note: schedule edits (working hours / capabilities / unavailable dates) intentionally do not take the therapist's `User`-row lock and do not retroactively validate existing appointments; narrowing a therapist's availability can leave already-booked appointments outside the new constraints — same accepted-risk class as the deactivation risk above.
+- Therapist creation (`POST /api/v1/users`) and account creation/editing remain Manager-only, unchanged from Phase 007/008 except for the addition of `IsActive` to the response.
 
 ### Permissions
 - Managers can create and edit all data.
 - Therapists can create orders and payments only; cannot edit after saving.
-- Only managers can access therapist management, package type management, and global settings.
+- Only managers can access therapist management (including deactivation and schedule/capability management), package type management, and global settings.
 
 ## Relationships
 

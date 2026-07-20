@@ -409,6 +409,35 @@ public class AppointmentsControllerPostgresTests : IAsyncLifetime
         }
     }
 
+    /// <summary>
+    /// Phase 012 Decision 6/RC-4's booking-side counterpart, and the ADR-011-A note added this
+    /// phase: a deactivated therapist must reject new bookings, distinctly (422
+    /// DomainValidationException, matching the pre-existing Role check's status class) from a
+    /// genuine scheduling conflict (409). Working hours + capability are seeded so this specific
+    /// case is proven to be the IsActive gate firing, not one of the other availability checks.
+    /// </summary>
+    [Fact]
+    public async Task Create_TargetTherapistIsInactive_ThrowsDomainValidationException()
+    {
+        var inactiveTherapist = new User
+        {
+            Id = Guid.NewGuid(), FullName = "מטפלת לא פעילה לתור", Email = $"appt-inactive-{Guid.NewGuid():N}@test.com",
+            Role = UserRole.Therapist, IsActive = false,
+        };
+        _context.Users.Add(inactiveTherapist);
+        await _context.SaveChangesAsync();
+        _createdUserIds.Add(inactiveTherapist.Id);
+        await SeedWorkingHours(inactiveTherapist.Id, _weekday, "09:00", "20:00");
+        await SeedCapability(inactiveTherapist.Id, _treatmentType.Id);
+
+        var controller = BuildController(_context, _author.Id, isManager: false);
+        var start = NextSlot();
+        var request = new CreateAppointmentRequest(_treatmentType.Id, inactiveTherapist.Id, start, start.AddHours(1));
+
+        var ex = await Assert.ThrowsAsync<DomainValidationException>(() => controller.Create(_customer.Id, request));
+        Assert.Equal("המטפלת המבוקשת לא פעילה", ex.Message);
+    }
+
     [Fact]
     public async Task Create_OverlapsExistingScheduledAppointment_ThrowsDomainConflictException()
     {
@@ -730,6 +759,32 @@ public class AppointmentsControllerPostgresTests : IAsyncLifetime
         var request = new UpdateAppointmentRequest(_author.Id, newStart, newStart.AddHours(1));
 
         await Assert.ThrowsAsync<DomainConflictException>(() => managerController.Update(pastAppointment.Id, request));
+    }
+
+    /// <summary>Phase 012 — rescheduling onto a deactivated therapist is rejected the same way as
+    /// booking one (422 DomainValidationException).</summary>
+    [Fact]
+    public async Task Update_RescheduleToInactiveTherapist_ThrowsDomainValidationException()
+    {
+        var appointment = await CreateAppointmentAsAuthor();
+
+        var inactiveTherapist = new User
+        {
+            Id = Guid.NewGuid(), FullName = "מטפלת לא פעילה לעדכון", Email = $"appt-update-inactive-{Guid.NewGuid():N}@test.com",
+            Role = UserRole.Therapist, IsActive = false,
+        };
+        _context.Users.Add(inactiveTherapist);
+        await _context.SaveChangesAsync();
+        _createdUserIds.Add(inactiveTherapist.Id);
+        await SeedWorkingHours(inactiveTherapist.Id, _weekday, "09:00", "20:00");
+        await SeedCapability(inactiveTherapist.Id, _treatmentType.Id);
+
+        var controller = BuildController(_context, _author.Id, isManager: false);
+        var newStart = appointment.StartTime.AddHours(2);
+        var request = new UpdateAppointmentRequest(inactiveTherapist.Id, newStart, newStart.AddHours(1));
+
+        var ex = await Assert.ThrowsAsync<DomainValidationException>(() => controller.Update(appointment.Id, request));
+        Assert.Equal("המטפלת המבוקשת לא פעילה", ex.Message);
     }
 
     [Fact]

@@ -69,12 +69,28 @@
 5. Both actions are hidden from the UI (and rejected 403 server-side) for a therapist who isn't the
    appointment's author, unless they are a Manager.
 
-## Configuring a Therapist *(Manager only)*
+## Creating a Therapist *(Manager only, Phase 012)*
+
+1. Therapist Management → "מטפלת חדשה" → enter full name, email, password, phone.
+2. Save → `POST /api/v1/users` (server hardcodes `role=Therapist`) → the new therapist appears in the active therapist list immediately, but has no working hours/capabilities configured yet — every booking against them fails availability until a Manager finishes setup (not a defect, expected onboarding step).
+
+## Configuring a Therapist *(Manager only, Phase 012 — backed by a real API)*
 
 1. Therapist Management → select therapist.
-2. Set weekly working days and hours.
-3. Block specific unavailable dates.
-4. Assign supported treatment types.
+2. Set weekly working days and hours — `POST`/`PUT`/`DELETE /api/v1/therapists/{userId}/working-hours[/{weekday}]`. Both start/end empty = day off.
+3. Block specific unavailable dates — `POST`/`DELETE /api/v1/therapists/{userId}/unavailable-dates[/{date}]`.
+4. Assign supported treatment types — `POST`/`DELETE /api/v1/therapists/{userId}/capabilities[/{treatmentTypeId}]`.
+5. Each section shows a loading state while saving and a Hebrew error toast on failure (e.g. invalid time range, duplicate entry).
+6. These three sections become read-only once the therapist is deactivated (see below) — the backend also rejects the write server-side (422) as a second line of defense.
+
+## Deactivating a Therapist *(Manager only, Phase 012)*
+
+1. Therapist Management → select therapist → "בטל פעילות" (visible only while the therapist is active) → confirm.
+2. `PUT /api/v1/users/{id}/deactivate` sets `isActive=false`. The therapist immediately disappears from `GET /api/v1/therapists` (booking/reschedule pickers) and from the default therapist list/availability view; their past appointments, treatments, and notes remain fully visible, still labeled with their name as before.
+3. Future `Scheduled` appointments already booked with this therapist are **not** auto-cancelled or flagged — left to manager judgment (accepted risk, documented, not tooled around in this phase).
+4. Attempting to book or reschedule an appointment against a deactivated therapist (directly via API, bypassing the now-filtered picker) is rejected with **422** and the Hebrew reason "המטפלת המבוקשת לא פעילה".
+5. A deactivated therapist can no longer log in — `POST /api/v1/auth/login` rejects the attempt with the same 401 shape as an unknown email or wrong password, even though their password is still valid and their identity record is untouched.
+6. Deactivation is a soft-delete distinct from `DELETE /api/v1/users/{id}` (hard-delete), which stays blocked (409) whenever the therapist has any appointment/treatment/note history — deactivation is the correct action for a departed therapist with real history; hard-delete remains only for a genuine duplicate/mistaken account with no history.
 
 ## Creating a Package Type *(Manager only)*
 

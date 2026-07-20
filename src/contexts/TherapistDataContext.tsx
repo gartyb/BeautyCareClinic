@@ -2,13 +2,15 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import type { TherapistWorkingHours, TherapistUnavailableDate, TherapistCapability } from '../types/Therapist';
 import type { User } from '../types/User';
 import { therapistAvailabilityApi } from '../api/therapistAvailabilityApi';
+import { therapistWorkingHoursApi } from '../api/therapistWorkingHoursApi';
+import { therapistCapabilityApi } from '../api/therapistCapabilityApi';
+import { therapistUnavailableDatesApi } from '../api/therapistUnavailableDatesApi';
 import { ApiRequestError } from '../api/apiError';
-import {
-  addUnavailableDate,
-  removeUnavailableDate,
-  updateTherapistCapabilities,
-} from '../features/therapists/therapistDataService';
+import { DomainError } from '../domain/errors';
 import { useAuth } from './AuthContext';
+import { triggerTherapistsContextRefresh } from './therapistRefreshBus';
+
+const WEEKDAY_NAMES_HE = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
 
 interface TherapistDataContextValue {
   therapists: User[];
@@ -18,10 +20,11 @@ interface TherapistDataContextValue {
   isLoading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
-  saveTherapistWorkingHours: (userId: string, hours: TherapistWorkingHours[]) => void;
-  addTherapistUnavailableDate: (entry: TherapistUnavailableDate) => void;
-  removeTherapistUnavailableDate: (userId: string, date: string) => void;
-  saveTherapistCapabilities: (userId: string, caps: TherapistCapability[]) => void;
+  saveTherapistWorkingHours: (userId: string, hours: TherapistWorkingHours[]) => Promise<void>;
+  addTherapistUnavailableDate: (entry: TherapistUnavailableDate) => Promise<void>;
+  removeTherapistUnavailableDate: (userId: string, date: string) => Promise<void>;
+  addTherapistCapability: (userId: string, treatmentTypeId: string) => Promise<void>;
+  removeTherapistCapability: (userId: string, treatmentTypeId: string) => Promise<void>;
   cleanupTherapist: (userId: string) => void;
 }
 
@@ -36,23 +39,23 @@ export function TherapistDataProvider({ children }: { children: React.ReactNode 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Phase 011 Architecture Review Correction #1 / Q4: this data is now read from the real
-  // GET /api/v1/therapists/availability endpoint (any authenticated user, not Manager-gated —
-  // unlike TherapistsContext's GET /api/v1/users), replacing the mock seed arrays
-  // (`data/therapistWorkingHours.ts` etc.), keyed to real User.Id GUIDs. There is still no
-  // write/management API for this data (Q4 stays deferred) — saveTherapistWorkingHours /
-  // addTherapistUnavailableDate / removeTherapistUnavailableDate / saveTherapistCapabilities
-  // remain local-state-only mutations used by the Manager-only TherapistDetail management screen,
-  // same as before.
+  // Phase 011 Architecture Review Correction #1 / Q4: working hours / unavailable dates /
+  // capabilities are read from GET /api/v1/therapists/availability (any authenticated user, not
+  // Manager-gated — unlike TherapistsContext's GET /api/v1/users), keyed to real User.Id GUIDs.
   //
-  // Bugfix (post-Phase-011): `therapists` here is now also sourced from GET /api/v1/therapists
-  // (name+id only, same non-Manager-gated access level), NOT TherapistsContext's
-  // GET /api/v1/users?role=Therapist (which is Manager-only end-to-end and 403s for a
-  // Therapist-role caller — see TherapistsContext.tsx). The booking/reschedule/calendar therapist
-  // picker (BookAppointmentModal, RescheduleModal, CalendarGrid) reads `therapists` from this
-  // context instead of TherapistsContext for exactly that reason. TherapistsContext itself is
-  // unchanged and remains the source for the Manager-only /therapists management screen, which
-  // needs full email/phone detail that this narrow endpoint intentionally does not carry.
+  // Phase 012 (RC-1): the three resources now also have a write/management API
+  // (/api/v1/therapists/{userId}/working-hours|capabilities|unavailable-dates, Manager-only
+  // writes) — see saveTherapistWorkingHours / addTherapistUnavailableDate /
+  // removeTherapistUnavailableDate / addTherapistCapability / removeTherapistCapability below,
+  // which now persist to the real backend instead of mutating local state only.
+  //
+  // Bugfix (post-Phase-011): `therapists` here is sourced from GET /api/v1/therapists (name+id
+  // only, same non-Manager-gated access level), NOT TherapistsContext's
+  // GET /api/v1/users?role=Therapist (Manager-only end-to-end, 403s for a Therapist-role caller).
+  // The booking/reschedule/calendar therapist picker (BookAppointmentModal, RescheduleModal,
+  // CalendarGrid) reads `therapists` from this context for exactly that reason — and, per Phase
+  // 012, GET /api/v1/therapists is always active-only, so a deactivated therapist disappears from
+  // the picker automatically without any frontend filtering logic needed here.
   const fetchAvailability = useCallback(async (isCancelled?: () => boolean) => {
     setIsLoading(true);
     setError(null);
@@ -63,7 +66,8 @@ export function TherapistDataProvider({ children }: { children: React.ReactNode 
       ]);
       if (isCancelled?.()) return;
       setWorkingHours(dto.workingHours.map(wh => ({
-        id: wh.id, userId: wh.userId, weekday: wh.weekday, startTime: wh.startTime, endTime: wh.endTime,
+        id: wh.id, userId: wh.userId, weekday: wh.weekday,
+        startTime: wh.startTime || null, endTime: wh.endTime || null,
       })));
       setUnavailableDates(dto.unavailableDates.map(ud => ({
         id: ud.id, userId: ud.userId, date: ud.date,
@@ -72,7 +76,7 @@ export function TherapistDataProvider({ children }: { children: React.ReactNode 
         id: c.id, userId: c.userId, treatmentTypeId: c.treatmentTypeId,
       })));
       setTherapists(therapistDtos.map(t => ({
-        id: t.id, fullName: t.fullName, email: '', phone: undefined, role: 'Therapist' as const,
+        id: t.id, fullName: t.fullName, email: '', phone: undefined, role: 'Therapist' as const, isActive: true,
       })));
     } catch (e) {
       if (isCancelled?.()) return;
@@ -96,29 +100,65 @@ export function TherapistDataProvider({ children }: { children: React.ReactNode 
 
   const refresh = useCallback(() => fetchAvailability(), [fetchAvailability]);
 
+  /**
+   * Phase 012 — persists all 7 weekday rows via PUT (upsert) in parallel. Risk noted in the
+   * approved plan ("Batch frontend saves"): report which specific day(s) failed, not just a
+   * generic error, since one save action fans out into 7 independent API calls.
+   */
   const saveTherapistWorkingHours = useCallback(
-    (userId: string, hours: TherapistWorkingHours[]) => {
-      // hours are already validated TherapistWorkingHours entries — replace all for this user
-      setWorkingHours(prev => [
-        ...prev.filter(h => h.userId !== userId),
-        ...hours,
-      ]);
+    async (userId: string, hours: TherapistWorkingHours[]): Promise<void> => {
+      const results = await Promise.allSettled(
+        hours.map(h => therapistWorkingHoursApi.upsert(userId, h.weekday, { startTime: h.startTime, endTime: h.endTime }))
+      );
+
+      const failedDays = results
+        .map((r, i) => ({ r, weekday: hours[i].weekday }))
+        .filter(({ r }) => r.status === 'rejected')
+        .map(({ weekday }) => WEEKDAY_NAMES_HE[weekday] ?? String(weekday));
+
+      await refresh();
+      triggerTherapistsContextRefresh(); // RC-5 — no direct effect today, but keeps both contexts coordinated
+
+      if (failedDays.length > 0) {
+        const firstRejection = results.find(r => r.status === 'rejected') as PromiseRejectedResult | undefined;
+        const detail = firstRejection?.reason instanceof ApiRequestError
+          ? firstRejection.reason.error.message
+          : undefined;
+        throw new DomainError(
+          'WORKING_HOURS_SAVE_PARTIAL_FAILURE',
+          `שמירת שעות העבודה נכשלה עבור: ${failedDays.join(', ')}${detail ? ` (${detail})` : ''}`
+        );
+      }
     },
-    []
+    [refresh]
   );
 
   const addTherapistUnavailableDate = useCallback(
-    (entry: TherapistUnavailableDate) => {
-      setUnavailableDates(prev => addUnavailableDate(entry.userId, entry.date, prev));
+    async (entry: TherapistUnavailableDate): Promise<void> => {
+      try {
+        await therapistUnavailableDatesApi.add(entry.userId, entry.date);
+        await refresh();
+        triggerTherapistsContextRefresh();
+      } catch (e) {
+        if (e instanceof ApiRequestError) throw new DomainError('UNAVAILABLE_DATE_SAVE_FAILED', e.error.message);
+        throw e;
+      }
     },
-    []
+    [refresh]
   );
 
   const removeTherapistUnavailableDate = useCallback(
-    (userId: string, date: string) => {
-      setUnavailableDates(prev => removeUnavailableDate(userId, date, prev));
+    async (userId: string, date: string): Promise<void> => {
+      try {
+        await therapistUnavailableDatesApi.remove(userId, date);
+        await refresh();
+        triggerTherapistsContextRefresh();
+      } catch (e) {
+        if (e instanceof ApiRequestError) throw new DomainError('UNAVAILABLE_DATE_REMOVE_FAILED', e.error.message);
+        throw e;
+      }
     },
-    []
+    [refresh]
   );
 
   const cleanupTherapist = useCallback((userId: string): void => {
@@ -127,14 +167,32 @@ export function TherapistDataProvider({ children }: { children: React.ReactNode 
     setCapabilities(prev => prev.filter(c => c.userId !== userId));
   }, []);
 
-  const saveTherapistCapabilities = useCallback(
-    (userId: string, caps: TherapistCapability[]) => {
-      setCapabilities(prev => {
-        const treatmentTypeIds = caps.map(c => c.treatmentTypeId);
-        return updateTherapistCapabilities(userId, treatmentTypeIds, prev);
-      });
+  const addTherapistCapability = useCallback(
+    async (userId: string, treatmentTypeId: string): Promise<void> => {
+      try {
+        await therapistCapabilityApi.add(userId, treatmentTypeId);
+        await refresh();
+        triggerTherapistsContextRefresh();
+      } catch (e) {
+        if (e instanceof ApiRequestError) throw new DomainError('CAPABILITY_ADD_FAILED', e.error.message);
+        throw e;
+      }
     },
-    []
+    [refresh]
+  );
+
+  const removeTherapistCapability = useCallback(
+    async (userId: string, treatmentTypeId: string): Promise<void> => {
+      try {
+        await therapistCapabilityApi.remove(userId, treatmentTypeId);
+        await refresh();
+        triggerTherapistsContextRefresh();
+      } catch (e) {
+        if (e instanceof ApiRequestError) throw new DomainError('CAPABILITY_REMOVE_FAILED', e.error.message);
+        throw e;
+      }
+    },
+    [refresh]
   );
 
   const value = useMemo<TherapistDataContextValue>(
@@ -149,7 +207,8 @@ export function TherapistDataProvider({ children }: { children: React.ReactNode 
       saveTherapistWorkingHours,
       addTherapistUnavailableDate,
       removeTherapistUnavailableDate,
-      saveTherapistCapabilities,
+      addTherapistCapability,
+      removeTherapistCapability,
       cleanupTherapist,
     }),
     [
@@ -163,7 +222,8 @@ export function TherapistDataProvider({ children }: { children: React.ReactNode 
       saveTherapistWorkingHours,
       addTherapistUnavailableDate,
       removeTherapistUnavailableDate,
-      saveTherapistCapabilities,
+      addTherapistCapability,
+      removeTherapistCapability,
       cleanupTherapist,
     ]
   );

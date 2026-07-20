@@ -7,11 +7,13 @@ export const therapists: User[] = [
     fullName: 'שרה לוי',
     email: 'sara.levi@example.co.il',
     role: 'Manager',
+    isActive: true,
   },
   {
     id: 'user-therapist-1',
     fullName: 'מיכל כהן',
     email: 'michal.cohen@example.co.il',
     role: 'Therapist',
+    isActive: true,
   },
 ];

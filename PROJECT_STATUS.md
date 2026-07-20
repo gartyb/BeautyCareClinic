@@ -2,9 +2,9 @@
 
 ## Current State
 
-- Current phase: 011 — Appointments Backend Integration
-- Phase status: Completed
-- Current branch: main
+- Current phase: 012 — Therapist Management Backend Integration
+- Phase status: Approved — Pending Commit
+- Current branch: feature/phase-012-therapist-management
 - Latest approved version: v0.12.0
 - Latest approved tag: v0.12.0
 
@@ -52,7 +52,28 @@ seed data אמיתי ל-TherapistWorkingHours/Capability), code review ו-securi
 
 כל התיקונים נבדקו: 200/200 טסטים בבקאנד (כולל אינטגרציה מול Postgres אמיתי), 306/306 בפרונטאנד,
 `tsc --noEmit` נקי (מלבד FU-016 הקיים והלא-קשור). המשתמשת בדקה ואישרה בדפדפן, כולל שחזור
-התרחיש המדויק של באג ה-timezone לאחר התיקון. אושר commit + merge ל-main.
+התרחיש המדויק של באג ה-timezone לאחר התיקון. אושר commit + merge ל-main (v0.12.0).
+
+Phase 012 הוצע ואושר ע"י המשתמשת: **Therapist Management Backend Integration** — סוגר את
+Q4 שנדחה מ-Phase 011 (ניהול שעות עבודה/הסמכות/ימי אי-זמינות למטפלות, שהיו seed-only) ואת
+FU-008 (יצירת מטפלת הייתה mock-only ב-frontend). עבר pm-spec, architecture review (6 תיקונים
+נדרשים — RC-1 עד RC-6, כולם שולבו: namespace ה-API תחת `/therapists/{userId}/...`, ללא
+service class חדש, קונבנציית `Kind=Utc` לתאריכי אי-זמינות, חסימת כניסה למטפלת מבוטלת,
+רענון cross-context, תיקון מבנה בקשת יצירת משתמש), מימוש מלא (CRUD לשעות עבודה/הסמכות/
+ימי אי-זמינות, `User.IsActive` + deactivate endpoint, חסימת login).
+
+בבדיקה ידנית עם המשתמשת נמצאו ותוקנו שני באגים נוספים מאותה משפחה (race condition בין
+context-ים א-סינכרוניים נפרדים):
+- **TherapistDetail ריק בטעינה ראשונית** — אפקט הזריעה לא רץ מחדש כשנתוני `TherapistsContext`
+  הגיעו אחרי ה-mount הראשוני.
+- **"שעות עבודה לא נשמרות" (דיווח המשתמשת)** — אותה משפחת באג בדיוק, אך מול context שני
+  ונפרד (`TherapistDataContext`): השמירה בפועל תמיד הצליחה בשרת (אומת ישירות מול ה-DB), אך
+  התצוגה ננעלה על מצב "כל הימים חופש" אם `workingHours` עדיין היה ריק ברגע שה-`therapist`
+  הראשון כבר נטען. תוקן ע"י המתנה לשני ה-context-ים לפני הזרעת הטופס.
+
+כל התיקונים נבדקו: 232/232 טסטים בבקאנד, 339/339 בפרונטאנד, `tsc --noEmit` נקי (מלבד FU-016).
+המשתמשת בדקה ואישרה בדפדפן, כולל שחזור התרחיש המדויק של באג "שעות העבודה" לאחר התיקון.
+אושרה הפאזה — ממתין ל-commit + tag (v0.13.0) + merge + push.
 
 ## Completed Phases
 
@@ -100,5 +121,5 @@ seed data אמיתי ל-TherapistWorkingHours/Capability), code review ו-securi
 
 ## Next Step
 
-Phase 011 הושלמה: commit + tag (v0.12.0) + merge ל-main + push ל-origin/main בוצעו. ממתינה
-להצעת הפאזה הבאה.
+Phase 012 מאושרת ע"י המשתמשת לאחר בדיקה בדפדפן. ממתינה ל-commit + tag (v0.13.0) + merge
+ל-main + push ל-origin/main. לאחר מכן — הצעת הפאזה הבאה.

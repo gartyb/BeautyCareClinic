@@ -45,7 +45,9 @@ No auth required.
 }
 ```
 
-**Response 401:** Invalid credentials.
+**Response 401:** Invalid credentials — also returned (Phase 012, Decision 6) when the account
+belongs to a deactivated (`isActive=false`) therapist, with the identical response shape as an
+unknown email or wrong password (no distinct "deactivated" signal).
 **Response 429:** Account locked (too many failed attempts).
 
 ---
@@ -138,11 +140,12 @@ All endpoints require Manager role.
 
 ### GET /api/v1/users
 
-Optional `?role=Manager|Therapist` filter.
+Optional `?role=Manager|Therapist` filter. Optional `?includeInactive=true` (Phase 012, default
+`false`) — when omitted/false, excludes deactivated (`isActive=false`) users.
 
 **Response 200:** `User[]`
 ```json
-[{ "id": "<uuid>", "fullName": "...", "email": "...", "role": "Therapist" }]
+[{ "id": "<uuid>", "fullName": "...", "email": "...", "role": "Therapist", "phone": "...", "isActive": true }]
 ```
 
 ### GET /api/v1/users/{id}
@@ -151,27 +154,38 @@ Optional `?role=Manager|Therapist` filter.
 
 ### POST /api/v1/users
 
-Creates a Therapist (Managers cannot be created via API).
+Creates a Therapist (Managers cannot be created via API). Server hardcodes `role=Therapist` — not
+accepted in the request body.
 
-**Request:** `{ "fullName": "...", "email": "...", "password": "..." }`
+**Request:** `{ "fullName": "...", "email": "...", "password": "...", "phone": "..." }`
 
-Validation: email unique; password meets Identity policy (min 8 chars, uppercase, digit, non-alphanumeric).
+Validation: email unique; password meets Identity policy (min 8 chars, uppercase, digit, non-alphanumeric); `phone` is optional server-side.
 
-**Response 201:** Created `User`.
+**Response 201:** Created `User` (`isActive: true`).
 
 ### PUT /api/v1/users/{id}
 
-Updates `fullName` and/or `email`. Role cannot be changed via API.
+Updates `fullName`, `email`, and/or `phone`. Role and `isActive` cannot be changed via this endpoint (see `PUT .../deactivate` below).
 
-**Request:** `{ "fullName": "...", "email": "..." }`
+**Request:** `{ "fullName": "...", "email": "...", "phone": "..." }`
 
 **Response 200:** Updated `User` | **404** | **409** email conflict.
 
+### PUT /api/v1/users/{id}/deactivate — Phase 012
+
+Soft-deletes a therapist who has left the clinic. Sets `isActive=false`. Does not cascade to
+appointments/treatments/notes (they remain valid and queryable, orphaned). Distinct from `DELETE`
+below, which is a true hard-delete.
+
+**Response 200:** Updated `User` (`isActive: false`). | **404** | **422** target is not a
+`Therapist`, or is already inactive.
+
 ### DELETE /api/v1/users/{id}
 
-Cannot delete self.
+Cannot delete self. True hard-delete — blocked if the user has any `Appointment`/`Treatment`/`Note`
+history (use `PUT .../deactivate` instead for a departed therapist with real history).
 
-**Response 204** | **400** if self-delete attempted | **404**.
+**Response 204** | **400** if self-delete attempted | **404** | **409** (Phase 012) FK-restrict — existing appointment/treatment/note history references this user.
 
 ---
 
@@ -457,18 +471,20 @@ Returns a customer's appointments, ordered by `startTime` ascending.
 
 Validates, in order: `endTime > startTime`; `startTime` not in the past; `customerId` /
 `treatmentTypeId` / `userId` exist; `userId` resolves to a `Therapist`-role user; then a full
-availability check (working hours cover the slot / no unavailable-date entry / therapist has
-capability for the treatment type / no overlapping `Scheduled`/`Completed` appointment for that
-therapist). Double-booking is prevented by locking the therapist's `User` row
-(`SELECT ... FOR UPDATE`) before the overlap check + insert (ADR-011-A) — not by locking
-`Appointment` rows, which would not block a concurrent phantom insert.
+availability check — target therapist is active (Phase 012) / working hours cover the slot / no
+unavailable-date entry / therapist has capability for the treatment type / no overlapping
+`Scheduled`/`Completed` appointment for that therapist. Double-booking is prevented by locking the
+therapist's `User` row (`SELECT ... FOR UPDATE`) before the overlap check + insert (ADR-011-A) —
+not by locking `Appointment` rows, which would not block a concurrent phantom insert. Schedule
+edits (working hours/capabilities/unavailable dates) do not take this same lock and do not
+retroactively re-validate existing appointments (accepted risk).
 
 **Known gap (CR-032):** the customer must hold an active `TreatmentSeries` for `treatmentTypeId`
 (see Domain Model → Appointments). This is currently enforced only by the client
 (`BookAppointmentModal.tsx`) and not by this endpoint — a direct API call can create an
 appointment for a customer with no active package.
 
-**Response 201:** Created `AppointmentDto`. | **404** customer/treatmentType/therapist not found. | **422** validation failure (bad time range, past start time, `userId` not a Therapist). | **409** availability conflict, with a Hebrew reason.
+**Response 201:** Created `AppointmentDto`. | **404** customer/treatmentType/therapist not found. | **422** validation failure (bad time range, past start time, `userId` not a Therapist, or — Phase 012 — target therapist is deactivated, Hebrew reason "המטפלת המבוקשת לא פעילה"). | **409** availability conflict (working hours / unavailable date / capability / overlap), with a Hebrew reason.
 
 ### PUT /api/v1/appointments/{id}
 
@@ -481,7 +497,7 @@ and the appointment being moved is excluded from its own overlap check.
 
 **Request:** same shape as POST, without `treatmentTypeId` (immutable after creation).
 
-**Response 200:** Updated `AppointmentDto`. | **403** | **404** appointment/therapist not found. | **409** appointment not `Scheduled` / already in the past / availability conflict. | **422** validation failure.
+**Response 200:** Updated `AppointmentDto`. | **403** | **404** appointment/therapist not found. | **409** appointment not `Scheduled` / already in the past / availability conflict. | **422** validation failure (including — Phase 012 — the new `userId` being a deactivated therapist).
 
 ### DELETE /api/v1/appointments/{id}
 
@@ -490,15 +506,24 @@ delete; no soft-delete audit trail (out of scope for Phase 011).
 
 **Response 204** | **403** | **404** | **409** appointment not currently `Scheduled`.
 
-## Therapist Availability (read-only)
+## Therapist Availability and Management (Phase 011 read, Phase 012 write)
+
+### GET /api/v1/therapists
+
+Auth: JWT, any authenticated user. Returns Role=Therapist users, name+id only (no PII — unlike
+`GET /api/v1/users`). Phase 012: always active-only (no query param — booking-safety default, a
+deactivated therapist must never appear in a booking picker).
+
+**Response 200:** `[{ "id": "<uuid>", "fullName": "..." }]`
 
 ### GET /api/v1/therapists/availability
 
 Auth: JWT, any authenticated user (not Manager-restricted — the appointment calendar's therapist
 picker must be usable by Therapist-role users too). Returns all `TherapistWorkingHours` /
-`TherapistUnavailableDate` / `TherapistCapability` rows, keyed by real `User.Id`. Read-only —
-there is no write/management API for this data in Phase 011 (deferred); the rows are seed data
-only (see `DbSeeder.cs`).
+`TherapistUnavailableDate` / `TherapistCapability` rows, keyed by real `User.Id`. Optional
+`?includeInactive=true` (Phase 012, default `false`) — when false, rows belonging to a deactivated
+therapist are excluded; `true` is a Manager-oriented escape hatch (e.g. reviewing a departed
+therapist's historical schedule).
 
 **Response 200:**
 ```json
@@ -518,13 +543,30 @@ only (see `DbSeeder.cs`).
 `weekday` is `0`=Sunday..`6`=Saturday (matches both the backend `Weekday` enum's declaration order
 and the frontend's `Date.getDay()` convention — no remapping required).
 
----
+### Working Hours — `/api/v1/therapists/{userId}/working-hours` (Phase 012)
 
-## Planned Endpoints (Phase 12+)
+GET: both roles. POST/PUT/DELETE: Manager only. All writes require `userId` to resolve to an
+existing, active `Therapist`-role user (**422** otherwise).
 
-| Resource              | Planned |
-| ---------------------- | ------- |
-| Treatment Photos       | Upload + list |
-| Working Hours mgmt API | Per-therapist create/update (currently seed-only, read exposed via `GET /api/v1/therapists/availability`) |
-| Unavailable Dates mgmt API | Per-therapist create/update (currently seed-only) |
-| Therapist Capability mgmt API | Per-therapist create/update (currently seed-only) |
+- `GET .../working-hours` → `TherapistWorkingHoursDto[]`.
+- `POST .../working-hours` — `{ "weekday": 0-6, "startTime": "HH:mm"|null, "endTime": "HH:mm"|null }`. Both null = day off. Creates a new row; **409** if one already exists for that weekday (use PUT).
+- `PUT .../working-hours/{weekday}` — same body without `weekday`. Upserts (creates if none exists yet for that weekday, replaces otherwise).
+- `DELETE .../working-hours/{weekday}` — **404** if no row exists for that weekday.
+
+Validation: one-null-one-set is **422**; both non-null requires valid `HH:mm` format and `startTime < endTime` (**422** otherwise).
+
+### Capabilities — `/api/v1/therapists/{userId}/capabilities` (Phase 012)
+
+GET: both roles. POST/DELETE: Manager only. Same active-therapist-target requirement as Working Hours.
+
+- `GET .../capabilities` → `TherapistCapabilityDto[]`.
+- `POST .../capabilities` — `{ "treatmentTypeId": "<uuid>" }`. **404** if the treatment type doesn't exist. **409** if the therapist already has this capability.
+- `DELETE .../capabilities/{treatmentTypeId}` — **404** if not found.
+
+### Unavailable Dates — `/api/v1/therapists/{userId}/unavailable-dates` (Phase 012)
+
+GET: both roles. POST/DELETE: Manager only. Same active-therapist-target requirement as Working Hours.
+
+- `GET .../unavailable-dates` → `TherapistUnavailableDateDto[]`.
+- `POST .../unavailable-dates` — `{ "date": "YYYY-MM-DD" }`. **409** if the date is already marked unavailable for this therapist. Persisted as `Kind=Utc`, date-only (RC-3) — matching `AvailabilityService`'s query convention; this is what makes the date actually block new bookings.
+- `DELETE .../unavailable-dates/{date}` — `{date}` is `yyyy-MM-dd`. **422** invalid format. **404** if not found.

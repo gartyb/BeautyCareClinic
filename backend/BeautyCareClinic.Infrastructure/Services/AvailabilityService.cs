@@ -28,6 +28,16 @@ public class AvailabilityService : IAvailabilityService
         DateTime endTime,
         Guid? excludeAppointmentId = null)
     {
+        // Step 0 (Phase 012, Decision 6/RC-4's booking-side counterpart) — the target therapist
+        // must be active. Checked here (not inline in the controller) per Phase 012 architecture
+        // review RC-2: AvailabilityService stays the only service touched, extended with this one
+        // check. IsValidationFailure=true so the controller throws a 422 DomainValidationException
+        // (matching the pre-existing Role check's status class) rather than a 409
+        // DomainConflictException like the scheduling-conflict checks below.
+        var therapistUser = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
+        if (therapistUser != null && !therapistUser.IsActive)
+            return new AvailabilityCheckResult(false, "המטפלת המבוקשת לא פעילה", IsValidationFailure: true);
+
         // Step 1 — working hours. .NET's DateTime.DayOfWeek is Sunday=0..Saturday=6, the same
         // ordering as both the Weekday enum and the frontend's Date.getDay() — no remapping needed.
         var weekday = (Weekday)(int)startTime.DayOfWeek;

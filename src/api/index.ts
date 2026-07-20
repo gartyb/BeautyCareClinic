@@ -12,9 +12,12 @@ export type { CreateNoteRequest, UpdateNoteRequest } from './notesApi';
 export { appointmentsApi } from './appointmentsApi';
 export type { CreateAppointmentRequest, UpdateAppointmentRequest } from './appointmentsApi';
 export { therapistAvailabilityApi } from './therapistAvailabilityApi';
-export type {
-  TherapistAvailabilityResponse,
-  TherapistWorkingHoursApiDto,
-  TherapistUnavailableDateApiDto,
-  TherapistCapabilityApiDto,
-} from './therapistAvailabilityApi';
+export type { TherapistAvailabilityResponse } from './therapistAvailabilityApi';
+export { therapistWorkingHoursApi } from './therapistWorkingHoursApi';
+export type { TherapistWorkingHoursApiDto, UpsertWorkingHoursApiRequest } from './therapistWorkingHoursApi';
+export { therapistCapabilityApi } from './therapistCapabilityApi';
+export type { TherapistCapabilityApiDto } from './therapistCapabilityApi';
+export { therapistUnavailableDatesApi } from './therapistUnavailableDatesApi';
+export type { TherapistUnavailableDateApiDto } from './therapistUnavailableDatesApi';
+export { getUsers, getUser, createUser, updateUser, deactivateUser, deleteUser } from './usersApi';
+export type { UserApiDto, CreateUserApiRequest, UpdateUserApiRequest } from './usersApi';

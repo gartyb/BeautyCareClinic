@@ -8,17 +8,19 @@ interface Props {
   onClose: () => void;
 }
 
-const EMPTY = { fullName: '', email: '', phone: '' };
+const EMPTY = { fullName: '', email: '', phone: '', password: '' };
 
 export function TherapistModal({ open, onClose }: Props) {
   const { createTherapist } = useTherapists();
   const [form, setForm] = useState(EMPTY);
   const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (open) {
       setForm(EMPTY);
       setError(null);
+      setIsSaving(false);
     }
   }, [open]);
 
@@ -29,15 +31,20 @@ export function TherapistModal({ open, onClose }: Props) {
 
   const isValid = form.fullName.trim().length > 0 &&
     form.email.trim().length > 0 &&
-    form.phone.trim().length > 0;
+    form.phone.trim().length > 0 &&
+    form.password.trim().length > 0;
 
-  function handleSave() {
-    if (!isValid) return;
+  async function handleSave() {
+    if (!isValid || isSaving) return;
+    setIsSaving(true);
+    setError(null);
     try {
-      createTherapist(form.fullName, form.email, form.phone);
+      await createTherapist(form.fullName, form.email, form.phone, form.password);
       onClose();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'שגיאה לא צפויה');
+    } finally {
+      setIsSaving(false);
     }
   }
 
@@ -92,20 +99,35 @@ export function TherapistModal({ open, onClose }: Props) {
             />
           </div>
         </div>
+        <div>
+          <label className="block text-sm font-medium text-clinic-text mb-1">
+            סיסמה <span className="text-red-400">*</span>
+          </label>
+          <input
+            type="password"
+            value={form.password}
+            onChange={e => set('password', e.target.value)}
+            placeholder="לפחות 8 תווים, אות גדולה, אות קטנה, ספרה ותו מיוחד"
+            className="border border-clinic-border rounded-lg px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-clinic-gold"
+            dir="ltr"
+            autoComplete="new-password"
+          />
+        </div>
       </div>
       <div className="mt-6 flex justify-end gap-3">
         <button
           onClick={onClose}
-          className="px-4 py-2 text-sm text-clinic-muted hover:text-clinic-text"
+          disabled={isSaving}
+          className="px-4 py-2 text-sm text-clinic-muted hover:text-clinic-text disabled:opacity-40"
         >
           ביטול
         </button>
         <button
           onClick={handleSave}
-          disabled={!isValid}
+          disabled={!isValid || isSaving}
           className="px-5 py-2 text-sm rounded-lg bg-clinic-gold text-white font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90"
         >
-          הוסף מטפלת
+          {isSaving ? 'שומר...' : 'הוסף מטפלת'}
         </button>
       </div>
     </Modal>

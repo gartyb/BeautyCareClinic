@@ -53,6 +53,13 @@ public class AppDbContext : IdentityDbContext<AppUser, IdentityRole<Guid>, Guid>
             .HasIndex(u => u.Email)
             .IsUnique();
 
+        // Phase 012 — IsActive default true; explicit DB default so the migration's ALTER TABLE
+        // backfills existing rows to true (no index — Users is too small to benefit, per
+        // architecture review).
+        modelBuilder.Entity<User>()
+            .Property(u => u.IsActive)
+            .HasDefaultValue(true);
+
         // User → Appointments (Restrict delete)
         modelBuilder.Entity<User>()
             .HasMany(u => u.Appointments)

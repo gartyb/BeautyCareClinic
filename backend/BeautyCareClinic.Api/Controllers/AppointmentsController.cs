@@ -76,6 +76,11 @@ public class AppointmentsController : ControllerBase
     /// POST /api/v1/customers/{customerId}/appointments — Both roles.
     /// Uses SELECT FOR UPDATE row-level lock on the target therapist's User row as a
     /// serialization mutex before the overlap check + insert (ADR-011-A).
+    /// Phase 012 note on ADR-011-A's scope: schedule edits (working hours / capabilities /
+    /// unavailable dates, via TherapistAvailabilityController) intentionally do not take this same
+    /// User-row lock and do not retroactively validate existing appointments; narrowing a
+    /// therapist's availability can leave already-booked appointments outside the new constraints —
+    /// same accepted-risk class as Phase 011's Decision 1 (orphaned appointments on deactivation).
     /// </summary>
     [HttpPost("api/v1/customers/{customerId:guid}/appointments")]
     public async Task<IActionResult> Create(Guid customerId, [FromBody] CreateAppointmentRequest request)
@@ -118,7 +123,9 @@ public class AppointmentsController : ControllerBase
                 request.UserId, request.TreatmentTypeId, startTimeUtc, endTimeUtc);
 
             if (!availability.IsAvailable)
-                throw new DomainConflictException(availability.Reason!);
+                throw availability.IsValidationFailure
+                    ? new DomainValidationException(availability.Reason!)
+                    : new DomainConflictException(availability.Reason!);
 
             appointment = new Appointment
             {
@@ -224,7 +231,9 @@ public class AppointmentsController : ControllerBase
                 newUserId, appointment.TreatmentTypeId, newStartUtc, newEndUtc, excludeAppointmentId: appointment.Id);
 
             if (!availability.IsAvailable)
-                throw new DomainConflictException(availability.Reason!);
+                throw availability.IsValidationFailure
+                    ? new DomainValidationException(availability.Reason!)
+                    : new DomainConflictException(availability.Reason!);
 
             appointment.UserId = newUserId;
             appointment.StartTime = newStartUtc;

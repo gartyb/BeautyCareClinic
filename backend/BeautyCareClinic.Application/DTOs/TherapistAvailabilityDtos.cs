@@ -27,3 +27,23 @@ public record TherapistAvailabilityResponse(
 /// exactly that.
 /// </summary>
 public record TherapistSummaryDto(Guid Id, string FullName);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 012 — write DTOs for the three therapist-schedule management resources
+// (working hours / capabilities / unavailable dates), added under
+// /api/v1/therapists/{userId}/... per architecture review RC-1. GET stays both-roles;
+// POST/PUT/DELETE are Manager-only (enforced per-action in TherapistAvailabilityController).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// <summary>POST body for working-hours. Both null = day off. Weekday is 0=Sunday..6=Saturday.</summary>
+public record CreateWorkingHoursRequest(int Weekday, string? StartTime, string? EndTime);
+
+/// <summary>PUT body for working-hours — weekday comes from the route, not the body. Upserts
+/// (creates the row if none exists yet for that weekday, replaces it otherwise).</summary>
+public record UpdateWorkingHoursRequest(string? StartTime, string? EndTime);
+
+/// <summary>POST body for a capability grant.</summary>
+public record CreateCapabilityRequest(Guid TreatmentTypeId);
+
+/// <summary>POST body for an unavailable-date entry.</summary>
+public record CreateUnavailableDateRequest(DateOnly Date);

@@ -2,6 +2,7 @@ using BeautyCareClinic.Application.DTOs;
 using BeautyCareClinic.Application.Interfaces;
 using BeautyCareClinic.Domain.Entities;
 using BeautyCareClinic.Domain.Enums;
+using BeautyCareClinic.Domain.Exceptions;
 using BeautyCareClinic.Infrastructure.Data;
 using BeautyCareClinic.Infrastructure.Identity;
 using Microsoft.AspNetCore.Authorization;
@@ -32,16 +33,20 @@ public class UsersController : ControllerBase
         _currentUserService = currentUserService;
     }
 
-    /// <summary>GET /api/v1/users?role= — Manager only.</summary>
+    /// <summary>GET /api/v1/users?role=&amp;includeInactive= — Manager only. `includeInactive`
+    /// (default false) — when false, excludes deactivated (IsActive=false) users.</summary>
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] string? role)
+    public async Task<IActionResult> GetAll([FromQuery] string? role, [FromQuery] bool includeInactive = false)
     {
         UserRole? roleFilter = null;
         if (!string.IsNullOrWhiteSpace(role) && Enum.TryParse<UserRole>(role, ignoreCase: true, out var parsed))
             roleFilter = parsed;
 
         var users = await _userRepository.GetAllAsync(roleFilter);
-        return Ok(users.Select(u => new UserDto(u.Id, u.FullName, u.Email, u.Role.ToString(), u.Phone)));
+        if (!includeInactive)
+            users = users.Where(u => u.IsActive);
+
+        return Ok(users.Select(u => new UserDto(u.Id, u.FullName, u.Email, u.Role.ToString(), u.Phone, u.IsActive)));
     }
 
     /// <summary>GET /api/v1/users/{id} — Manager only.</summary>
@@ -52,7 +57,7 @@ public class UsersController : ControllerBase
         if (user == null)
             return NotFound(new ErrorResponse(ErrorCodes.NotFound, "The requested resource was not found.", DateTime.UtcNow, HttpContext.TraceIdentifier));
 
-        return Ok(new UserDto(user.Id, user.FullName, user.Email, user.Role.ToString(), user.Phone));
+        return Ok(new UserDto(user.Id, user.FullName, user.Email, user.Role.ToString(), user.Phone, user.IsActive));
     }
 
     /// <summary>
@@ -116,7 +121,7 @@ public class UsersController : ControllerBase
             await transaction.CommitAsync();
 
             return CreatedAtAction(nameof(GetById), new { id = created.Id },
-                new UserDto(created.Id, created.FullName, created.Email, created.Role.ToString(), created.Phone));
+                new UserDto(created.Id, created.FullName, created.Email, created.Role.ToString(), created.Phone, created.IsActive));
         }
         catch
         {
@@ -186,7 +191,7 @@ public class UsersController : ControllerBase
             }
 
             await transaction.CommitAsync();
-            return Ok(new UserDto(updated.Id, updated.FullName, updated.Email, updated.Role.ToString(), updated.Phone));
+            return Ok(new UserDto(updated.Id, updated.FullName, updated.Email, updated.Role.ToString(), updated.Phone, updated.IsActive));
         }
         catch
         {
@@ -196,8 +201,37 @@ public class UsersController : ControllerBase
     }
 
     /// <summary>
+    /// PUT /api/v1/users/{id}/deactivate — Manager only.
+    /// Phase 012 (Decision 5) — soft-delete for a therapist who left the clinic. Sets
+    /// IsActive=false; does not cascade to appointments/treatments/notes (they remain valid,
+    /// orphaned per Decision 1). Distinct from DELETE, which is a true hard-delete blocked by
+    /// existing history (see Delete below).
+    /// </summary>
+    [HttpPut("{id:guid}/deactivate")]
+    public async Task<IActionResult> Deactivate(Guid id)
+    {
+        var existing = await _userRepository.GetByIdAsync(id);
+        if (existing == null)
+            return NotFound(new ErrorResponse(ErrorCodes.NotFound, "The requested resource was not found.", DateTime.UtcNow, HttpContext.TraceIdentifier));
+
+        if (existing.Role != UserRole.Therapist)
+            throw new DomainValidationException("ניתן לבטל פעילות עבור מטפלות בלבד");
+
+        if (!existing.IsActive)
+            throw new DomainValidationException("המשתמשת כבר אינה פעילה");
+
+        existing.IsActive = false;
+        var updated = await _userRepository.UpdateAsync(existing);
+
+        return Ok(new UserDto(updated.Id, updated.FullName, updated.Email, updated.Role.ToString(), updated.Phone, updated.IsActive));
+    }
+
+    /// <summary>
     /// DELETE /api/v1/users/{id} — Manager only.
-    /// A manager cannot delete their own account.
+    /// A manager cannot delete their own account. True hard-delete (Decision 5) — distinct from
+    /// PUT .../deactivate — blocked by FK-restrict if the user has any appointment/treatment/note
+    /// history; checked explicitly here (rather than letting a raw DbUpdateException propagate) so
+    /// the client sees a clean Hebrew 409, not a 500.
     /// </summary>
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id)
@@ -213,6 +247,10 @@ public class UsersController : ControllerBase
         var existing = await _userRepository.GetByIdAsync(id);
         if (existing == null)
             return NotFound(new ErrorResponse(ErrorCodes.NotFound, "The requested resource was not found.", DateTime.UtcNow, HttpContext.TraceIdentifier));
+
+        var hasRelated = await _userRepository.HasRelatedDataAsync(id);
+        if (hasRelated)
+            throw new DomainConflictException("לא ניתן למחוק — קיימים תורים, טיפולים או הערות המשויכים למשתמשת זו. ניתן לבטל את פעילותה במקום זאת.");
 
         await using var transaction = await _dbContext.Database.BeginTransactionAsync();
         try

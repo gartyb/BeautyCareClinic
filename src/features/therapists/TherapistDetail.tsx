@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronRight, Trash2, Plus } from 'lucide-react';
+import { ChevronRight, Trash2, Plus, UserX } from 'lucide-react';
 import { DomainError } from '../../domain/errors';
 import { useTherapists } from '../../contexts/TherapistsContext';
 import { useTreatmentTypes } from '../../contexts/TreatmentTypesContext';
@@ -26,7 +26,7 @@ function buildDefaultDayRows(userId: string, hours: TherapistWorkingHours[]): Da
         weekday,
         startTime: existing.startTime ?? '',
         endTime: existing.endTime ?? '',
-        isDayOff: existing.startTime === null && existing.endTime === null,
+        isDayOff: !existing.startTime && !existing.endTime,
       };
     }
     return { weekday, startTime: '', endTime: '', isDayOff: true };
@@ -40,38 +40,63 @@ export function TherapistDetail() {
     workingHours,
     unavailableDates,
     capabilities,
+    isLoading: therapistDataLoading,
     saveTherapistWorkingHours,
     addTherapistUnavailableDate,
     removeTherapistUnavailableDate,
-    saveTherapistCapabilities,
+    addTherapistCapability,
+    removeTherapistCapability,
   } = useTherapistData();
 
   const { treatmentTypes } = useTreatmentTypes();
-  const { therapists, updateTherapist } = useTherapists();
+  const { therapists, updateTherapist, deactivateTherapist } = useTherapists();
   const therapist = therapists.find(u => u.id === userId);
+  const isReadOnly = therapist ? therapist.isActive === false : false;
 
   const [dayRows, setDayRows] = useState<DayRow[]>([]);
   const [newDate, setNewDate] = useState('');
   const [hoursSuccess, setHoursSuccess] = useState(false);
   const [hoursError, setHoursError] = useState<string | null>(null);
+  const [hoursSaving, setHoursSaving] = useState(false);
   const [capsSuccess, setCapsSuccess] = useState(false);
+  const [capsError, setCapsError] = useState<string | null>(null);
+  const [savingCapabilityId, setSavingCapabilityId] = useState<string | null>(null);
   const [contactPhone, setContactPhone] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [contactError, setContactError] = useState<string | null>(null);
   const [contactSuccess, setContactSuccess] = useState(false);
+  const [contactSaving, setContactSaving] = useState(false);
+  const [dateError, setDateError] = useState<string | null>(null);
+  const [dateSaving, setDateSaving] = useState(false);
+  const [removingDate, setRemovingDate] = useState<string | null>(null);
+  const [deactivating, setDeactivating] = useState(false);
+  const [confirmingDeactivate, setConfirmingDeactivate] = useState(false);
+  const [deactivateError, setDeactivateError] = useState<string | null>(null);
   const hoursSuccessTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const capsSuccessTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const contactSuccessTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const seededForUserIdRef = useRef<string | null>(null);
 
-  // Seed dayRows and contact fields once per therapist navigation.
+  // Seed dayRows and contact fields once per therapist navigation. `therapist` (from
+  // TherapistsContext, GET /api/v1/users?role=Therapist) and `workingHours` (from the
+  // completely separate TherapistDataContext, GET /api/v1/therapists/availability) are fetched
+  // independently and asynchronously, so either one can resolve first. We must not seed until
+  // BOTH have settled: seeding as soon as `therapist` is truthy — while `workingHours` is still
+  // its initial `[]` because TherapistDataContext's fetch hasn't finished — would lock in an
+  // all-day-off dayRows snapshot via `seededForUserIdRef`, and the real data arriving moments
+  // later would never re-seed. `therapistDataLoading` (TherapistDataContext's `isLoading`)
+  // tracks whether that fetch has settled, so we gate the seed on it as well as on `therapist`.
+  // `seededForUserIdRef` still ensures we only seed once per userId, so a later background
+  // refetch (e.g. triggered by saving one section) doesn't clobber unsaved edits elsewhere.
   useEffect(() => {
-    if (userId && therapist) {
+    if (userId && therapist && !therapistDataLoading && seededForUserIdRef.current !== userId) {
       setDayRows(buildDefaultDayRows(userId, workingHours));
       setContactPhone(therapist.phone ?? '');
       setContactEmail(therapist.email);
       setContactError(null);
+      seededForUserIdRef.current = userId;
     }
-  }, [userId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [userId, therapist, workingHours, therapistDataLoading]);
 
   // Clean up success timers on unmount to prevent setState on unmounted component.
   useEffect(() => {
@@ -90,15 +115,18 @@ export function TherapistDetail() {
     );
   }
 
-  function handleSaveContact() {
+  async function handleSaveContact() {
     setContactError(null);
+    setContactSaving(true);
     try {
-      updateTherapist(userId!, contactPhone, contactEmail);
+      await updateTherapist(userId!, contactPhone, contactEmail);
       setContactSuccess(true);
       if (contactSuccessTimer.current) clearTimeout(contactSuccessTimer.current);
       contactSuccessTimer.current = setTimeout(() => setContactSuccess(false), 2000);
     } catch (e) {
-      setContactError(e instanceof DomainError ? e.message : 'שגיאה לא צפויה');
+      setContactError(e instanceof Error ? e.message : 'שגיאה לא צפויה');
+    } finally {
+      setContactSaving(false);
     }
   }
 
@@ -108,36 +136,56 @@ export function TherapistDetail() {
     );
   }
 
-  function handleSaveHours() {
+  async function handleSaveHours() {
     setHoursError(null);
     const hoursInput = dayRows.map(r => ({
       weekday: r.weekday,
       startTime: r.isDayOff ? null : (r.startTime || null),
       endTime: r.isDayOff ? null : (r.endTime || null),
     }));
+    setHoursSaving(true);
     try {
-      const updated = updateTherapistWorkingHours(userId!, hoursInput, workingHours);
-      saveTherapistWorkingHours(userId!, updated.filter(h => h.userId === userId));
+      // Client-side pre-validation (fail fast, no round trip) — same rules the backend enforces.
+      const validated = updateTherapistWorkingHours(userId!, hoursInput, workingHours);
+      await saveTherapistWorkingHours(userId!, validated.filter(h => h.userId === userId));
       setHoursSuccess(true);
       if (hoursSuccessTimer.current) clearTimeout(hoursSuccessTimer.current);
       hoursSuccessTimer.current = setTimeout(() => setHoursSuccess(false), 2000);
     } catch (e) {
-      if (e instanceof DomainError) {
+      if (e instanceof DomainError || e instanceof Error) {
         setHoursError(e.message);
       } else {
         setHoursError('שגיאה לא צפויה');
       }
+    } finally {
+      setHoursSaving(false);
     }
   }
 
-  function handleAddDate() {
+  async function handleAddDate() {
     if (!newDate) return;
-    addTherapistUnavailableDate({ id: '', userId: userId!, date: newDate });
-    setNewDate('');
+    setDateError(null);
+    setDateSaving(true);
+    try {
+      await addTherapistUnavailableDate({ id: '', userId: userId!, date: newDate });
+      setNewDate('');
+    } catch (e) {
+      setDateError(e instanceof Error ? e.message : 'שגיאה לא צפויה');
+    } finally {
+      setDateSaving(false);
+    }
   }
 
-  function handleRemoveDate(date: string) {
-    removeTherapistUnavailableDate(userId!, date);
+  async function handleRemoveDate(date: string) {
+    setDateError(null);
+    setRemovingDate(date);
+    try {
+      await removeTherapistUnavailableDate(userId!, date);
+    } catch (e) {
+      setDateError(e instanceof Error ? e.message : 'שגיאה לא צפויה');
+    } finally {
+      setRemovingDate(null);
+    }
   }
 
   const userDates = unavailableDates.filter(d => d.userId === userId).sort((a, b) => a.date.localeCompare(b.date));
@@ -146,15 +194,36 @@ export function TherapistDetail() {
     .filter(c => c.userId === userId)
     .map(c => c.treatmentTypeId);
 
-  function toggleCapability(ttId: string) {
-    const next = userCapabilityIds.includes(ttId)
-      ? userCapabilityIds.filter(id => id !== ttId)
-      : [...userCapabilityIds, ttId];
-    const updatedCaps = next.map(treatmentTypeId => ({ id: '', userId: userId!, treatmentTypeId }));
-    saveTherapistCapabilities(userId!, updatedCaps);
-    setCapsSuccess(true);
-    if (capsSuccessTimer.current) clearTimeout(capsSuccessTimer.current);
-    capsSuccessTimer.current = setTimeout(() => setCapsSuccess(false), 2000);
+  async function toggleCapability(ttId: string) {
+    setCapsError(null);
+    setSavingCapabilityId(ttId);
+    try {
+      if (userCapabilityIds.includes(ttId)) {
+        await removeTherapistCapability(userId!, ttId);
+      } else {
+        await addTherapistCapability(userId!, ttId);
+      }
+      setCapsSuccess(true);
+      if (capsSuccessTimer.current) clearTimeout(capsSuccessTimer.current);
+      capsSuccessTimer.current = setTimeout(() => setCapsSuccess(false), 2000);
+    } catch (e) {
+      setCapsError(e instanceof Error ? e.message : 'שגיאה לא צפויה');
+    } finally {
+      setSavingCapabilityId(null);
+    }
+  }
+
+  async function handleConfirmDeactivate() {
+    setDeactivateError(null);
+    setDeactivating(true);
+    try {
+      await deactivateTherapist(userId!);
+      setConfirmingDeactivate(false);
+    } catch (e) {
+      setDeactivateError(e instanceof Error ? e.message : 'שגיאה לא צפויה');
+    } finally {
+      setDeactivating(false);
+    }
   }
 
   return (
@@ -171,10 +240,51 @@ export function TherapistDetail() {
           <h1 className="text-2xl font-bold text-clinic-text">
             {therapist.fullName}
           </h1>
+          {therapist.isActive === false && (
+            <span className="text-xs font-medium bg-red-100 text-red-600 rounded-full px-3 py-1">
+              לא פעילה
+            </span>
+          )}
           {therapist.phone && (
             <span className="text-sm text-clinic-muted" dir="ltr">{formatPhone(therapist.phone)}</span>
           )}
+          <div className="flex-1" />
+          {therapist.isActive !== false && (
+            <button
+              onClick={() => setConfirmingDeactivate(true)}
+              className="flex items-center gap-1.5 text-sm text-red-500 hover:text-red-600 border border-red-200 hover:bg-red-50 rounded-lg px-3 py-1.5"
+            >
+              <UserX size={16} />
+              בטל פעילות
+            </button>
+          )}
         </div>
+
+        {confirmingDeactivate && (
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-4 space-y-3" dir="rtl">
+            <p className="text-sm text-clinic-text">
+              לבטל את פעילותה של <strong>{therapist.fullName}</strong>? היא תוסר ממסך קביעת התורים,
+              אך התורים, הטיפולים וההערות ההיסטוריים שלה יישארו זמינים כרגיל.
+            </p>
+            {deactivateError && <p className="text-sm text-red-600">{deactivateError}</p>}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleConfirmDeactivate}
+                disabled={deactivating}
+                className="px-4 py-2 text-sm rounded-lg bg-red-500 text-white hover:bg-red-600 disabled:opacity-40"
+              >
+                {deactivating ? 'מבטל...' : 'בטל פעילות'}
+              </button>
+              <button
+                onClick={() => { setConfirmingDeactivate(false); setDeactivateError(null); }}
+                disabled={deactivating}
+                className="px-4 py-2 text-sm text-clinic-muted hover:text-clinic-text disabled:opacity-40"
+              >
+                ביטול
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Contact Info */}
         <div className="bg-white rounded-2xl shadow-sm p-6">
@@ -191,7 +301,8 @@ export function TherapistDetail() {
                 onChange={e => { setContactPhone(parsePhone(e.target.value)); setContactError(null); }}
                 maxLength={10}
                 inputMode="numeric"
-                className="border border-clinic-border rounded-lg px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-clinic-gold"
+                disabled={isReadOnly}
+                className="border border-clinic-border rounded-lg px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-clinic-gold disabled:opacity-40 disabled:cursor-not-allowed"
                 dir="ltr"
               />
             </div>
@@ -202,7 +313,8 @@ export function TherapistDetail() {
                 value={contactEmail}
                 onChange={e => { setContactEmail(e.target.value); setContactError(null); }}
                 maxLength={100}
-                className="border border-clinic-border rounded-lg px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-clinic-gold"
+                disabled={isReadOnly}
+                className="border border-clinic-border rounded-lg px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-clinic-gold disabled:opacity-40 disabled:cursor-not-allowed"
                 dir="ltr"
               />
             </div>
@@ -210,9 +322,10 @@ export function TherapistDetail() {
           <div className="mt-4 flex items-center gap-3">
             <button
               onClick={handleSaveContact}
-              className="bg-clinic-gold text-white hover:opacity-90 rounded-lg px-4 py-2 text-sm font-medium"
+              disabled={isReadOnly || contactSaving}
+              className="bg-clinic-gold text-white hover:opacity-90 rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              שמור פרטי קשר
+              {contactSaving ? 'שומר...' : 'שמור פרטי קשר'}
             </button>
             {contactSuccess && <span className="text-sm text-green-600">נשמר בהצלחה</span>}
           </div>
@@ -238,7 +351,7 @@ export function TherapistDetail() {
                     <input
                       type="time"
                       value={row.startTime}
-                      disabled={row.isDayOff}
+                      disabled={row.isDayOff || isReadOnly}
                       onChange={e => updateDayRow(row.weekday, 'startTime', e.target.value)}
                       className="border border-clinic-border rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-clinic-gold disabled:opacity-40 disabled:cursor-not-allowed"
                     />
@@ -247,7 +360,7 @@ export function TherapistDetail() {
                     <input
                       type="time"
                       value={row.endTime}
-                      disabled={row.isDayOff}
+                      disabled={row.isDayOff || isReadOnly}
                       onChange={e => updateDayRow(row.weekday, 'endTime', e.target.value)}
                       className="border border-clinic-border rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-clinic-gold disabled:opacity-40 disabled:cursor-not-allowed"
                     />
@@ -256,8 +369,9 @@ export function TherapistDetail() {
                     <input
                       type="checkbox"
                       checked={row.isDayOff}
+                      disabled={isReadOnly}
                       onChange={e => updateDayRow(row.weekday, 'isDayOff', e.target.checked)}
-                      className="w-4 h-4 accent-clinic-gold"
+                      className="w-4 h-4 accent-clinic-gold disabled:opacity-40"
                     />
                   </td>
                 </tr>
@@ -267,9 +381,10 @@ export function TherapistDetail() {
           <div className="mt-4 flex items-center gap-3">
             <button
               onClick={handleSaveHours}
-              className="bg-clinic-gold text-white hover:opacity-90 rounded-lg px-4 py-2 text-sm font-medium"
+              disabled={isReadOnly || hoursSaving}
+              className="bg-clinic-gold text-white hover:opacity-90 rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              שמור שעות עבודה
+              {hoursSaving ? 'שומר...' : 'שמור שעות עבודה'}
             </button>
             {hoursSuccess && (
               <span className="text-sm text-green-600">נשמר בהצלחה</span>
@@ -283,21 +398,25 @@ export function TherapistDetail() {
         {/* Unavailable Dates */}
         <div className="bg-white rounded-2xl shadow-sm p-6">
           <h2 className="text-lg font-semibold text-clinic-text mb-4">תאריכים לא זמינים</h2>
+          {dateError && (
+            <div className="text-sm text-red-500 bg-red-50 rounded-lg px-3 py-2 mb-4">{dateError}</div>
+          )}
           <div className="flex items-center gap-3 mb-4">
             <input
               type="date"
               value={newDate}
               onChange={e => setNewDate(e.target.value)}
-              className="border border-clinic-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-clinic-gold"
+              disabled={isReadOnly}
+              className="border border-clinic-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-clinic-gold disabled:opacity-40 disabled:cursor-not-allowed"
               dir="ltr"
             />
             <button
               onClick={handleAddDate}
-              disabled={!newDate}
+              disabled={!newDate || isReadOnly || dateSaving}
               className="flex items-center gap-1 bg-clinic-gold text-white hover:opacity-90 rounded-lg px-3 py-2 text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Plus size={16} />
-              הוסף
+              {dateSaving ? 'מוסיף...' : 'הוסף'}
             </button>
           </div>
           {userDates.length === 0 ? (
@@ -305,11 +424,12 @@ export function TherapistDetail() {
           ) : (
             <ul className="space-y-2">
               {userDates.map(d => (
-                <li key={d.id} className="flex items-center justify-between border-b border-clinic-border pb-2">
+                <li key={d.id || d.date} className="flex items-center justify-between border-b border-clinic-border pb-2">
                   <span className="text-clinic-text text-sm" dir="ltr">{d.date}</span>
                   <button
                     onClick={() => handleRemoveDate(d.date)}
-                    className="text-clinic-muted hover:text-red-500 p-1"
+                    disabled={isReadOnly || removingDate === d.date}
+                    className="text-clinic-muted hover:text-red-500 p-1 disabled:opacity-40 disabled:cursor-not-allowed"
                     title="הסר"
                   >
                     <Trash2 size={16} />
@@ -323,14 +443,18 @@ export function TherapistDetail() {
         {/* Capabilities */}
         <div className="bg-white rounded-2xl shadow-sm p-6">
           <h2 className="text-lg font-semibold text-clinic-text mb-4">יכולות טיפול</h2>
+          {capsError && (
+            <div className="text-sm text-red-500 bg-red-50 rounded-lg px-3 py-2 mb-4">{capsError}</div>
+          )}
           <div className="space-y-3">
             {treatmentTypes.map(tt => (
               <label key={tt.id} className="flex items-center gap-3 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={userCapabilityIds.includes(tt.id)}
+                  disabled={isReadOnly || savingCapabilityId === tt.id}
                   onChange={() => toggleCapability(tt.id)}
-                  className="w-4 h-4 accent-clinic-gold"
+                  className="w-4 h-4 accent-clinic-gold disabled:opacity-40"
                 />
                 <span className="text-clinic-text text-sm">{tt.name}</span>
               </label>
