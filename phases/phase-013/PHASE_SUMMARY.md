@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved — Pending Commit
+Completed
 
 ## Architecture Review
 
@@ -257,8 +257,8 @@ Approved — Pending Commit
 ## Version
 
 - Version: v0.14.0
-- Commit: _(ייקבע)_
-- Tag: _(ייקבע)_
+- Commit: `25bfa88`
+- Tag: `v0.14.0`
 
 ## Lessons Learned
 
