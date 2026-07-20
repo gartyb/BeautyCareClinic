@@ -4,7 +4,7 @@
 
 - Current phase: 013 — Nginx Reverse Proxy + HTTPS Access
 - Phase status: Completed
-- Current branch: feature/phase-013-nginx-https-access
+- Current branch: main (merged from feature/phase-013-nginx-https-access, fast-forward)
 - Latest approved version: v0.14.0
 - Latest approved tag: v0.14.0
 
@@ -126,11 +126,10 @@ context-ים א-סינכרוניים נפרדים):
 
 ## Next Step
 
-Phase 013 (Nginx Reverse Proxy + HTTPS Access) **הושלמה במלואה** — commit (`25bfa88`) ו-tag
-(`v0.14.0`) בוצעו על ענף `feature/phase-013-nginx-https-access`. האפליקציה נגישה כעת דרך
-`https://169-58-26-157.sslip.io` בלבד (dev servers הישנים חסומים חיצונית). טרם בוצע push
-ל-origin ו/או merge ל-main — ממתין להנחיית המשתמשת. ראה `phases/phase-013/PHASE_SUMMARY.md`
-לפירוט מלא.
+Phase 013 (Nginx Reverse Proxy + HTTPS Access) **הושלמה במלואה** — commit (`25bfa88`,
+`04bd99c`) ו-tag (`v0.14.0`) בוצעו, מוזג ל-`main` (fast-forward, `04bd99c`) ונדחף ל-`origin`
+(branch + tag). האפליקציה נגישה כעת דרך `https://169-58-26-157.sslip.io` בלבד (dev servers
+הישנים חסומים חיצונית). ראה `phases/phase-013/PHASE_SUMMARY.md` לפירוט מלא.
 
 הפאזה הבאה טרם הוצעה — ממתין לבקשת המשתמשת (`Propose the next phase`). מועמדים טבעיים
 מתוך ה-CRs הפתוחים: CR-013/CR-014 (production CORS + HTTPS hardening בקוד עצמו, חופפים
