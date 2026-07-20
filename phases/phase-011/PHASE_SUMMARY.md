@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved — Pending Commit
+Completed
 
 ## Architecture Review
 
@@ -231,9 +231,9 @@ Completed in the earlier same-day pass referenced above (per `PROGRESS.txt`); no
 
 ## Version
 
-- Version: v0.12.0 (proposed — new backward-compatible feature, Minor per project versioning guidelines)
-- Commit: pending
-- Tag: pending
+- Version: v0.12.0 (new backward-compatible feature, Minor per project versioning guidelines)
+- Commit: 7a7da37ab09d121440ba34c042bad6a08852d7cd
+- Tag: v0.12.0
 
 ## Lessons Learned
 

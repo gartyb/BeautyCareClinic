@@ -3,10 +3,10 @@
 ## Current State
 
 - Current phase: 011 — Appointments Backend Integration
-- Phase status: Approved — Pending Commit
-- Current branch: feature/phase-011-appointments-backend
-- Latest approved version: v0.11.0
-- Latest approved tag: v0.11.0
+- Phase status: Completed
+- Current branch: main
+- Latest approved version: v0.12.0
+- Latest approved tag: v0.12.0
 
 ## Current Activity
 
@@ -68,6 +68,7 @@ seed data אמיתי ל-TherapistWorkingHours/Capability), code review ו-securi
 | 008   | Frontend-Backend Integration             | v0.8.0  | Completed |
 | 009   | Orders, Series & Payments                | v0.9.0  | Completed |
 | 010   | Treatment Recording & Notes              | v0.10.0 | Completed |
+| 011   | Appointments Backend Integration         | v0.12.0 | Completed |
 
 ## Open Change Requests
 
@@ -99,5 +100,5 @@ seed data אמיתי ל-TherapistWorkingHours/Capability), code review ו-securi
 
 ## Next Step
 
-Phase 011 מאושרת ע"י המשתמשת, ממתינה ל-commit + tag + merge ל-main. לאחר מכן — הצעת הפאזה
-הבאה.
+Phase 011 הושלמה: commit + tag (v0.12.0) + merge ל-main + push ל-origin/main בוצעו. ממתינה
+להצעת הפאזה הבאה.
