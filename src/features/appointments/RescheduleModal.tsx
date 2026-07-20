@@ -4,9 +4,9 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 import { Appointment } from '../../types/Appointment';
 import { useAppointments } from '../../contexts/AppointmentsContext';
-import { useTherapists } from '../../contexts/TherapistsContext';
 import { useTherapistData } from '../../contexts/TherapistDataContext';
-import { getAvailableTherapists, getAvailableSlots } from './appointmentService';
+import { getAvailableTherapists, getAvailableSlots, computeEndTime, getDurationMinutes } from './appointmentService';
+import { ApiRequestError } from '../../api/apiError';
 import { Toast } from '../../components/shared/Toast';
 
 interface RescheduleModalProps {
@@ -24,8 +24,14 @@ const STEPS = 3;
 
 export function RescheduleModal({ appointment, onClose }: RescheduleModalProps) {
   const { appointments, rescheduleAppointment } = useAppointments();
-  const { therapists } = useTherapists();
-  const { workingHours, unavailableDates, capabilities } = useTherapistData();
+  const {
+    therapists,
+    isLoading: therapistsLoading,
+    error: therapistsError,
+    workingHours,
+    unavailableDates,
+    capabilities,
+  } = useTherapistData();
 
   const [step, setStep] = useState(0);
   const [selectedDate, setSelectedDate] = useState('');
@@ -33,6 +39,7 @@ export function RescheduleModal({ appointment, onClose }: RescheduleModalProps) 
   const [selectedSlot, setSelectedSlot] = useState('');
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const open = Boolean(appointment);
 
@@ -40,16 +47,17 @@ export function RescheduleModal({ appointment, onClose }: RescheduleModalProps) 
     if (open) {
       setStep(0);
       setSelectedDate('');
-      setSelectedTherapistId(appointment?.therapistId ?? '');
+      setSelectedTherapistId(appointment?.userId ?? '');
       setSelectedSlot('');
       setError(null);
+      setSaving(false);
     }
-  }, [open, appointment?.id, appointment?.therapistId]);
+  }, [open, appointment?.id, appointment?.userId]);
 
   useEffect(() => {
-    setSelectedTherapistId(appointment?.therapistId ?? '');
+    setSelectedTherapistId(appointment?.userId ?? '');
     setSelectedSlot('');
-  }, [selectedDate, appointment?.therapistId]);
+  }, [selectedDate, appointment?.userId]);
 
   useEffect(() => {
     setSelectedSlot('');
@@ -72,11 +80,13 @@ export function RescheduleModal({ appointment, onClose }: RescheduleModalProps) 
       )
     : [];
 
+  const durationMinutes = getDurationMinutes(appointment);
+
   const availableSlots = selectedDate && selectedTherapistId
     ? getAvailableSlots(
         selectedDate,
         selectedTherapistId,
-        appointment.durationMinutes,
+        durationMinutes,
         workingHours,
         unavailableDates,
         capabilities,
@@ -91,14 +101,23 @@ export function RescheduleModal({ appointment, onClose }: RescheduleModalProps) 
     return Boolean(selectedSlot);
   }
 
-  function handleSave() {
-    if (!canProceed()) return;
+  async function handleSave() {
+    if (!canProceed() || saving || !appointment) return;
+    setSaving(true);
+    setError(null);
     try {
-      rescheduleAppointment(appointment!.id, `${selectedDate}T${selectedSlot}:00`, selectedTherapistId);
+      const startTime = `${selectedDate}T${selectedSlot}:00`;
+      const endTime = computeEndTime(startTime, durationMinutes);
+      await rescheduleAppointment(appointment.id, selectedTherapistId, startTime, endTime);
       setToast('התור עודכן בהצלחה');
       setTimeout(() => { setToast(null); onClose(); }, 1500);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'שגיאה לא צפויה');
+      const msg = e instanceof ApiRequestError
+        ? e.error.message
+        : e instanceof Error ? e.message : 'שגיאה לא צפויה';
+      setError(msg);
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -126,7 +145,11 @@ export function RescheduleModal({ appointment, onClose }: RescheduleModalProps) 
             <label className="block text-sm font-medium text-clinic-text">
               מטפלת <span className="text-red-400">*</span>
             </label>
-            {availableTherapists.length === 0 ? (
+            {therapistsLoading ? (
+              <p className="text-sm text-clinic-muted py-4 text-center">טוען רשימת מטפלות...</p>
+            ) : therapistsError ? (
+              <p className="text-sm text-red-500 py-4 text-center">{therapistsError}</p>
+            ) : availableTherapists.length === 0 ? (
               <p className="text-sm text-clinic-muted py-4 text-center">אין מטפלות זמינות לתאריך זה</p>
             ) : (
               <div className="space-y-2">
@@ -219,7 +242,7 @@ export function RescheduleModal({ appointment, onClose }: RescheduleModalProps) 
             <div className="mt-6 flex justify-between items-center">
               <button
                 onClick={() => setStep(s => s - 1)}
-                disabled={step === 0}
+                disabled={step === 0 || saving}
                 className="flex items-center gap-1 px-4 py-2 text-sm text-clinic-muted hover:text-clinic-text disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 <ChevronRight size={16} />
@@ -238,10 +261,10 @@ export function RescheduleModal({ appointment, onClose }: RescheduleModalProps) 
               ) : (
                 <button
                   onClick={handleSave}
-                  disabled={!canProceed()}
+                  disabled={!canProceed() || saving}
                   className="px-5 py-2 text-sm rounded-lg bg-clinic-gold text-white font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90"
                 >
-                  שמור
+                  {saving ? 'שומר...' : 'שמור'}
                 </button>
               )}
             </div>

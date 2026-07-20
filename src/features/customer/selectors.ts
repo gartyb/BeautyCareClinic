@@ -3,6 +3,7 @@ import { TreatmentSeries } from '../../types/TreatmentSeries';
 import { Appointment } from '../../types/Appointment';
 import { Payment } from '../../types/Payment';
 import { toCents } from '../../domain/money';
+import { localNow } from '../appointments/appointmentService';
 
 // Sum of remainingBalance across open orders (remainingBalance > 0)
 export function outstandingBalance(orders: CustomerOrder[]): number {
@@ -31,19 +32,25 @@ export function completedTreatmentsForSeries(series: TreatmentSeries): number {
 
 // Most recent past appointment
 export function previousAppointment(appointments: Appointment[]): Appointment | null {
-  const now = new Date().toISOString();
+  // Appointment.startTime is a naive Israel-local ISO string (no `Z` suffix — Phase 011
+  // storage convention). Comparing it against `new Date().toISOString()` (UTC-suffixed) is a
+  // timezone mismatch that misclassifies appointments during the Israel/UTC offset window every
+  // day (same bug class as FU-019). Use the naive-local "now" instead, matching
+  // appointmentService.ts's `localNow()` (the frontend counterpart to the backend's
+  // `GetIsraelLocalNow()`).
+  const now = localNow();
   const past = appointments
-    .filter(a => a.appointmentDateTime < now && a.status === 'Completed')
-    .sort((a, b) => b.appointmentDateTime.localeCompare(a.appointmentDateTime));
+    .filter(a => a.startTime < now && a.status === 'Completed')
+    .sort((a, b) => b.startTime.localeCompare(a.startTime));
   return past[0] ?? null;
 }
 
 // Earliest future scheduled appointment
 export function nextAppointment(appointments: Appointment[]): Appointment | null {
-  const now = new Date().toISOString();
+  const now = localNow();
   const future = appointments
-    .filter(a => a.appointmentDateTime >= now && a.status === 'Scheduled')
-    .sort((a, b) => a.appointmentDateTime.localeCompare(b.appointmentDateTime));
+    .filter(a => a.startTime >= now && a.status === 'Scheduled')
+    .sort((a, b) => a.startTime.localeCompare(b.startTime));
   return future[0] ?? null;
 }
 

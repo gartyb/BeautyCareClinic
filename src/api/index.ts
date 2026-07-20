@@ -9,3 +9,12 @@ export { treatmentsApi } from './treatmentsApi';
 export type { CreateTreatmentRequest, UpdateTreatmentRequest } from './treatmentsApi';
 export { notesApi } from './notesApi';
 export type { CreateNoteRequest, UpdateNoteRequest } from './notesApi';
+export { appointmentsApi } from './appointmentsApi';
+export type { CreateAppointmentRequest, UpdateAppointmentRequest } from './appointmentsApi';
+export { therapistAvailabilityApi } from './therapistAvailabilityApi';
+export type {
+  TherapistAvailabilityResponse,
+  TherapistWorkingHoursApiDto,
+  TherapistUnavailableDateApiDto,
+  TherapistCapabilityApiDto,
+} from './therapistAvailabilityApi';

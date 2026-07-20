@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   outstandingBalance,
   activeSeries,
@@ -183,11 +183,13 @@ function makeAppt(id: string, dateTime: string, status: Appointment['status']): 
     id,
     customerId: 'c1',
     treatmentTypeId: 'tt-1',
-    therapistId: 'u1',
-    appointmentDateTime: dateTime,
-    durationMinutes: 60,
+    treatmentTypeName: 'טיפול',
+    userId: 'u1',
+    userFullName: 'מטפלת',
+    startTime: dateTime,
+    endTime: dateTime,
     status,
-    createdDate: '2020-01-01T00:00:00',
+    createdAt: '2020-01-01T00:00:00',
   };
 }
 
@@ -228,6 +230,36 @@ describe('previousAppointment', () => {
     const appts = [makeAppt('a1', PAST_DATE_1, 'Scheduled')];
     expect(previousAppointment(appts)).toBeNull();
   });
+
+  // ── UTC/Israel-local boundary regression (Fix 2) ──────────────────────────
+  //
+  // Appointment.startTime is a naive Israel-local ISO string (no `Z` suffix). Comparing it
+  // against `new Date().toISOString()` (UTC-suffixed) is wrong: this environment's real local
+  // timezone is Asia/Jerusalem (UTC+3 in DST), so `new Date().toISOString()` shifts the wall-clock
+  // value back ~3 hours relative to `startTime`'s convention. That means any appointment that
+  // occurred within the last ~3 hours would fail the naive `startTime < utcNowIso` check (its
+  // Israel-local hour digits are numerically LARGER than the UTC ones for the same instant) and
+  // get wrongly excluded from "previous appointment", even though it's genuinely in the past.
+  describe('near the UTC/Israel-local boundary', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('classifies an appointment from ~1.5h ago as the previous appointment (would be wrongly excluded by a raw UTC toISOString() comparison)', () => {
+      // Real "now": 2026-07-20T10:00:00 Israel-local (= 2026-07-20T07:00:00Z).
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-07-20T10:00:00+03:00'));
+
+      // Appointment 1.5h in the past, Israel-local convention (no Z suffix).
+      const appts = [makeAppt('a1', '2026-07-20T08:30:00', 'Completed')];
+
+      // Under the old bug, `new Date().toISOString()` → '2026-07-20T07:00:00.000Z', and the
+      // string comparison '2026-07-20T08:30:00' < '2026-07-20T07:00:00.000Z' is FALSE (the '08'
+      // hour digits sort after '07'), wrongly excluding this genuinely-past appointment.
+      const result = previousAppointment(appts);
+      expect(result?.id).toBe('a1');
+    });
+  });
 });
 
 describe('nextAppointment', () => {
@@ -261,6 +293,29 @@ describe('nextAppointment', () => {
   it('returns null when only future appointment is cancelled', () => {
     const appts = [makeAppt('a1', FUTURE_DATE_1, 'Cancelled')];
     expect(nextAppointment(appts)).toBeNull();
+  });
+
+  // ── UTC/Israel-local boundary regression (Fix 2) ──────────────────────────
+  describe('near the UTC/Israel-local boundary', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('does not classify an appointment from ~1.5h ago as the next appointment (would be wrongly included by a raw UTC toISOString() comparison)', () => {
+      // Real "now": 2026-07-20T10:00:00 Israel-local (= 2026-07-20T07:00:00Z).
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-07-20T10:00:00+03:00'));
+
+      // A still-"Scheduled" appointment 1.5h in the past (e.g. a no-show), Israel-local
+      // convention (no Z suffix) — genuinely in the past, must not be "next".
+      const appts = [makeAppt('a1', '2026-07-20T08:30:00', 'Scheduled')];
+
+      // Under the old bug, `new Date().toISOString()` → '2026-07-20T07:00:00.000Z', and the
+      // string comparison '2026-07-20T08:30:00' >= '2026-07-20T07:00:00.000Z' is TRUE (the '08'
+      // hour digits sort after '07'), wrongly classifying this past appointment as upcoming.
+      const result = nextAppointment(appts);
+      expect(result).toBeNull();
+    });
   });
 });
 

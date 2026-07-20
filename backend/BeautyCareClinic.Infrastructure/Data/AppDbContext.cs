@@ -81,6 +81,18 @@ public class AppDbContext : IdentityDbContext<AppUser, IdentityRole<Guid>, Guid>
             .Property(a => a.Status)
             .HasConversion<string>();
 
+        // StartTime/EndTime are naive-local (no timezone) — see doc comments on
+        // CreateAppointmentRequest/UpdateAppointmentRequest. Force "timestamp without time zone"
+        // so Npgsql doesn't fall back to its default "timestamp with time zone" mapping and
+        // misinterpret these as real UTC instants. CreatedAt stays timestamptz (genuinely UTC).
+        modelBuilder.Entity<Appointment>()
+            .Property(a => a.StartTime)
+            .HasColumnType("timestamp without time zone");
+
+        modelBuilder.Entity<Appointment>()
+            .Property(a => a.EndTime)
+            .HasColumnType("timestamp without time zone");
+
         // Composite indexes for calendar queries
         modelBuilder.Entity<Appointment>()
             .HasIndex(a => new { a.UserId, a.StartTime });
@@ -101,6 +113,12 @@ public class AppDbContext : IdentityDbContext<AppUser, IdentityRole<Guid>, Guid>
             .WithMany(t => t.Appointments)
             .HasForeignKey(a => a.TreatmentTypeId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Appointment>()
+            .Property(a => a.UserFullName)
+            .HasColumnName("user_full_name")
+            .IsRequired()
+            .HasDefaultValue(string.Empty);
 
         // -----------------------------------------------------------------------
         // TherapistWorkingHours — Weekday stored as string

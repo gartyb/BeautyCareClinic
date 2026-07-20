@@ -2,9 +2,9 @@
 
 ## Current State
 
-- Current phase: 010 — Treatment Recording & Notes
-- Phase status: Completed
-- Current branch: main
+- Current phase: 011 — Appointments Backend Integration
+- Phase status: Approved — Pending Commit
+- Current branch: feature/phase-011-appointments-backend
 - Latest approved version: v0.11.0
 - Latest approved tag: v0.11.0
 
@@ -30,7 +30,29 @@ Phase 010 הושלם ואושר (v0.10.0). מאז הוטמעו:
     (in-memory בלבד, ללא API).
 
 כל התיקונים נבדקו (ראה טבלת טסטים בהמשך), אושרו בדפדפן ע"י המשתמשת, ובוצע commit+tag יחיד
-ל-main. מוכן להצעת Phase 011 (תמונות טיפול + Appointments backend + CR-019/CR-012 וכו').
+ל-main (v0.11.0, נדחף ל-origin/main).
+
+Phase 011 הוצע ואושר ע"י המשתמשת: **Appointments Backend Integration** — חיבור מסך לוח
+השנה (שהוקם ב-Phase 006) ל-API אמיתי. עבר pm-spec, architecture review (ADR-011-A — מניעת
+double-booking ע"י נעילת שורת ה-User של המטפלת), מימוש מלא (6 endpoints + AvailabilityService +
+seed data אמיתי ל-TherapistWorkingHours/Capability), code review ו-security review — כל
+הממצאים טופלו (ראה `phases/phase-011/PHASE_SUMMARY.md`).
+
+בהמשך לכך, בבדיקה ידנית עם המשתמשת (2026-07-20) נמצאו ותוקנו שני באגים נוספים:
+- **BookAppointmentModal לא רענן חבילות פעילות בפתיחה חוזרת** — הרכיב לא מתפרק בסגירה (רק prop
+  `open` משתנה), אז רכישת חבילה חדשה תוך כדי שהמודל סגור לא השתקפה עד רענון מלא של הדף. תוקן
+  ע"י תלות ה-effect גם ב-`open`.
+- **תור שנקבע ל-12:00 הוצג ב-15:00 בלוח הזמנים** (offset של +3 שעות, UTC+3 ישראל) — הבקאנד סימן
+  `StartTime`/`EndTime` כ-`DateTimeKind.Utc` (בלי המרה אמיתית, רק תיוג שגוי) ושמר בעמודת
+  `timestamptz`, מה שגרם ל-Postgres לשמור זמן UTC אמיתי. תוקן ע"י מעבר לעמודת
+  `timestamp without time zone` + `DateTimeKind.Unspecified` בעקביות, כך שהאחסון תואם בפועל
+  את הכוונה המתועדת מראש ("naive local"). כלל עסקי נוסף נוסף באותה הזדמנות, לבקשת המשתמשת:
+  קביעת תור מוגבלת לסוגי טיפול שיש ללקוחה בהם חבילה פעילה (נאכף כרגע רק ב-Frontend — CR-032
+  לאכיפה גם בבקאנד).
+
+כל התיקונים נבדקו: 200/200 טסטים בבקאנד (כולל אינטגרציה מול Postgres אמיתי), 306/306 בפרונטאנד,
+`tsc --noEmit` נקי (מלבד FU-016 הקיים והלא-קשור). המשתמשת בדקה ואישרה בדפדפן, כולל שחזור
+התרחיש המדויק של באג ה-timezone לאחר התיקון. אושר commit + merge ל-main.
 
 ## Completed Phases
 
@@ -66,12 +88,16 @@ Phase 010 הושלם ואושר (v0.10.0). מאז הוטמעו:
 - CR-023: First-login password change (Phase 9+)
 - CR-024: GlobalSettings unique constraint (Phase 9+)
 - CR-025: Phase 008 P2/P3 code quality (Phase 9+)
+- CR-030: Batch package type lookup in CustomerOrdersController.Create
+- CR-032: Server-side enforcement of active-package booking eligibility (Phase 011)
 
 ## Known Risks or Accepted Findings
 
 - H2 (Security): JWT stored in localStorage — deferred to Phase 9+ (CR-012, refresh tokens + HttpOnly cookies)
 - M4/M5: Kestrel + Vite bound to 0.0.0.0 in dev — required for current remote-access dev setup
+- Active-package booking eligibility enforced client-side only, not by the API — deferred (CR-032)
 
 ## Next Step
 
-Phase 010 הושלם (v0.10.2 patches applied). מוכן להצעת Phase 011.
+Phase 011 מאושרת ע"י המשתמשת, ממתינה ל-commit + tag + merge ל-main. לאחר מכן — הצעת הפאזה
+הבאה.

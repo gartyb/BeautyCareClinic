@@ -44,9 +44,15 @@
 - `TreatmentSeries` does not store its own copy of the number; it is read through `TreatmentSeries.OrderItem.PackageNumber`.
 - This is the single source of truth for the "#N" package badge shown on both the Active Series tab and the Treatment History tab of the Customer Card, so the same package always shows the same number in both places.
 
-### Appointments
-- Availability = working hours ∩ no unavailable dates ∩ no existing appointments ∩ therapist capability for the treatment type.
-- A booking cannot be saved in an unavailable slot.
+### Appointments (Phase 011)
+- Eligibility: a customer may only book an appointment for a `TreatmentType` they hold an active `TreatmentSeries` for (quantity-based with remaining sessions, or timer-based with remaining minutes). A customer with no active series for a given treatment type cannot select it when booking. Enforced client-side today (`BookAppointmentModal.tsx`); server-side enforcement is tracked as CR-032.
+- Availability = working hours ∩ no unavailable dates ∩ no existing `Scheduled`/`Completed` appointment for that therapist ∩ therapist capability for the treatment type.
+- A booking cannot be saved in an unavailable slot; the check runs server-side, not just client-side.
+- Status scope for this phase: only `Scheduled` → `Cancelled` (via cancel). `Completed`/`NoShow` and any Appointment → Treatment link are deferred.
+- Create: any authenticated user. Reschedule/cancel: the appointment's assigned therapist (author) or a Manager — same author-or-Manager pattern as `Treatment`/`Note`.
+- Reschedule is blocked for every role, including Manager, if the appointment is not currently `Scheduled` or its current start time has already passed — no exception.
+- Double-booking prevention invariant (ADR-011-A): any code that inserts or moves an `Appointment` must first lock the target therapist's `User` row (`SELECT ... FOR UPDATE`) within the same transaction, as a serialization mutex — not by locking `Appointment` rows, since the conflicting row may not exist yet at lock time.
+- `TherapistWorkingHours`/`TherapistUnavailableDate`/`TherapistCapability` are seed data only as of Phase 011, keyed to real `User.Id`; exposed read-only via `GET /api/v1/therapists/availability`. No management API yet.
 
 ### Permissions
 - Managers can create and edit all data.

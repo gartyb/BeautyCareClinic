@@ -1014,3 +1014,500 @@
   Photos, NotesController.cs/PaymentsController.cs, OrdersTab.tsx, or the CR-031 packageNumber
   work, per explicit instruction.
   Not committed, per explicit instruction.
+
+- Phase 011 backend — Appointments CRUD + availability checking (frontend wiring is a separate
+  follow-up, not part of this pass). Implemented per phases/phase-011/PHASE_SUMMARY.md, including
+  both mandatory architecture-review corrections (real availability seed data, ADR-011-A User-row
+  locking instead of Appointment-row locking).
+  New: backend/BeautyCareClinic.Api/Controllers/AppointmentsController.cs (6 endpoints: GET
+  /api/v1/appointments, GET /api/v1/customers/{customerId}/appointments, GET
+  /api/v1/appointments/{id}, POST /api/v1/customers/{customerId}/appointments, PUT
+  /api/v1/appointments/{id}, DELETE /api/v1/appointments/{id} — [Authorize] class-level,
+  ICurrentUserService for identity, ErrorResponse/ErrorCodes, ToDto helper, CreatedAtAction on
+  create — matching TreatmentsController/PaymentsController/NotesController conventions exactly);
+  backend/BeautyCareClinic.Api/Controllers/TherapistAvailabilityController.cs (new, small
+  dedicated read-only GET /api/v1/therapists/availability — chosen over embedding in
+  UsersController's GET /api/v1/users?role=Therapist because that endpoint is
+  [Authorize(Policy="Manager")]-only, and Q7 requires the calendar's therapist picker/booking flow
+  to work for Therapist-role users too, not just Managers; returns WorkingHours/UnavailableDates/
+  Capabilities arrays shaped to mirror the frontend's existing TherapistWorkingHours[] /
+  TherapistUnavailableDate[] / TherapistCapability[] mock arrays 1:1, to minimize transformation
+  work for the frontend follow-up); backend/BeautyCareClinic.Application/DTOs/AppointmentDtos.cs;
+  backend/BeautyCareClinic.Application/DTOs/TherapistAvailabilityDtos.cs;
+  backend/BeautyCareClinic.Application/Interfaces/IAppointmentRepository.cs (includes UpdateAsync
+  from the start, unlike TreatmentRepository where it was added later);
+  backend/BeautyCareClinic.Application/Interfaces/IAvailabilityService.cs (Application-layer
+  interface, no EF/AppDbContext reference — mirrors the ICurrentUserService split);
+  backend/BeautyCareClinic.Infrastructure/Repositories/AppointmentRepository.cs;
+  backend/BeautyCareClinic.Infrastructure/Services/AvailabilityService.cs (implements
+  IAvailabilityService against AppDbContext — faithfully ports the frontend's isSlotAvailable()
+  from src/features/appointments/appointmentService.ts: working hours → unavailable dates →
+  capability → overlap, in that order, each with a distinct Hebrew rejection reason).
+  Modified: backend/BeautyCareClinic.Domain/Entities/Appointment.cs (added UserFullName, snapshot
+  pattern matching Treatment.PerformedByFullName/Note.WrittenByFullName/Payment.RecordedByFullName);
+  backend/BeautyCareClinic.Infrastructure/Data/AppDbContext.cs (UserFullName column config);
+  backend/BeautyCareClinic.Infrastructure/Data/DbSeeder.cs (captures the real seeded therapist
+  User.Id GUIDs — previously discarded after the seeding loop — and seeds
+  TherapistWorkingHours/TherapistCapability/TherapistUnavailableDate rows keyed to them: both
+  therapists Sun-Thu, therapist1 09:00-17:00 capable of 2 of 3 treatment types, therapist2
+  10:00-18:00 capable of all 3 — deliberately giving the availability check a real
+  capability-rejection case to exercise — plus one TherapistUnavailableDate row 14 days out so
+  that code path is exercisable too); backend/BeautyCareClinic.Api/Program.cs (DI registration for
+  IAppointmentRepository/IAvailabilityService).
+  New migration: 20260719204834_AddUserFullNameToAppointments (AddColumn "user_full_name" text,
+  default ""), generated via `dotnet ef migrations add` and applied via `dotnet ef database
+  update` against the live dev Postgres.
+  Concurrency (ADR-011-A, followed exactly, no deviation): before the overlap check + insert,
+  locks the target therapist's User row (`SELECT "Id" FROM "Users" WHERE "Id" = {0} FOR UPDATE`)
+  inside a `BeginTransactionAsync(IsolationLevel.ReadCommitted)` transaction — the same
+  SqlQueryRaw/transaction pattern as PaymentsController.Create — as a pure serialization mutex,
+  not because the User row is mutated. On reschedule with a therapist change, locks both the old
+  and new User rows in ascending-Guid.CompareTo() order before the availability check, to avoid an
+  AB/BA deadlock against a concurrent reschedule doing the reverse swap.
+  DateTime handling (item 8 of the task — explicit judgment call): every Appointment
+  StartTime/EndTime/CreatedAt write uses DateTime.SpecifyKind(..., DateTimeKind.Utc) explicitly.
+  For the past-time validation, deliberately did NOT reproduce TreatmentsController.Create's
+  existing `DateTime.UtcNow` convention for "now" — that convention only misclassifies things at
+  day granularity right at a midnight boundary (TreatmentDate has no time component), whereas
+  Appointments compare at minute granularity across the *entire* Israel UTC offset window
+  (currently +3h, DST, confirmed by direct test: TimeZoneInfo.ConvertTimeFromUtc against
+  "Asia/Jerusalem" showed 23:42 local vs 20:42 UTC at time of implementation) — reproducing the
+  Treatment convention here would have wrongly rejected/accepted every booking made within ~2-3
+  hours of the real current time, every day, which is a materially different (much larger) bug
+  than the pre-existing day-boundary edge case. Added a private GetIsraelLocalNow() helper in
+  AppointmentsController that converts DateTime.UtcNow via TimeZoneInfo to "Asia/Jerusalem" (this
+  is a pure in-memory "what time is it right now" computation, never persisted — does not
+  reintroduce timezone-aware storage or touch CR-019's deferred DateTimeOffset migration), with a
+  try/catch fallback to a fixed UTC+3 offset if the host's tzdata lacks the "Asia/Jerusalem" zone
+  (verified present in this dev environment; flagged as a residual risk on a stripped-down
+  container image in a future deploy target). Flagged, not fixed (out of scope): the pre-existing
+  TreatmentDate/PaymentDate/NoteDate day-only "today" comparisons in
+  TreatmentsController/PaymentsController/NotesController have the same root-cause issue at a much
+  smaller blast radius; left untouched. NOTE: FOLLOWUPS.md is explicitly out of scope for this
+  task per instruction ("the orchestrating session owns those") — this finding is recorded here in
+  PROGRESS.txt only; flagging for the orchestrating session to add a FU-entry if warranted.
+  Bug found and fixed during live verification (not present in any committed code before this
+  session — introduced and caught within the same pass): the first draft of
+  TherapistAvailabilityController.Get() cast `(int)wh.Weekday` *inside* an EF Core Select()
+  projection; EF translated that to a literal SQL `CAST("Weekday" AS integer)` on the physical
+  text column (TherapistWorkingHours.Weekday is stored as text via HasConversion<string>()),
+  which Postgres rejected at runtime with 22P02 ("invalid input syntax for type integer: 'Sunday'")
+  — invisible against the EF InMemory provider, only surfaced when the seeded endpoint was hit
+  against the real dev Postgres. Fixed by materializing entities first (ToListAsync()) and casting
+  in memory afterward. Added a dedicated regression test,
+  backend/BeautyCareClinic.Tests/Integration/TherapistAvailabilityControllerPostgresTests.cs, that
+  fails against the original code and passes against the fix.
+  New tests:
+  backend/BeautyCareClinic.Tests/Application/Phase011Tests.cs (20 cases, EF InMemory — AvailabilityService
+  working-hours/unavailable-date/capability/overlap logic including the exclude-appointment-id and
+  different-therapist-no-conflict edge cases, plain-boolean permission checks matching the
+  Phase010Tests.cs style, AppointmentRepository CRUD, DTO field check);
+  backend/BeautyCareClinic.Tests/Integration/AppointmentsControllerPostgresTests.cs (30 cases, real
+  Npgsql AppDbContext, controller invoked directly — create success/validation/404s/409s for each
+  of the 4 rejection reasons, GetById/ListByCustomer/ListAll, reschedule including a real
+  therapist-change with the dual-lock path, 403 for wrong user on update and delete, 404s, 409 for
+  rescheduling an already-cancelled appointment AND a since-passed appointment for every role
+  including Manager, overlap-on-reschedule, cancel success/403/404/already-cancelled-409, and the
+  concurrency test below);
+  backend/BeautyCareClinic.Tests/Integration/TherapistAvailabilityControllerPostgresTests.cs (1
+  case, the regression above).
+  Concurrency genuineness proof (same rigor as this session's prior fixes): fired 5 truly
+  concurrent Create requests (separate AppDbContext per task, Task.Run + Task.WhenAll, matching
+  CustomerOrdersControllerPostgresTests's established pattern) for the identical therapist/slot.
+  Temporarily commented out the `FOR UPDATE` lock line in AppointmentsController.Create and ran
+  the test 3x — failed all 3 times with all 5 requests succeeding (5 double-booked rows for the
+  identical slot, confirmed via direct Postgres read-back). Restored the lock and ran the test 3x
+  more — passed all 3 times (exactly 1 success, 4 rejected with DomainConflictException, exactly 1
+  row persisted for the slot).
+  Docs updated: docs/API_SPECIFICATION.md (new "## Appointments" and "## Therapist Availability
+  (read-only)" sections, replacing the "Planned Endpoints (Phase 11+)" table entries that are now
+  implemented with a renamed "Planned Endpoints (Phase 12+)" table covering only the
+  still-deferred write/management APIs for working hours/unavailable dates/capabilities);
+  docs/DATABASE_SCHEMA.md (added status/created_at/user_full_name fields to the APPOINTMENT ER
+  entry, which was previously incomplete; added Design Notes for the status scope, the
+  user_full_name snapshot pattern, the naive-local timezone convention, the ADR-011-A locking
+  invariant, and the Weekday-stored-as-text EF-cast caveat found above);
+  docs/DOMAIN_MODEL.md (expanded the "Appointments" business-rules bullet list with the Phase 011
+  permission model, status scope, and the ADR-011-A locking invariant); docs/WORKFLOWS.md (updated
+  "Booking an Appointment" to note the check now runs server-side, and added a new "Rescheduling
+  or Cancelling an Appointment" workflow section).
+  Verified:
+    - dotnet build BeautyCareClinic.sln — 0 errors, 0 warnings.
+    - dotnet test BeautyCareClinic.sln (ConnectionStrings__DefaultConnection + Development) —
+      200/200 passing (149 baseline + 20 Phase011Tests + 30 AppointmentsControllerPostgresTests +
+      1 TherapistAvailabilityControllerPostgresTests).
+    - Live-verified against the running dev backend (restarted on :5000 after the build, real
+      Postgres; manually seeded working-hours/capabilities for the pre-existing dev-DB therapist
+      accounts via a throwaway Npgsql script since the dev DB's Users table was already non-empty
+      from prior sessions, so DbSeeder's idempotency check skipped seeding on restart): real HTTP
+      calls confirmed create 201, overlap → 409 CONFLICT, past-start-time → 422 VALIDATION_FAILED,
+      no-capability → 409 CONFLICT, nonexistent customer → 404 NOT_FOUND, reschedule (time-only)
+      200, reschedule with a real therapist change (dual-lock path) 200 with the new
+      userId/userFullName in the response, nonexistent appointment → 404, wrong-user update/delete
+      → 403 FORBIDDEN, cancel → 204, reschedule-after-cancel → 409 CONFLICT, GetById reflecting
+      Cancelled status, ListAll returning the created appointment, and
+      GET /api/v1/therapists/availability returning real seeded data keyed to real User.Id GUIDs
+      (weekday 0 = Sunday, matching the documented convention). Deleted the scratch appointment
+      row afterward via the same throwaway script to leave the dev DB clean; left the
+      working-hours/capability seed rows in place (harmless, matches what DbSeeder would have
+      produced on a fresh DB).
+  Deferred / out of scope, per explicit instruction: all frontend files (src/api/appointmentsApi.ts,
+  src/types/Appointment.ts, src/contexts/AppointmentsContext.tsx, calendar UI components,
+  therapistId→userId rename) — separate follow-up task, not touched. The pre-existing
+  TreatmentDate/PaymentDate/NoteDate day-only "now" comparison noted above was left unfixed (out
+  of this ADR's scope); recorded in this entry rather than FOLLOWUPS.md, which is explicitly
+  out of scope to modify per instruction. No BACKLOG.md items identified beyond what the phase summary
+  already scoped out (Q4 write/management API for therapist availability data, Completed/NoShow
+  statuses, Appointment→Treatment linking, notifications/reminders — all already documented as
+  out of scope in phases/phase-011/PHASE_SUMMARY.md).
+  Not committed, per explicit instruction.
+
+2026-07-20 Phase 011 — Appointments FRONTEND wiring (branch feature/phase-011-appointments-backend)
+  Completes the frontend half of Phase 011 against the already-implemented, already-verified
+  backend (see the previous entry above). Read the actual delivered API/DTOs directly from
+  backend source and live-verified against the running dev backend (:5000, real Postgres) rather
+  than assuming from phases/phase-011/PHASE_SUMMARY.md alone.
+
+  New: src/api/appointmentsApi.ts (listAll/listByCustomer/getById/create/update/cancel, mirrors
+  treatmentsApi.ts conventions exactly), src/api/appointmentsApi.test.ts (6 unit tests, mocked
+  apiClient); src/api/therapistAvailabilityApi.ts (single GET, read-only per Q4),
+  src/api/therapistAvailabilityApi.test.ts; both exported from src/api/index.ts.
+  src/features/appointments/BookAppointmentModal.test.tsx (3 tests: booking success asserting the
+  exact startTime/endTime/userId payload, 409 Hebrew conflict message surfaced without closing the
+  modal, Save button disabled+"שומר..." while in flight); src/features/appointments/
+  RescheduleModal.test.tsx (3 tests: reschedule success preserving original duration, Hebrew error
+  surfaced, renders null for a null appointment); src/features/appointments/components/
+  CalendarGrid.test.tsx (5 tests: author/Manager see reschedule+cancel controls, a different
+  non-manager therapist does not — Phase 011's 403 rule — cancel confirm flow success + Hebrew
+  error-surfacing without dismissing the confirm dialog); src/contexts/TherapistsContext.test.tsx
+  (2 tests, real fetch mocked at the global-fetch layer via renderWithProviders — not the context
+  itself — proving the therapist list is actually sourced from GET /api/v1/users?role=Therapist
+  and not the old data/therapists.ts mock array, plus the 403/error-degradation path).
+
+  Modified: src/types/Appointment.ts (full realignment to the backend AppointmentDto: id,
+  customerId, treatmentTypeId, treatmentTypeName, userId, userFullName, startTime, endTime,
+  status, createdAt — replacing therapistId/appointmentDateTime/durationMinutes/createdDate;
+  status union kept as all 4 enum values for forward-compat even though the API only reaches
+  Scheduled/Cancelled in this phase's MVP); src/contexts/AppointmentsContext.tsx (full rewrite:
+  auth-gated fetch-on-mount from appointmentsApi.listAll — same pattern as CustomersContext/
+  TreatmentTypesContext's v0.10.1 fix, guards against firing before login and against a stale
+  in-flight fetch from a prior auth state — createAppointment/cancelAppointment/
+  rescheduleAppointment are now async, call the API, then refetch the full list;
+  updateAppointmentStatus was removed entirely — no backend equivalent exists, see AppointmentsTab
+  note below); src/contexts/TherapistsContext.tsx (read side switched to real
+  GET /api/v1/users?role=Therapist via usersApi.getUsers, same auth-gated-fetch pattern, isLoading/
+  error now real; createTherapist/updateTherapist/deleteTherapist deliberately left as local-
+  state-only mutations — pre-existing FU-008 gap, unaffected/out of scope for this pass, the
+  Manager-only management screen that calls them keeps behaving exactly as before);
+  src/contexts/TherapistDataContext.tsx (read side switched to real
+  GET /api/v1/therapists/availability via therapistAvailabilityApi.get, same auth-gated-fetch
+  pattern; write-side local mutations for the Manager-only TherapistDetail screen kept as-is per
+  Q4's deferral — no write API exists); src/features/appointments/appointmentService.ts (removed
+  buildAppointment/cancelAppointmentInList/rescheduleAppointmentInList/updateAppointmentStatusInList
+  — dead code once AppointmentsContext calls the real API instead of mutating a local array; KEPT
+  isSlotAvailable/getAvailableSlots/getAvailableTherapists as client-side UX pre-filtering per the
+  architecture review's explicit guidance — same rationale as RecordPaymentModal/TreatmentModal's
+  client-side pre-validation before calling the API — updated to the userId field name and to read
+  real startTime/endTime instead of the old appointmentDateTime+durationMinutes pair; added
+  computeEndTime() and getDurationMinutes() helpers since the backend DTO carries startTime/endTime
+  directly rather than a start+duration pair; getNextAppointment's "now" reference kept as a
+  naive-local-formatted string, NOT `new Date().toISOString()`, to avoid the FU-019 class of bug —
+  string-comparing a naive-local value against a UTC-suffixed one); src/features/appointments/
+  BookAppointmentModal.tsx, RescheduleModal.tsx (async handleSave with saving/error state +
+  ApiRequestError→Hebrew message per the established RecordPaymentModal/TreatmentModal convention;
+  therapist step now shows a loading/error state sourced from TherapistsContext); src/features/
+  appointments/AppointmentPopover.tsx (userId/startTime/userFullName rename; cancel is now async
+  with its own error surface; cancel button now hidden unless the current user is the appointment's
+  author or a Manager — reads appointment.userFullName directly instead of looking the therapist up
+  by id, which also sidesteps TherapistsContext's known 403-for-non-Manager gap for this display);
+  src/features/appointments/components/CalendarGrid.tsx (userId/startTime rename, duration derived
+  via getDurationMinutes, cancel is now async with an inline Hebrew error message in the confirm
+  card, reschedule+cancel action buttons on each calendar block are now hidden entirely unless
+  canManage(appt) — author or Manager — matching the backend's 403 rule; the block's info area
+  remains clickable→popover for everyone, so a non-author therapist can still see full appointment
+  detail read-only); src/features/appointments/AppointmentCalendarScreen.tsx (surfaces
+  isLoading/error from AppointmentsContext above the grid); src/features/customer/tabs/
+  AppointmentsTab.tsx (removed the Completed/NoShow status-toggle buttons entirely — the backend's
+  Phase 011 MVP scope, Q2, has no status-update endpoint and no Completed/NoShow transition at all;
+  the tab is now a read-only appointment history list showing the API-driven status as a badge;
+  added loading/error states); src/features/customer/SummaryRow.tsx, src/features/search/
+  SearchResults.tsx, src/features/customer/selectors.ts (+selectors.test.ts) — appointmentDateTime→
+  startTime field rename ripple (selectors.ts's previousAppointment/nextAppointment were not in the
+  original file list but import the Appointment type directly and would not compile otherwise —
+  in-scope as a direct consequence of the required type rename, not scope creep; its pre-existing
+  `new Date().toISOString()` "now" comparison bug, same FU-019 class, was left as-is — out of scope
+  to fix here, not introduced by this change). src/test/setup.ts (added default mock fetch handlers
+  for /appointments → [] and /therapists/availability → empty arrays, since AppointmentsProvider/
+  TherapistDataProvider now genuinely fetch on mount under renderWithProviders instead of being
+  pure in-memory mocks).
+
+  Deleted (confirmed unused first): src/data/appointments.ts (only consumer was
+  AppointmentsContext, now API-backed; SearchResults.tsx already consumed useAppointments() from
+  context, not this file, before this pass — see FU-007 note below), src/data/
+  therapistWorkingHours.ts / therapistUnavailableDates.ts / therapistCapabilities.ts (only consumer
+  was TherapistDataContext, now API-backed).
+
+  Therapist-list source for Q7 (documented reasoning): used usersApi.getUsers('Therapist') (GET
+  /api/v1/users?role=Therapist) via TherapistsContext, per the phase summary's Q7 resolution and
+  the architecture-review-documented intent. Live-verified this endpoint's exact response shape
+  against the real dev backend (id/fullName/email/role/phone, matching UserApiDto already defined
+  in src/api/usersApi.ts) rather than assuming it. Considered GET /api/v1/therapists/availability
+  instead (also real, also keyed to real User.Id) but it only returns working-hours/unavailable-
+  date/capability rows, not fullName — insufficient to render a picker. KNOWN GAP, flagged not
+  fixed (backend files off-limits this pass): UsersController is [Authorize(Policy="Manager")]-only
+  at the class level for ALL its endpoints including GET, but the Appointments calendar screen
+  itself (Sidebar.tsx — "לוח זמנים") is intentionally NOT Manager-gated (Q7's whole point). A
+  logged-in Therapist-role user hitting the calendar will get a 403 from this fetch — the picker in
+  BookAppointmentModal/RescheduleModal will show TherapistsContext's Hebrew error message instead
+  of a therapist list, and CalendarGrid's header/columns will render zero therapist columns. This
+  is a genuine backend/frontend contract mismatch (PROGRESS.txt's own prior backend-session entry
+  above states the *intent* was for non-Managers to be able to use the picker, but the
+  UsersController policy was never relaxed to match — it stayed class-level Manager-only, unlike
+  CustomersController's pattern of [Authorize] at the class level with [Authorize(Policy="Manager")]
+  only on the specific write endpoints). Recommended fix (not implemented, backend out of scope):
+  relax UsersController's GET endpoints to [Authorize], keep write endpoints Manager-only.
+
+  FU-007 (SearchResults.tsx / static data): partially pre-resolved before this pass began —
+  SearchResults.tsx already read `appointments` from useAppointments() context (confirmed by direct
+  inspection), so no change was needed there for the Appointments piece beyond the
+  appointmentDateTime→startTime field rename. Its `treatmentSeries`/`orders` static-data reads
+  (data/series.ts, data/orders.ts) are untouched — out of scope for Phase 011 (different domain
+  objects, not part of the Appointments backend integration) — left exactly as FU-007 already
+  documented them.
+
+  Client-side availability-filtering logic — kept vs. removed (see appointmentService.ts entry
+  above for the full reasoning): KEPT isSlotAvailable/getAvailableSlots/getAvailableTherapists as
+  pure UX pre-filtering (greys out/hides obviously-unavailable slots and therapists before the user
+  submits) since the algorithm itself never depended on fake IDs, only its data sources did — now
+  fed real userId GUIDs and real API data, it produces correct answers, and the backend 409 remains
+  authoritative for the actual race/conflict case. REMOVED buildAppointment/
+  cancelAppointmentInList/rescheduleAppointmentInList/updateAppointmentStatusInList — these
+  directly mutated a local mock array that no longer exists once AppointmentsContext calls the real
+  API.
+
+  Verified:
+    - npx tsc -b --noEmit — 0 new errors; only the known pre-existing FU-016
+      (RecordPaymentModal.tsx unused `currentUser`) remains, confirmed present before this pass too.
+    - npx vitest run --config vitest.config.ts — 297/297 passing across 23 files (baseline 284/284
+      across 17 files; net +13 tests: -40 removed dead-code tests in the old appointmentService.ts
+      list-mutation suite, +33 rewritten appointmentService.test.ts for the new shapes, +7 new API
+      unit tests, +2 TherapistsContext tests, +11 across BookAppointmentModal/RescheduleModal/
+      CalendarGrid component tests, +6 more test *files* than baseline's 17).
+    - Live-verified against the real running dev backend (already up on :5000/real Postgres,
+      frontend dev server already up on :5174 — neither needed a restart): logged in as
+      manager@clinic.local, confirmed GET /api/v1/therapists/availability and
+      GET /api/v1/users?role=Therapist return exactly the shapes coded into
+      therapistAvailabilityApi.ts/usersApi.ts; did a full real POST→PUT→DELETE→GET round trip
+      against a live customer/treatment-type/therapist (create 201 with the exact AppointmentDto
+      field set the frontend types expect, reschedule 200 with updated startTime/endTime, cancel
+      204, GET-by-id afterward showing status: "Cancelled") — confirms the frontend types were not
+      just assumed from the phase summary but checked against real live responses. The scratch
+      appointment created for this test was cancelled (soft-cancel, matches Phase 011's DELETE
+      semantics) rather than hard-deleted — no cleanup script needed, matches the backend's own
+      no-hard-delete design.
+    - Did not need to restart either dev server (both already running from the prior backend pass).
+
+  Deviations / points flagged instead of guessed: the UsersController Manager-only-GET gap
+  documented above under "Therapist-list source for Q7" — implemented against the real (imperfect)
+  backend contract as directed, flagged clearly rather than silently working around it or touching
+  backend files. AppointmentsTab.tsx's Completed/NoShow toggle removal is a UI behavior change
+  beyond a pure rename (removing user-facing functionality) — judged necessary since the backend
+  has zero support for it in this phase (Q2) and leaving dead buttons wired to a removed context
+  method would not compile; flagged here rather than silently deciding alone.
+  Not committed, per explicit instruction.
+
+--------------------------------------------------------------------------------
+Bugfix (branch feature/phase-011-appointments-backend): therapist picker 403 for non-Manager
+--------------------------------------------------------------------------------
+
+  Fixed the known gap flagged in the prior entry above: the Appointments booking/reschedule/
+  calendar therapist picker 403'd for a Therapist-role user because it was sourced from
+  UsersController's GET /api/v1/users?role=Therapist, which is [Authorize(Policy="Manager")] at
+  the class level for ALL actions (its UserDto carries email/phone — real PII — for every user).
+
+  Chosen fix (per explicit direction, considered and rejected relaxing UsersController wholesale):
+  did NOT touch UsersController's authorization or any of its endpoints — it stays exactly as-is,
+  Manager-only, unchanged. Instead added a small, narrowly-scoped, name+id-only endpoint following
+  the same pattern already established this phase by TherapistAvailabilityController (non-Manager-
+  gated read-only endpoint for booking-flow data).
+
+  Backend: backend/BeautyCareClinic.Api/Controllers/TherapistAvailabilityController.cs — changed
+  the class-level route from "api/v1/therapists/availability" to "api/v1/therapists" and moved the
+  existing action to [HttpGet("availability")] (external route unchanged: still
+  GET /api/v1/therapists/availability), then added a new [HttpGet] GetTherapists() action at
+  GET /api/v1/therapists returning List<TherapistSummaryDto> (Id, FullName only — no email/phone)
+  for all Role=Therapist users, ordered by FullName. Folded into this controller rather than a new
+  file since it's the same "narrow, non-Manager-gated read endpoint for the booking flow" concept,
+  and [Authorize] (no Policy) was already exactly right. New DTO: TherapistSummaryDto in
+  backend/BeautyCareClinic.Application/DTOs/TherapistAvailabilityDtos.cs.
+
+  Frontend: added therapistAvailabilityApi.getTherapists() (GET /therapists) in
+  src/api/therapistAvailabilityApi.ts. Wired it into TherapistDataContext.tsx (NOT
+  TherapistsContext.tsx) — TherapistDataContext already fetches non-Manager-gated booking data
+  (working hours/unavailable dates/capabilities) from the same availability domain, so `therapists`
+  now lives there too (fetched via Promise.all alongside the existing availability call, sharing
+  the same isLoading/error state), mapped to User-shaped objects with email:'' and role:'Therapist'
+  (neither field is read by any of the 3 consumers below). TherapistsContext.tsx itself is
+  UNCHANGED — it remains the source for the Manager-only /therapists management screen
+  (TherapistsScreen/TherapistDetail/TherapistModal), which genuinely needs full email/phone detail
+  that the narrow endpoint intentionally does not carry; that screen is Manager-gated via
+  Sidebar.tsx already, so it was never actually broken by this bug. Updated 3 consumers to read
+  `therapists`/`isLoading`/`error` from useTherapistData() instead of useTherapists(): src/features/
+  appointments/BookAppointmentModal.tsx, src/features/appointments/RescheduleModal.tsx, src/
+  features/appointments/components/CalendarGrid.tsx (dropped their useTherapists imports entirely).
+  Updated stale comments in TherapistsContext.tsx describing the now-fixed gap.
+
+  Tests added/updated:
+    - backend/BeautyCareClinic.Tests/Integration/TherapistAvailabilityControllerPostgresTests.cs:
+      new GetTherapists_AgainstRealPostgres_ReturnsOnlyTherapists_NameAndIdOnly test (seeds a
+      Manager alongside the existing Therapist fixture, asserts the new endpoint returns the
+      therapist by id+fullName and excludes the manager).
+    - backend/BeautyCareClinic.Tests/Api/AuthorizationPolicyTests.cs (new file): reflection-based
+      assertions that TherapistAvailabilityController carries [Authorize] with no Policy/Roles (not
+      Manager-gated) and that UsersController still carries [Authorize(Policy="Manager")]
+      (regression check, unaffected by this fix). This codebase's controller tests instantiate
+      controllers directly rather than through a WebApplicationFactory/JWT pipeline, so this is the
+      test-tier-appropriate way to assert the authorization policy itself; true end-to-end JWT
+      proof was done via live verification (below).
+    - src/api/therapistAvailabilityApi.test.ts: added a test for getTherapists() → GET /therapists.
+    - src/contexts/TherapistDataContext.test.tsx (new file): drives the real fetch (mocking global
+      fetch) to prove `therapists` is populated from GET /therapists, and — the actual bug being
+      fixed — that this data source still returns 200/populated even when GET /users would 403 for
+      a non-Manager caller.
+    - Updated src/contexts/TherapistsContext.test.tsx's docstring only (still valid coverage for
+      the Manager-only management-screen source; no longer describes the booking picker).
+    - Updated src/features/appointments/BookAppointmentModal.test.tsx, RescheduleModal.test.tsx,
+      components/CalendarGrid.test.tsx to mock useTherapistData() (with `therapists` included)
+      instead of the now-unused useTherapists() mock, matching the real wiring change.
+    - src/test/setup.ts: added a default mock handler for bare /therapists (empty array), ordered
+      after the existing /therapists/availability handler.
+
+  Verified:
+    - dotnet build — 0 warnings, 0 errors.
+    - dotnet test (ConnectionStrings__DefaultConnection + ASPNETCORE_ENVIRONMENT=Development) —
+      203/203 passing (baseline 200/200 confirmed via a run before starting this fix; net +3: the
+      new Postgres GetTherapists test + 2 AuthorizationPolicyTests).
+    - npx tsc -b --noEmit — 0 new errors; only the known pre-existing FU-016
+      (RecordPaymentModal.tsx unused `currentUser`) remains.
+    - npx vitest run --config vitest.config.ts — 300/300 passing across 24 files (baseline 297/297
+      across 23 files confirmed before starting; net +3: +2 in the new TherapistDataContext.test.tsx,
+      +1 in therapistAvailabilityApi.test.ts).
+    - Live-verified against the real running dev backend/Postgres: the dev `dotnet run` process was
+      restarted (it predated this fix, confirmed via a 404 against the new route before restart) —
+      logged in as therapist1@clinic.local (Role=Therapist, non-Manager) and made real HTTP calls
+      with that JWT: GET /api/v1/therapists → 200 with [{id, fullName}, ...] for all 3 seeded
+      therapists (proves the actual bug is fixed); GET /api/v1/users?role=Therapist → still 403 with
+      that same JWT (proves UsersController is genuinely untouched, not just untouched in source);
+      GET /api/v1/therapists/availability → still 200 (existing endpoint unaffected). Also checked
+      as manager@clinic.local: GET /api/v1/therapists → 200 (Managers can use it too, as intended —
+      any authenticated user); GET /api/v1/users?role=Therapist → still 200 with full email/phone
+      detail (regression check: Manager-only management screen's data source is untouched).
+    - Frontend dev server (Vite, already running) picks up the source changes live; did not need a
+      restart.
+
+  Not committed, per explicit instruction.
+
+--------------------------------------------------------------------------------
+2026-07-20 Bugfix + code-review follow-up pass (branch feature/phase-011-appointments-backend)
+--------------------------------------------------------------------------------
+
+  Six fixes in one pass: one user-reported bug (highest priority) plus five code-review findings
+  (P1/P2/P2/P3/P3) from the architect/security review of the Phase 011 Appointments backend work.
+
+  Fix 1 (user-reported, highest priority) — BookAppointmentModal couldn't select a treatment type:
+  src/features/appointments/BookAppointmentModal.tsx is only ever invoked from
+  AppointmentCalendarScreen with NO customerId prop — the user picks a customer from a step-0
+  dropdown. filteredTreatmentTypes was filtering against CustomerContext's `allSeries`, which is
+  only populated for a customer once that customer's own Customer Card page has been visited
+  (via refreshForCustomer) — never true for a customer picked from this modal's own dropdown, so
+  filteredTreatmentTypes was always empty and the modal always showed "אין חבילות פעילות ללקוחה
+  זו", blocking booking for every customer. Fixed by fetching the selected customer's active
+  series directly via treatmentSeriesApi.listActiveByCustomer(effectiveCustomerId) into new local
+  component state (customerActiveSeries/seriesLoading/seriesError), refetched on
+  effectiveCustomerId change, mapped the same way CustomerContext's own refreshForCustomer maps
+  isTimerBased → seriesKind. Dropped the useCustomer()/allSeries dependency entirely. Added
+  loading/error UI states consistent with the file's existing patterns.
+
+  Fix 2 (P1) — same timezone-comparison bug class as FU-019, found in the frontend:
+  src/features/customer/selectors.ts's previousAppointment/nextAppointment compared
+  Appointment.startTime (naive Israel-local, no `Z`) against `new Date().toISOString()` (UTC-
+  suffixed), misclassifying appointments during the Israel/UTC offset window (live-wired into
+  SearchResults.tsx's "תור הבא" column). Fixed by reusing appointmentService.ts's `localNow()`
+  helper (exported it) instead of `new Date().toISOString()`. Appended a note to FOLLOWUPS.md's
+  existing FU-019 entry (backend Treatment/Payment/Note instances remain open; this frontend
+  instance is now fixed).
+
+  Fix 3 (P3) — TherapistsContext fired a call guaranteed to 403 for Therapist-role users:
+  src/contexts/TherapistsContext.tsx fetched GET /api/v1/users?role=Therapist on every
+  authenticated mount regardless of role; UsersController is Manager-only, so every Therapist
+  login guaranteed a 403. Fixed by also gating the fetch on `currentUser.role === 'Manager'`
+  (alongside the existing currentUser-truthy auth gate).
+
+  Fix 4 (P3 + security-review, same finding) — narrow exception handling in Israel-local-time
+  fallback: backend/BeautyCareClinic.Api/Controllers/AppointmentsController.cs's
+  GetIsraelLocalNow() only caught TimeZoneNotFoundException; a corrupt/partial tzdata install
+  could throw InvalidTimeZoneException instead, bubbling up as an unhandled 500 on every
+  Create/Update. Broadened the catch to `catch (Exception ex) when (ex is
+  TimeZoneNotFoundException or InvalidTimeZoneException)`.
+
+  Fix 5 (P2) — dead-weight tests that reimplement logic instead of calling the controller:
+  deleted 5 tests from backend/BeautyCareClinic.Tests/Application/Phase011Tests.cs
+  (CreateAppointment_EndTimeNotAfterStartTime_ThrowsDomainValidationException,
+  CreateAppointment_StartTimeInPast_ThrowsDomainValidationException,
+  UpdateAppointment_AuthorMatchesCurrentUser_IsAllowed,
+  UpdateAppointment_ByManager_ForOthersAppointment_IsAllowed,
+  UpdateAppointment_WrongAuthorTherapist_Returns403) that re-implemented the controller's
+  validation/permission logic inline instead of invoking AppointmentsController — they'd pass
+  regardless of the real controller's behavior. Real coverage for the same scenarios already
+  exists in AppointmentsControllerPostgresTests.cs. Also removed the now-unused MockCurrentUser
+  helper (only used by the three deleted permission tests). Note: the task listed this as "six
+  tests" but named exactly five; found no sixth test in the file matching the "reimplements
+  controller logic" pattern, so only these five were removed — flagging this discrepancy rather
+  than deleting an unrelated, legitimate test to force the count.
+
+  Fix 6 (P3, minor) — undocumented unreachable repository methods:
+  backend/BeautyCareClinic.Infrastructure/Repositories/AppointmentRepository.cs's
+  AddAsync/DeleteAsync aren't called by AppointmentsController in production (Create uses
+  _context.Appointments.Add directly for transaction control; Cancel goes through UpdateAsync).
+  Added a one-line comment on each noting they exist for interface completeness / are exercised
+  only by unit tests.
+
+  Tests added/updated:
+    - src/features/appointments/BookAppointmentModal.test.tsx: added a CustomerContext mock with
+      an EMPTY allSeries (faithfully reproducing "context mounted, no cached data for this
+      customer" rather than priming it, which would let the old broken code pass too), a mock for
+      treatmentSeriesApi.listActiveByCustomer, and two new tests: one proving the treatment-type
+      dropdown populates from the direct fetch when no customer is pre-filled (confirmed this test
+      fails against the pre-fix code — 0 calls to the API mock, since the old code never called
+      it — and that the 3 pre-existing tests also fail pre-fix once CustomerContext no longer has
+      data primed for them), and one for the empty-series case.
+    - src/features/customer/selectors.test.ts: added a "near the UTC/Israel-local boundary"
+      describe block under each of previousAppointment/nextAppointment using
+      vi.useFakeTimers()/vi.setSystemTime to pin "now" to a specific Israel-local instant, proving
+      an appointment from ~1.5h ago is correctly classified as past/not-next. Confirmed both new
+      tests fail against the pre-fix `new Date().toISOString()` comparison (0/2 passing) while all
+      38 pre-existing tests in the file remain green.
+    - src/contexts/TherapistsContext.test.tsx: added a test asserting GET /users?role=Therapist is
+      never called for a Therapist-role current user (mocks /auth/me to return Role=Therapist).
+      Confirmed it fails against the pre-fix code.
+
+  Verified:
+    - dotnet build — 0 warnings, 0 errors.
+    - dotnet test (ConnectionStrings__DefaultConnection + ASPNETCORE_ENVIRONMENT=Development,
+      against the real running Postgres instance) — 198/198 passing (baseline 203/203, -5 from
+      Fix 5; no new backend tests added for Fix 4/6, comment-only/narrowing changes).
+    - npx tsc -b --noEmit — 1 error, the known pre-existing FU-016 (RecordPaymentModal.tsx unused
+      `currentUser`); no new errors.
+    - npx vitest run --config vitest.config.ts — 305/305 passing across 24 files (baseline
+      300/300; net +5: +2 BookAppointmentModal.test.tsx, +2 selectors.test.ts, +1
+      TherapistsContext.test.tsx).
+    - Live-verified Fix 1's data flow against the real running dev backend/Postgres: logged in as
+      manager@clinic.local, called GET /api/v1/customers/{id}/treatment-series for a customer with
+      3 real active series — confirmed the endpoint returns treatmentTypeId/isTimerBased/
+      totalTreatments/completedTreatments directly, exactly the shape BookAppointmentModal's new
+      fetch+mapping code consumes to populate the treatment-type dropdown.
+    - Did not restart the dev backend process for Fix 4/6 (backend controller/repository changes)
+      — those were verified via dotnet build/test only, not live HTTP, since the task's live-
+      verification requirement was scoped to Fix 1 specifically.
+
+  Not committed, per explicit instruction.

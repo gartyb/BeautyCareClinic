@@ -1,65 +1,106 @@
-import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Appointment } from '../types/Appointment';
-import { appointments as seedAppointments } from '../data/appointments';
-import { buildAppointment, cancelAppointmentInList, rescheduleAppointmentInList, updateAppointmentStatusInList } from '../features/appointments/appointmentService';
-import { newId } from '../domain/id';
+import { appointmentsApi } from '../api/appointmentsApi';
+import { ApiRequestError } from '../api/apiError';
+import { useAuth } from './AuthContext';
 
 interface AppointmentsContextValue {
   appointments: Appointment[];
+  isLoading: boolean;
+  error: string | null;
+  refresh: () => Promise<void>;
   createAppointment: (
     customerId: string,
     treatmentTypeId: string,
-    therapistId: string,
-    appointmentDateTime: string,
-    durationMinutes: number
-  ) => Appointment;
-  cancelAppointment: (appointmentId: string) => void;
-  rescheduleAppointment: (appointmentId: string, newDateTime: string, newTherapistId: string) => void;
-  updateAppointmentStatus: (appointmentId: string, status: Appointment['status']) => void;
+    userId: string,
+    startTime: string,
+    endTime: string
+  ) => Promise<Appointment>;
+  cancelAppointment: (appointmentId: string) => Promise<void>;
+  rescheduleAppointment: (
+    appointmentId: string,
+    userId: string,
+    startTime: string,
+    endTime: string
+  ) => Promise<Appointment>;
 }
 
 const AppointmentsContext = createContext<AppointmentsContextValue | null>(null);
 
 export function AppointmentsProvider({ children }: { children: React.ReactNode }) {
-  const [appointments, setAppointments] = useState<Appointment[]>(seedAppointments);
+  const { currentUser } = useAuth();
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchAll = useCallback(async (isCancelled?: () => boolean) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await appointmentsApi.listAll();
+      if (isCancelled?.()) return;
+      setAppointments(data);
+    } catch (e) {
+      if (isCancelled?.()) return;
+      const msg = e instanceof ApiRequestError ? e.error.message : 'שגיאה בטעינת התורים';
+      setError(msg);
+    } finally {
+      if (!isCancelled?.()) setIsLoading(false);
+    }
+  }, []);
+
+  // Load once the user is authenticated (covers both session restore and fresh login) — matches
+  // the auth-gated fetch pattern used by CustomersContext/TreatmentTypesContext (v0.10.1 fix for
+  // "data not loading after first login").
+  useEffect(() => {
+    if (!currentUser) {
+      setIsLoading(false);
+      return;
+    }
+    let cancelled = false;
+    fetchAll(() => cancelled);
+    return () => { cancelled = true; };
+  }, [currentUser, fetchAll]);
+
+  const refresh = useCallback(() => fetchAll(), [fetchAll]);
 
   const createAppointment = useCallback(
-    (
+    async (
       customerId: string,
       treatmentTypeId: string,
-      therapistId: string,
-      appointmentDateTime: string,
-      durationMinutes: number
-    ): Appointment => {
-      const appt = buildAppointment(
-        customerId,
-        treatmentTypeId,
-        therapistId,
-        appointmentDateTime,
-        durationMinutes,
-        { newId }
-      );
-      setAppointments(prev => [...prev, appt]);
+      userId: string,
+      startTime: string,
+      endTime: string
+    ): Promise<Appointment> => {
+      const appt = await appointmentsApi.create(customerId, { treatmentTypeId, userId, startTime, endTime });
+      await fetchAll();
       return appt;
     },
-    []
+    [fetchAll]
   );
 
-  const cancelAppointment = useCallback((appointmentId: string): void => {
-    setAppointments(prev => cancelAppointmentInList(prev, appointmentId));
-  }, []);
+  const cancelAppointment = useCallback(async (appointmentId: string): Promise<void> => {
+    await appointmentsApi.cancel(appointmentId);
+    await fetchAll();
+  }, [fetchAll]);
 
-  const rescheduleAppointment = useCallback((appointmentId: string, newDateTime: string, newTherapistId: string): void => {
-    setAppointments(prev => rescheduleAppointmentInList(prev, appointmentId, newDateTime, newTherapistId));
-  }, []);
-
-  const updateAppointmentStatus = useCallback((appointmentId: string, status: Appointment['status']): void => {
-    setAppointments(prev => updateAppointmentStatusInList(prev, appointmentId, status));
-  }, []);
+  const rescheduleAppointment = useCallback(
+    async (
+      appointmentId: string,
+      userId: string,
+      startTime: string,
+      endTime: string
+    ): Promise<Appointment> => {
+      const appt = await appointmentsApi.update(appointmentId, { userId, startTime, endTime });
+      await fetchAll();
+      return appt;
+    },
+    [fetchAll]
+  );
 
   const value = useMemo<AppointmentsContextValue>(
-    () => ({ appointments, createAppointment, cancelAppointment, rescheduleAppointment, updateAppointmentStatus }),
-    [appointments, createAppointment, cancelAppointment, rescheduleAppointment, updateAppointmentStatus]
+    () => ({ appointments, isLoading, error, refresh, createAppointment, cancelAppointment, rescheduleAppointment }),
+    [appointments, isLoading, error, refresh, createAppointment, cancelAppointment, rescheduleAppointment]
   );
 
   return (

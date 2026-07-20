@@ -31,7 +31,7 @@ function today(): Date {
 }
 
 export default function AppointmentCalendarScreen() {
-  const { appointments } = useAppointments();
+  const { appointments, isLoading, error } = useAppointments();
   const [selectedDate, setSelectedDate] = useState<Date>(today);
   const [showBookModal, setShowBookModal] = useState(false);
   const dateInputRef = useRef<HTMLInputElement>(null);
@@ -102,7 +102,14 @@ export default function AppointmentCalendarScreen() {
 
       {/* Calendar */}
       <div className="flex-1 overflow-auto">
-        <CalendarGrid selectedDate={selectedDate} appointments={appointments} />
+        {error && (
+          <div className="m-4 text-sm text-red-500 bg-red-50 rounded-lg px-3 py-2">{error}</div>
+        )}
+        {isLoading && appointments.length === 0 && !error ? (
+          <div className="p-8 text-center text-clinic-muted text-sm">טוען תורים...</div>
+        ) : (
+          <CalendarGrid selectedDate={selectedDate} appointments={appointments} />
+        )}
       </div>
 
       <BookAppointmentModal

@@ -1,17 +1,18 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { ChevronRight, ChevronLeft } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 import { useTreatmentTypes } from '../../contexts/TreatmentTypesContext';
-import { useTherapists } from '../../contexts/TherapistsContext';
 import { useTherapistData } from '../../contexts/TherapistDataContext';
 import { useAppointments } from '../../contexts/AppointmentsContext';
 import { useCustomers } from '../../contexts/CustomersContext';
-import { useCustomer } from '../../contexts/CustomerContext';
 import { usePackageTypes } from '../../contexts/PackageTypesContext';
 import { activeSeries } from '../customer/selectors';
-import { getAvailableTherapists, getAvailableSlots } from './appointmentService';
+import { getAvailableTherapists, getAvailableSlots, computeEndTime } from './appointmentService';
+import { treatmentSeriesApi } from '../../api/treatmentSeriesApi';
+import { ApiRequestError } from '../../api/apiError';
 import { Toast } from '../../components/shared/Toast';
+import type { TreatmentSeries, SeriesKind } from '../../types/TreatmentSeries';
 
 interface BookAppointmentModalProps {
   open: boolean;
@@ -27,11 +28,16 @@ function todayISO(): string {
 
 export function BookAppointmentModal({ open, onClose, customerId }: BookAppointmentModalProps) {
   const { treatmentTypes } = useTreatmentTypes();
-  const { therapists } = useTherapists();
-  const { workingHours, unavailableDates, capabilities } = useTherapistData();
+  const {
+    therapists,
+    isLoading: therapistsLoading,
+    error: therapistsError,
+    workingHours,
+    unavailableDates,
+    capabilities,
+  } = useTherapistData();
   const { appointments, createAppointment } = useAppointments();
   const { customers } = useCustomers();
-  const { allSeries } = useCustomer();
   const { packageTypes } = usePackageTypes();
 
   const hasPrefilledCustomer = Boolean(customerId);
@@ -51,10 +57,29 @@ export function BookAppointmentModal({ open, onClose, customerId }: BookAppointm
   const [selectedSlot, setSelectedSlot] = useState('');
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  // Bugfix: this modal is only ever reached from AppointmentCalendarScreen with no pre-filled
+  // customerId — the customer is picked from the step-0 dropdown below. CustomerContext's
+  // `allSeries` cache is only populated for whichever customer's Customer Card page has been
+  // visited (via refreshForCustomer), so it's never reliable here. Fetch the selected customer's
+  // active treatment series directly instead, the same way CustomerContext's own
+  // refreshForCustomer does internally.
+  const [customerActiveSeries, setCustomerActiveSeries] = useState<TreatmentSeries[]>([]);
+  const [seriesLoading, setSeriesLoading] = useState(false);
+  const [seriesError, setSeriesError] = useState<string | null>(null);
+
+  // Tracks whether the "reset on open" effect below just ran in this same commit (i.e. `open`
+  // flipped to true). The series-fetch effect uses this to avoid firing a wasted request for the
+  // stale, about-to-be-cleared `selectedCustomerId` on reopen in the non-prefilled entry flow —
+  // effects in the same commit still see each other's pre-update closure values, since a
+  // setState call in one effect only takes effect on the *next* render.
+  const openedThisCommitRef = useRef(false);
 
   // Reset on open
   useEffect(() => {
     if (open) {
+      openedThisCommitRef.current = true;
       setStep(0);
       setSelectedCustomerId(customerId ?? '');
       setSelectedTreatmentTypeId('');
@@ -64,6 +89,7 @@ export function BookAppointmentModal({ open, onClose, customerId }: BookAppointm
       setDurationStr('60');
       setSelectedSlot('');
       setError(null);
+      setSaving(false);
     }
   }, [open, customerId]);
 
@@ -83,6 +109,51 @@ export function BookAppointmentModal({ open, onClose, customerId }: BookAppointm
     setSelectedTreatmentTypeId('');
   }, [selectedCustomerId]);
 
+  // Fetch the selected customer's active treatment series whenever it changes.
+  useEffect(() => {
+    if (openedThisCommitRef.current) {
+      openedThisCommitRef.current = false;
+      // The reset-on-open effect above just ran in this same commit. In the non-prefilled entry
+      // flow (customer picked via the step-0 dropdown) it is about to clear `selectedCustomerId`
+      // to '' on the next render, so `effectiveCustomerId` here is still the stale, pre-reset
+      // value — skip fetching for it. This effect will re-run automatically once
+      // `effectiveCustomerId` settles to its post-reset value.
+      if (!hasPrefilledCustomer) {
+        setSeriesLoading(false);
+        return;
+      }
+    }
+    if (!open || !effectiveCustomerId) {
+      setCustomerActiveSeries([]);
+      setSeriesError(null);
+      setSeriesLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setSeriesLoading(true);
+    setSeriesError(null);
+    treatmentSeriesApi.listActiveByCustomer(effectiveCustomerId)
+      .then(apiSeries => {
+        if (cancelled) return;
+        const mapped: TreatmentSeries[] = apiSeries.map(s => ({
+          ...s,
+          customerId: effectiveCustomerId,
+          seriesKind: (s.isTimerBased ? 'timer' : 'quantity') as SeriesKind,
+        }));
+        setCustomerActiveSeries(mapped);
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return;
+        const msg = e instanceof ApiRequestError ? e.error.message : 'שגיאה בטעינת חבילות הלקוחה';
+        setSeriesError(msg);
+        setCustomerActiveSeries([]);
+      })
+      .finally(() => {
+        if (!cancelled) setSeriesLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [effectiveCustomerId, open, hasPrefilledCustomer]);
+
   // Reset downstream selections when upstream changes
   useEffect(() => {
     setSelectedTherapistId('');
@@ -95,13 +166,13 @@ export function BookAppointmentModal({ open, onClose, customerId }: BookAppointm
 
   const filteredTreatmentTypes = useMemo(() => {
     if (!effectiveCustomerId) return treatmentTypes;
-    const customerActiveSeries = activeSeries(allSeries.filter(s => s.customerId === effectiveCustomerId));
-    if (customerActiveSeries.length === 0) return [];
+    const active = activeSeries(customerActiveSeries);
+    if (active.length === 0) return [];
     const activeTypeIds = new Set(
-      customerActiveSeries.map(s => packageTypes.find(p => p.id === s.packageTypeId)?.treatmentTypeId).filter(Boolean)
+      active.map(s => s.treatmentTypeId ?? packageTypes.find(p => p.id === s.packageTypeId)?.treatmentTypeId).filter(Boolean)
     );
     return treatmentTypes.filter(tt => activeTypeIds.has(tt.id));
-  }, [effectiveCustomerId, allSeries, packageTypes, treatmentTypes]);
+  }, [effectiveCustomerId, customerActiveSeries, packageTypes, treatmentTypes]);
 
   const availableTherapists = selectedTreatmentTypeId && selectedDate
     ? getAvailableTherapists(
@@ -183,20 +254,28 @@ export function BookAppointmentModal({ open, onClose, customerId }: BookAppointm
     setStep(s => s - 1);
   }
 
-  function handleSave() {
-    if (!canProceed()) return;
+  async function handleSave() {
+    if (!canProceed() || saving) return;
+    setSaving(true);
+    setError(null);
     try {
-      const dateTime = `${selectedDate}T${selectedSlot}:00`;
+      const startTime = `${selectedDate}T${selectedSlot}:00`;
       const duration = parseInt(durationStr, 10);
+      const endTime = computeEndTime(startTime, duration);
       const custId = hasPrefilledCustomer ? customerId! : selectedCustomerId;
-      createAppointment(custId, selectedTreatmentTypeId, selectedTherapistId, dateTime, duration);
+      await createAppointment(custId, selectedTreatmentTypeId, selectedTherapistId, startTime, endTime);
       setToast('התור נקבע בהצלחה');
       setTimeout(() => {
         setToast(null);
         onClose();
       }, 1500);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'שגיאה לא צפויה');
+      const msg = e instanceof ApiRequestError
+        ? e.error.message
+        : e instanceof Error ? e.message : 'שגיאה לא צפויה';
+      setError(msg);
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -234,7 +313,11 @@ export function BookAppointmentModal({ open, onClose, customerId }: BookAppointm
             <label className="block text-sm font-medium text-clinic-text mb-1">
               סוג טיפול <span className="text-red-400">*</span>
             </label>
-            {filteredTreatmentTypes.length === 0 ? (
+            {seriesLoading ? (
+              <p className="text-sm text-clinic-muted py-4 text-center">טוען חבילות פעילות...</p>
+            ) : seriesError ? (
+              <p className="text-sm text-red-500 py-4 text-center">{seriesError}</p>
+            ) : filteredTreatmentTypes.length === 0 ? (
               <p className="text-sm text-clinic-muted py-4 text-center">אין חבילות פעילות ללקוחה זו</p>
             ) : (
               <select
@@ -275,7 +358,11 @@ export function BookAppointmentModal({ open, onClose, customerId }: BookAppointm
             <label className="block text-sm font-medium text-clinic-text mb-1">
               מטפלת <span className="text-red-400">*</span>
             </label>
-            {availableTherapists.length === 0 ? (
+            {therapistsLoading ? (
+              <p className="text-sm text-clinic-muted py-4 text-center">טוען רשימת מטפלות...</p>
+            ) : therapistsError ? (
+              <p className="text-sm text-red-500 py-4 text-center">{therapistsError}</p>
+            ) : availableTherapists.length === 0 ? (
               <p className="text-sm text-clinic-muted py-4 text-center">
                 אין מטפלות זמינות לתאריך וסוג טיפול זה
               </p>
@@ -398,7 +485,7 @@ export function BookAppointmentModal({ open, onClose, customerId }: BookAppointm
             <div className="mt-6 flex justify-between items-center">
               <button
                 onClick={handlePrev}
-                disabled={step === 0}
+                disabled={step === 0 || saving}
                 className="flex items-center gap-1 px-4 py-2 text-sm text-clinic-muted hover:text-clinic-text disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 <ChevronRight size={16} />
@@ -408,10 +495,10 @@ export function BookAppointmentModal({ open, onClose, customerId }: BookAppointm
               {isLastStep ? (
                 <button
                   onClick={handleSave}
-                  disabled={!canProceed()}
+                  disabled={!canProceed() || saving}
                   className="px-5 py-2 text-sm rounded-lg bg-clinic-gold text-white font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90"
                 >
-                  שמור
+                  {saving ? 'שומר...' : 'שמור'}
                 </button>
               ) : (
                 <button

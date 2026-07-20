@@ -129,6 +129,9 @@ erDiagram
         uuid user_id FK
         datetime start_time
         datetime end_time
+        enum status
+        datetime created_at
+        string user_full_name
     }
 
     THERAPIST_WORKING_HOURS {
@@ -182,3 +185,31 @@ erDiagram
 - `CUSTOMER_ORDER.remaining_balance` — PostgreSQL `GENERATED ALWAYS AS (discounted_price - amount_paid) STORED`. Never written from application code.
 - `PAYMENT.recorded_by_user_id` / `recorded_by_full_name` — server-derived from the authenticated JWT at payment creation. Client never supplies these values.
 - Money columns: `decimal(10,2)` throughout.
+- `APPOINTMENT.status` — `Scheduled` | `Completed` | `Cancelled` | `NoShow` at the enum level, but
+  Phase 011's API only exercises `Scheduled` → `Cancelled` (via DELETE). `Completed` / `NoShow`
+  and any Appointment → Treatment link are deferred to a future phase.
+- `APPOINTMENT.user_full_name` — snapshotted at creation/reschedule time, same pattern as
+  `TREATMENT.performed_by_full_name` / `NOTE.written_by_full_name` / `PAYMENT.recorded_by_full_name`.
+- `APPOINTMENT.start_time` / `end_time` — naive local time (Israel), no DST-aware conversion, same
+  convention as `TREATMENT.treatment_date` / `PAYMENT.payment_date` / `NOTE.note_date` (CR-019's
+  `DateTimeOffset` migration stays deferred). Column type is `timestamp without time zone`; always
+  written with `DateTimeKind.Unspecified` explicitly at the application layer.
+- `APPOINTMENT.created_at` — a genuine UTC instant (`timestamp with time zone`), set via
+  `DateTime.UtcNow` at the application layer. Unlike `start_time`/`end_time`, it is not part of the
+  naive-local convention above.
+- Double-booking prevention (ADR-011-A) locks the target therapist's `USER` row
+  (`SELECT ... FOR UPDATE`) as a mutex before the overlap check + `APPOINTMENT` insert/update —
+  not the `APPOINTMENT` rows themselves, since the conflicting row may not exist yet at lock time
+  (a naive row lock on existing rows would not block a concurrent phantom insert under READ
+  COMMITTED). A reschedule that changes therapist locks both the old and new `USER` rows in
+  ascending-GUID order to avoid deadlock. Any future code path that inserts/moves an `APPOINTMENT`
+  must take this same lock first.
+- `THERAPIST_WORKING_HOURS` / `THERAPIST_UNAVAILABLE_DATE` / `THERAPIST_CAPABILITY` are seed-data
+  only as of Phase 011 — keyed to real `USER.id` GUIDs (seeded in `DbSeeder.cs`), exposed read-only
+  via `GET /api/v1/therapists/availability`. No write/management API exists yet for these tables.
+- `THERAPIST_WORKING_HOURS.weekday` is stored as text (enum-as-string, e.g. `"Sunday"`), not an
+  integer column — declaration order is `Sunday=0 .. Saturday=6`, matching both .NET's
+  `DateTime.DayOfWeek` and the frontend's `Date.getDay()`. Caution: casting the enum to `int`
+  inside an EF Core LINQ `Select()` projection translates to a literal SQL `CAST(... AS integer)`
+  on the underlying text column and fails at runtime — materialize entities first, then cast in
+  memory (see `TherapistAvailabilityController.Get()`).

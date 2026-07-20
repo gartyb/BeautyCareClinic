@@ -77,6 +77,11 @@ public static class DbSeeder
                     (FullName: "שרה מטפלת",    Email: "therapist2@clinic.local",  Role: UserRole.Therapist, Phone: (string?)"054-2222222" ),
                 };
 
+                // Phase 011 — captured so real (not fake string) therapist User.Id GUIDs can be
+                // used to seed TherapistWorkingHours/TherapistCapability/TherapistUnavailableDate
+                // below (Architecture Review Correction #1).
+                var createdTherapistIds = new Dictionary<string, Guid>();
+
                 foreach (var u in usersToSeed)
                 {
                     var id              = Guid.NewGuid();
@@ -111,9 +116,70 @@ public static class DbSeeder
                             $"Failed to create user {u.Email}: " +
                             string.Join(", ", result.Errors.Select(e => e.Description)));
                     }
+
+                    if (u.Role == UserRole.Therapist)
+                        createdTherapistIds[normalizedEmail] = id;
                 }
 
                 await context.SaveChangesAsync();
+
+                // ---------------------------------------------------------------
+                // Phase 011 — Architecture Review Correction #1: seed real
+                // TherapistWorkingHours / TherapistCapability / TherapistUnavailableDate rows
+                // keyed to the real therapist User.Id GUIDs just created above (not the frontend
+                // mock data's fake string IDs like 'user-therapist-1'). Without this, the
+                // Appointments availability check would have nothing to validate against and no
+                // therapist would ever appear available. No write/management API is added for
+                // this data (Q4 stays deferred) — it is exposed read-only via
+                // GET /api/v1/therapists/availability.
+                // ---------------------------------------------------------------
+                if (createdTherapistIds.TryGetValue("therapist1@clinic.local", out var therapist1Id) &&
+                    createdTherapistIds.TryGetValue("therapist2@clinic.local", out var therapist2Id))
+                {
+                    var weekdays = new[]
+                    {
+                        Weekday.Sunday, Weekday.Monday, Weekday.Tuesday, Weekday.Wednesday, Weekday.Thursday
+                    };
+
+                    var workingHours = new List<TherapistWorkingHours>();
+                    foreach (var weekday in weekdays)
+                    {
+                        workingHours.Add(new TherapistWorkingHours
+                        {
+                            Id = Guid.NewGuid(), UserId = therapist1Id, Weekday = weekday,
+                            StartTime = "09:00", EndTime = "17:00"
+                        });
+                        workingHours.Add(new TherapistWorkingHours
+                        {
+                            Id = Guid.NewGuid(), UserId = therapist2Id, Weekday = weekday,
+                            StartTime = "10:00", EndTime = "18:00"
+                        });
+                    }
+                    context.TherapistWorkingHours.AddRange(workingHours);
+
+                    // therapist1 (טלי) is capable of פנים/עיסוי only; therapist2 (שרה) covers all
+                    // three including לייזר — gives the availability check a real
+                    // capability-rejection case to exercise (therapist1 booked for לייזר → 409).
+                    var capabilities = new List<TherapistCapability>
+                    {
+                        new() { Id = Guid.NewGuid(), UserId = therapist1Id, TreatmentTypeId = treatmentTypes[0].Id },
+                        new() { Id = Guid.NewGuid(), UserId = therapist1Id, TreatmentTypeId = treatmentTypes[2].Id },
+                        new() { Id = Guid.NewGuid(), UserId = therapist2Id, TreatmentTypeId = treatmentTypes[0].Id },
+                        new() { Id = Guid.NewGuid(), UserId = therapist2Id, TreatmentTypeId = treatmentTypes[1].Id },
+                        new() { Id = Guid.NewGuid(), UserId = therapist2Id, TreatmentTypeId = treatmentTypes[2].Id },
+                    };
+                    context.TherapistCapabilities.AddRange(capabilities);
+
+                    // At least one unavailable-date row so that code path is exercisable.
+                    context.TherapistUnavailableDates.Add(new TherapistUnavailableDate
+                    {
+                        Id = Guid.NewGuid(),
+                        UserId = therapist1Id,
+                        UnavailableDate = DateTime.SpecifyKind(DateTime.UtcNow.Date.AddDays(14), DateTimeKind.Utc),
+                    });
+
+                    await context.SaveChangesAsync();
+                }
             }
 
             await transaction.CommitAsync();

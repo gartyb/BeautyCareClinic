@@ -45,14 +45,29 @@
 2. Upload one or more photos.
 3. Photos appear in the customer gallery.
 
-## Booking an Appointment
+## Booking an Appointment (Phase 011 — backed by a real API)
 
 1. Customer Card → Book Appointment (or Appointment Calendar).
-2. Select treatment type.
+2. Select treatment type — only treatment types the customer holds an active package (`TreatmentSeries`) for are offered. A customer with no active series for any treatment type cannot proceed (shown as "אין חבילות פעילות ללקוחה זו"); they must purchase a package first.
 3. Option A — Select date first: system shows available therapists for that date and treatment type.
 4. Option B — Select therapist first: system shows the next 5 available dates.
-5. Select a time slot (availability = working hours ∩ no unavailable dates ∩ no existing appointments ∩ therapist capability).
-6. Save — slot is now blocked.
+5. Select a time slot (availability = working hours ∩ no unavailable dates ∩ no existing appointments ∩ therapist capability — checked server-side by `POST /api/v1/customers/{customerId}/appointments`, not just client-side).
+6. Save — slot is now blocked. Double-booking under concurrent requests for the same therapist/slot is prevented by locking the therapist's `User` row before the availability check + insert (ADR-011-A); the loser(s) receive a 409 with a Hebrew reason.
+7. Validation errors (past time, therapist not qualified, slot unavailable) surface as a Hebrew toast.
+
+## Rescheduling or Cancelling an Appointment *(author therapist or Manager)*
+
+1. Open the appointment (calendar or Customer Card) → "עדכן" (reschedule) or "בטל" (cancel).
+2. Reschedule (`PUT /api/v1/appointments/{id}`) may change date, time, and/or therapist, and re-runs
+   the full availability check against the new slot (excluding the appointment's own current slot).
+   Changing the therapist locks both the old and new therapist's `User` rows (ascending-GUID order)
+   to avoid deadlocking against a concurrent reschedule doing the reverse swap.
+3. Reschedule is blocked (409) if the appointment is not currently `Scheduled`, or if its current
+   start time has already passed — for every role, including Manager; there is no override.
+4. Cancel (`DELETE /api/v1/appointments/{id}`) transitions `Scheduled` → `Cancelled`. No hard
+   delete, no soft-delete audit trail. Blocked (409) if the appointment is not currently `Scheduled`.
+5. Both actions are hidden from the UI (and rejected 403 server-side) for a therapist who isn't the
+   appointment's author, unless they are a Manager.
 
 ## Configuring a Therapist *(Manager only)*
 

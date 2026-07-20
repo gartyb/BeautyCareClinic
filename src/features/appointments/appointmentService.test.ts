@@ -1,14 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import {
-  buildAppointment,
-  cancelAppointmentInList,
+  computeEndTime,
+  getDurationMinutes,
   getAppointmentInterval,
   isSlotAvailable,
   getAvailableSlots,
+  getAvailableTherapists,
   getNextAppointment,
 } from './appointmentService';
-import { DomainError } from '../../domain/errors';
 import { Appointment } from '../../types/Appointment';
+import { User } from '../../types/User';
 import { TherapistWorkingHours, TherapistUnavailableDate, TherapistCapability } from '../../types/Therapist';
 
 // ─── Test helpers ─────────────────────────────────────────────────────────────
@@ -18,24 +19,19 @@ function makeAppt(overrides: Partial<Appointment> = {}): Appointment {
     id: 'appt-1',
     customerId: 'cust-1',
     treatmentTypeId: 'tt-1',
-    therapistId: 'therapist-1',
-    appointmentDateTime: '2099-01-01T10:00:00',
-    durationMinutes: 60,
+    treatmentTypeName: 'טיפול פנים',
+    userId: 'therapist-1',
+    userFullName: 'מטפלת בדיקה',
+    startTime: '2099-01-01T10:00:00',
+    endTime: '2099-01-01T11:00:00',
     status: 'Scheduled',
-    createdDate: '2099-01-01T00:00:00',
+    createdAt: '2099-01-01T00:00:00',
     ...overrides,
   };
 }
 
 // 2099-01-14 is a Wednesday (weekday=3)
 const FUTURE_DATE = '2099-01-14';
-const FUTURE_DATETIME = '2099-01-14T10:00:00';
-const PAST_DATETIME = '2000-01-01T10:00:00';
-
-const testDeps = {
-  newId: () => 'test-appt-id',
-  now: () => '2026-07-15T12:00:00',
-};
 
 const baseWorkingHours: TherapistWorkingHours[] = [
   { id: 'wh-1', userId: 'therapist-1', weekday: 3, startTime: '09:00', endTime: '18:00' }, // Wednesday
@@ -47,143 +43,29 @@ const baseCapabilities: TherapistCapability[] = [
   { id: 'cap-1', userId: 'therapist-1', treatmentTypeId: 'tt-1' },
 ];
 
-// 2099-01-14 is a Wednesday (weekday=3)
+// ─── computeEndTime ─────────────────────────────────────────────────────────────
 
-// ─── buildAppointment ─────────────────────────────────────────────────────────
-
-describe('buildAppointment', () => {
-  it('creates appointment with status Scheduled for valid inputs', () => {
-    const appt = buildAppointment('cust-1', 'tt-1', 'therapist-1', FUTURE_DATETIME, 60, testDeps);
-    expect(appt.status).toBe('Scheduled');
-    expect(appt.customerId).toBe('cust-1');
-    expect(appt.treatmentTypeId).toBe('tt-1');
-    expect(appt.therapistId).toBe('therapist-1');
-    expect(appt.appointmentDateTime).toBe(FUTURE_DATETIME);
-    expect(appt.durationMinutes).toBe(60);
+describe('computeEndTime', () => {
+  it('adds minutes to a naive-local startTime and preserves the date', () => {
+    expect(computeEndTime('2026-07-20T10:00:00', 60)).toBe('2026-07-20T11:00:00');
   });
 
-  it('uses injected newId', () => {
-    const appt = buildAppointment('cust-1', 'tt-1', 'therapist-1', FUTURE_DATETIME, 60, testDeps);
-    expect(appt.id).toBe('test-appt-id');
-  });
-
-  it('uses injected now for createdDate', () => {
-    const appt = buildAppointment('cust-1', 'tt-1', 'therapist-1', FUTURE_DATETIME, 60, testDeps);
-    expect(appt.createdDate).toBe('2026-07-15T12:00:00');
-  });
-
-  it('throws INVALID_CUSTOMER for empty customerId', () => {
-    expect.assertions(2);
-    try {
-      buildAppointment('', 'tt-1', 'therapist-1', FUTURE_DATETIME, 60, testDeps);
-    } catch (e) {
-      expect(e).toBeInstanceOf(DomainError);
-      expect((e as DomainError).code).toBe('INVALID_CUSTOMER');
-    }
-  });
-
-  it('throws INVALID_TREATMENT_TYPE for empty treatmentTypeId', () => {
-    expect.assertions(2);
-    try {
-      buildAppointment('cust-1', '', 'therapist-1', FUTURE_DATETIME, 60, testDeps);
-    } catch (e) {
-      expect(e).toBeInstanceOf(DomainError);
-      expect((e as DomainError).code).toBe('INVALID_TREATMENT_TYPE');
-    }
-  });
-
-  it('throws INVALID_THERAPIST for empty therapistId', () => {
-    expect.assertions(2);
-    try {
-      buildAppointment('cust-1', 'tt-1', '', FUTURE_DATETIME, 60, testDeps);
-    } catch (e) {
-      expect(e).toBeInstanceOf(DomainError);
-      expect((e as DomainError).code).toBe('INVALID_THERAPIST');
-    }
-  });
-
-  it('throws INVALID_APPOINTMENT_DATE for past appointmentDateTime', () => {
-    expect.assertions(2);
-    try {
-      buildAppointment('cust-1', 'tt-1', 'therapist-1', PAST_DATETIME, 60, testDeps);
-    } catch (e) {
-      expect(e).toBeInstanceOf(DomainError);
-      expect((e as DomainError).code).toBe('INVALID_APPOINTMENT_DATE');
-    }
-  });
-
-  it('throws INVALID_APPOINTMENT_DATE for empty appointmentDateTime', () => {
-    expect.assertions(2);
-    try {
-      buildAppointment('cust-1', 'tt-1', 'therapist-1', '', 60, testDeps);
-    } catch (e) {
-      expect(e).toBeInstanceOf(DomainError);
-      expect((e as DomainError).code).toBe('INVALID_APPOINTMENT_DATE');
-    }
-  });
-
-  it('throws INVALID_DURATION for durationMinutes = 0', () => {
-    expect.assertions(2);
-    try {
-      buildAppointment('cust-1', 'tt-1', 'therapist-1', FUTURE_DATETIME, 0, testDeps);
-    } catch (e) {
-      expect(e).toBeInstanceOf(DomainError);
-      expect((e as DomainError).code).toBe('INVALID_DURATION');
-    }
-  });
-
-  it('throws INVALID_DURATION for durationMinutes = -1', () => {
-    expect.assertions(2);
-    try {
-      buildAppointment('cust-1', 'tt-1', 'therapist-1', FUTURE_DATETIME, -1, testDeps);
-    } catch (e) {
-      expect(e).toBeInstanceOf(DomainError);
-      expect((e as DomainError).code).toBe('INVALID_DURATION');
-    }
-  });
-
-  it('throws INVALID_DURATION for non-integer durationMinutes', () => {
-    expect.assertions(2);
-    try {
-      buildAppointment('cust-1', 'tt-1', 'therapist-1', FUTURE_DATETIME, 1.5, testDeps);
-    } catch (e) {
-      expect(e).toBeInstanceOf(DomainError);
-      expect((e as DomainError).code).toBe('INVALID_DURATION');
-    }
+  it('handles non-round-hour durations', () => {
+    expect(computeEndTime('2026-07-20T10:30:00', 45)).toBe('2026-07-20T11:15:00');
   });
 });
 
-// ─── cancelAppointmentInList ──────────────────────────────────────────────────
+// ─── getDurationMinutes ───────────────────────────────────────────────────────
 
-describe('cancelAppointmentInList', () => {
-  it('returns new array with status Cancelled for the found appointment', () => {
-    const appts = [makeAppt({ id: 'a1' }), makeAppt({ id: 'a2' })];
-    const result = cancelAppointmentInList(appts, 'a1');
-    expect(result.find(a => a.id === 'a1')?.status).toBe('Cancelled');
-    expect(result.find(a => a.id === 'a2')?.status).toBe('Scheduled');
+describe('getDurationMinutes', () => {
+  it('returns the whole-minute difference between startTime and endTime', () => {
+    const appt = makeAppt({ startTime: '2099-01-01T09:00:00', endTime: '2099-01-01T10:00:00' });
+    expect(getDurationMinutes(appt)).toBe(60);
   });
 
-  it('does not mutate original array', () => {
-    const appts = [makeAppt({ id: 'a1' })];
-    cancelAppointmentInList(appts, 'a1');
-    expect(appts[0].status).toBe('Scheduled');
-  });
-
-  it('throws APPOINTMENT_NOT_FOUND when id not in list', () => {
-    expect.assertions(2);
-    const appts = [makeAppt({ id: 'a1' })];
-    try {
-      cancelAppointmentInList(appts, 'unknown');
-    } catch (e) {
-      expect(e).toBeInstanceOf(DomainError);
-      expect((e as DomainError).code).toBe('APPOINTMENT_NOT_FOUND');
-    }
-  });
-
-  it('returns a new array reference (immutable)', () => {
-    const appts = [makeAppt({ id: 'a1' })];
-    const result = cancelAppointmentInList(appts, 'a1');
-    expect(result).not.toBe(appts);
+  it('handles a 90-minute appointment', () => {
+    const appt = makeAppt({ startTime: '2099-01-01T10:30:00', endTime: '2099-01-01T12:00:00' });
+    expect(getDurationMinutes(appt)).toBe(90);
   });
 });
 
@@ -191,20 +73,11 @@ describe('cancelAppointmentInList', () => {
 
 describe('getAppointmentInterval', () => {
   it('60-min appointment at 09:00 → end at 10:00', () => {
-    const appt = makeAppt({ appointmentDateTime: '2099-01-01T09:00:00', durationMinutes: 60 });
+    const appt = makeAppt({ startTime: '2099-01-01T09:00:00', endTime: '2099-01-01T10:00:00' });
     const { start, end } = getAppointmentInterval(appt);
     expect(start.getHours()).toBe(9);
     expect(start.getMinutes()).toBe(0);
     expect(end.getHours()).toBe(10);
-    expect(end.getMinutes()).toBe(0);
-  });
-
-  it('90-min appointment at 10:30 → end at 12:00', () => {
-    const appt = makeAppt({ appointmentDateTime: '2099-01-01T10:30:00', durationMinutes: 90 });
-    const { start, end } = getAppointmentInterval(appt);
-    expect(start.getHours()).toBe(10);
-    expect(start.getMinutes()).toBe(30);
-    expect(end.getHours()).toBe(12);
     expect(end.getMinutes()).toBe(0);
   });
 
@@ -284,9 +157,9 @@ describe('isSlotAvailable', () => {
   it('returns false when overlapping scheduled appointment exists', () => {
     const existing: Appointment[] = [
       makeAppt({
-        therapistId: 'therapist-1',
-        appointmentDateTime: '2099-01-14T09:30:00',
-        durationMinutes: 60,
+        userId: 'therapist-1',
+        startTime: '2099-01-14T09:30:00',
+        endTime: '2099-01-14T10:30:00',
         status: 'Scheduled',
       }),
     ];
@@ -301,10 +174,26 @@ describe('isSlotAvailable', () => {
   it('returns true when cancelled appointment exists in same slot (no block)', () => {
     const existing: Appointment[] = [
       makeAppt({
-        therapistId: 'therapist-1',
-        appointmentDateTime: '2099-01-14T10:00:00',
-        durationMinutes: 60,
+        userId: 'therapist-1',
+        startTime: '2099-01-14T10:00:00',
+        endTime: '2099-01-14T11:00:00',
         status: 'Cancelled',
+      }),
+    ];
+    const result = isSlotAvailable(
+      FUTURE_DATE, '10:00', 60, 'therapist-1',
+      baseWorkingHours, baseUnavailableDates, baseCapabilities, 'tt-1', existing
+    );
+    expect(result).toBe(true);
+  });
+
+  it('ignores appointments for a different therapist', () => {
+    const existing: Appointment[] = [
+      makeAppt({
+        userId: 'therapist-2',
+        startTime: '2099-01-14T10:00:00',
+        endTime: '2099-01-14T11:00:00',
+        status: 'Scheduled',
       }),
     ];
     const result = isSlotAvailable(
@@ -378,9 +267,9 @@ describe('getAvailableSlots', () => {
   it('excludes slots overlapping existing scheduled appointment', () => {
     const existing: Appointment[] = [
       makeAppt({
-        therapistId: 'therapist-1',
-        appointmentDateTime: '2099-01-14T10:00:00',
-        durationMinutes: 60,
+        userId: 'therapist-1',
+        startTime: '2099-01-14T10:00:00',
+        endTime: '2099-01-14T11:00:00',
         status: 'Scheduled',
       }),
     ];
@@ -399,9 +288,9 @@ describe('getAvailableSlots', () => {
   it('slots from cancelled appointments are not excluded', () => {
     const existing: Appointment[] = [
       makeAppt({
-        therapistId: 'therapist-1',
-        appointmentDateTime: '2099-01-14T10:00:00',
-        durationMinutes: 60,
+        userId: 'therapist-1',
+        startTime: '2099-01-14T10:00:00',
+        endTime: '2099-01-14T11:00:00',
         status: 'Cancelled',
       }),
     ];
@@ -413,13 +302,64 @@ describe('getAvailableSlots', () => {
   });
 });
 
+// ─── getAvailableTherapists ───────────────────────────────────────────────────
+
+describe('getAvailableTherapists', () => {
+  const therapist1: User = { id: 'therapist-1', fullName: 'טלי כהן', email: 't1@clinic.local', role: 'Therapist' };
+  const therapist2: User = { id: 'therapist-2', fullName: 'שרה לוי', email: 't2@clinic.local', role: 'Therapist' };
+  const manager: User = { id: 'manager-1', fullName: 'מנהלת', email: 'm@clinic.local', role: 'Manager' };
+
+  it('excludes non-Therapist users even if they have working hours/capability rows', () => {
+    const workingHours: TherapistWorkingHours[] = [
+      ...baseWorkingHours,
+      { id: 'wh-2', userId: 'manager-1', weekday: 3, startTime: '09:00', endTime: '18:00' },
+    ];
+    const capabilities: TherapistCapability[] = [
+      ...baseCapabilities,
+      { id: 'cap-2', userId: 'manager-1', treatmentTypeId: 'tt-1' },
+    ];
+    const result = getAvailableTherapists(
+      FUTURE_DATE, 'tt-1', [therapist1, manager], workingHours, baseUnavailableDates, capabilities, []
+    );
+    expect(result.map(t => t.id)).toEqual(['therapist-1']);
+    expect(result.map(t => t.id)).not.toContain('manager-1');
+  });
+
+  it('excludes a therapist with no working hours on the given weekday', () => {
+    const result = getAvailableTherapists(
+      FUTURE_DATE, 'tt-1', [therapist1, therapist2], baseWorkingHours, baseUnavailableDates, baseCapabilities, []
+    );
+    expect(result.map(t => t.id)).toEqual(['therapist-1']);
+  });
+
+  it('excludes a therapist without capability for the treatment type', () => {
+    const result = getAvailableTherapists(
+      FUTURE_DATE, 'tt-2', [therapist1], baseWorkingHours, baseUnavailableDates, baseCapabilities, []
+    );
+    expect(result).toHaveLength(0);
+  });
+
+  it('excludes a therapist fully booked for the entire working-hours window', () => {
+    // Working hours 09:00-18:00 — 3 back-to-back blocks leave no free slot of any length.
+    const existing: Appointment[] = [
+      makeAppt({ id: 'blk-1', userId: 'therapist-1', startTime: '2099-01-14T09:00:00', endTime: '2099-01-14T12:00:00', status: 'Scheduled' }),
+      makeAppt({ id: 'blk-2', userId: 'therapist-1', startTime: '2099-01-14T12:00:00', endTime: '2099-01-14T15:00:00', status: 'Scheduled' }),
+      makeAppt({ id: 'blk-3', userId: 'therapist-1', startTime: '2099-01-14T15:00:00', endTime: '2099-01-14T18:00:00', status: 'Scheduled' }),
+    ];
+    const result = getAvailableTherapists(
+      FUTURE_DATE, 'tt-1', [therapist1], baseWorkingHours, baseUnavailableDates, baseCapabilities, existing
+    );
+    expect(result).toHaveLength(0);
+  });
+});
+
 // ─── getNextAppointment ───────────────────────────────────────────────────────
 
 describe('getNextAppointment', () => {
   it('returns earliest upcoming scheduled appointment', () => {
     const appts: Appointment[] = [
-      makeAppt({ id: 'a1', customerId: 'cust-1', appointmentDateTime: '2099-03-01T10:00:00', status: 'Scheduled' }),
-      makeAppt({ id: 'a2', customerId: 'cust-1', appointmentDateTime: '2099-02-01T10:00:00', status: 'Scheduled' }),
+      makeAppt({ id: 'a1', customerId: 'cust-1', startTime: '2099-03-01T10:00:00', status: 'Scheduled' }),
+      makeAppt({ id: 'a2', customerId: 'cust-1', startTime: '2099-02-01T10:00:00', status: 'Scheduled' }),
     ];
     const result = getNextAppointment('cust-1', appts);
     expect(result?.id).toBe('a2');
@@ -427,7 +367,7 @@ describe('getNextAppointment', () => {
 
   it('returns null when no upcoming scheduled appointments', () => {
     const appts: Appointment[] = [
-      makeAppt({ id: 'a1', customerId: 'cust-1', appointmentDateTime: '2000-01-01T10:00:00', status: 'Completed' }),
+      makeAppt({ id: 'a1', customerId: 'cust-1', startTime: '2000-01-01T10:00:00', status: 'Completed' }),
     ];
     expect(getNextAppointment('cust-1', appts)).toBeNull();
   });
@@ -438,29 +378,29 @@ describe('getNextAppointment', () => {
 
   it('ignores cancelled appointments', () => {
     const appts: Appointment[] = [
-      makeAppt({ id: 'a1', customerId: 'cust-1', appointmentDateTime: '2099-02-01T10:00:00', status: 'Cancelled' }),
+      makeAppt({ id: 'a1', customerId: 'cust-1', startTime: '2099-02-01T10:00:00', status: 'Cancelled' }),
     ];
     expect(getNextAppointment('cust-1', appts)).toBeNull();
   });
 
   it('ignores past appointments', () => {
     const appts: Appointment[] = [
-      makeAppt({ id: 'a1', customerId: 'cust-1', appointmentDateTime: '2000-01-01T10:00:00', status: 'Scheduled' }),
+      makeAppt({ id: 'a1', customerId: 'cust-1', startTime: '2000-01-01T10:00:00', status: 'Scheduled' }),
     ];
     expect(getNextAppointment('cust-1', appts)).toBeNull();
   });
 
   it('ignores appointments for other customers', () => {
     const appts: Appointment[] = [
-      makeAppt({ id: 'a1', customerId: 'cust-2', appointmentDateTime: '2099-02-01T10:00:00', status: 'Scheduled' }),
+      makeAppt({ id: 'a1', customerId: 'cust-2', startTime: '2099-02-01T10:00:00', status: 'Scheduled' }),
     ];
     expect(getNextAppointment('cust-1', appts)).toBeNull();
   });
 
   it('returns appointment for specific customer only', () => {
     const appts: Appointment[] = [
-      makeAppt({ id: 'a1', customerId: 'cust-1', appointmentDateTime: '2099-02-01T10:00:00', status: 'Scheduled' }),
-      makeAppt({ id: 'a2', customerId: 'cust-2', appointmentDateTime: '2099-01-01T10:00:00', status: 'Scheduled' }),
+      makeAppt({ id: 'a1', customerId: 'cust-1', startTime: '2099-02-01T10:00:00', status: 'Scheduled' }),
+      makeAppt({ id: 'a2', customerId: 'cust-2', startTime: '2099-01-01T10:00:00', status: 'Scheduled' }),
     ];
     const result = getNextAppointment('cust-1', appts);
     expect(result?.id).toBe('a1');

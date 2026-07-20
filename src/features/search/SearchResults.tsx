@@ -99,7 +99,7 @@ export function SearchResults({ results, query }: Props) {
 
               {/* תור הבא */}
               <td className="px-4 py-3 text-center text-clinic-text">
-                {next ? formatDate(next.appointmentDateTime) : (
+                {next ? formatDate(next.startTime) : (
                   <span className="text-clinic-muted">—</span>
                 )}
               </td>

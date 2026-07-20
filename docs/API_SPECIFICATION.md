@@ -413,12 +413,118 @@ Requires author or Manager role.
 
 ---
 
-## Planned Endpoints (Phase 11+)
+## Appointments
 
-| Resource             | Planned |
-| -------------------- | ------- |
-| Treatment Photos     | Upload + list (Phase 011) |
-| Appointments         | CRUD + availability (Phase 011) |
-| Working Hours        | Per therapist (Phase 011) |
-| Unavailable Dates    | Per therapist (Phase 011) |
-| Therapist Capability | Per therapist (Phase 011) |
+Auth: JWT. Read (list/get) is available to any authenticated user. Create is available to any
+authenticated user. Update (reschedule) / Delete (cancel) require the appointment's assigned
+therapist (`userId`) or a Manager.
+
+`startTime` / `endTime` are naive local time (Israel, no DST-aware conversion — same convention as
+`TreatmentDate` / `PaymentDate` / `NoteDate`; CR-019's DateTimeOffset migration stays deferred).
+`userFullName` is snapshotted at creation/reschedule time, matching the
+`performedByFullName` / `writtenByFullName` / `recordedByFullName` pattern used elsewhere.
+
+Phase 011 MVP status scope: only `Scheduled` → `Cancelled` (via DELETE) is supported.
+`Completed` / `NoShow` and any Appointment → Treatment link are out of scope.
+
+### GET /api/v1/appointments
+
+Returns every appointment, ordered by `startTime` ascending.
+
+**Response 200:** `AppointmentDto[]`.
+
+### GET /api/v1/customers/{customerId}/appointments
+
+Returns a customer's appointments, ordered by `startTime` ascending.
+
+**Response 200:** `AppointmentDto[]` | **404** customer not found.
+
+### GET /api/v1/appointments/{id}
+
+**Response 200:** `AppointmentDto` | **404**.
+
+### POST /api/v1/customers/{customerId}/appointments
+
+**Request:**
+```json
+{
+  "treatmentTypeId": "<uuid>",
+  "userId": "<uuid — the therapist being booked>",
+  "startTime": "2026-07-26T10:00:00",
+  "endTime": "2026-07-26T11:00:00"
+}
+```
+
+Validates, in order: `endTime > startTime`; `startTime` not in the past; `customerId` /
+`treatmentTypeId` / `userId` exist; `userId` resolves to a `Therapist`-role user; then a full
+availability check (working hours cover the slot / no unavailable-date entry / therapist has
+capability for the treatment type / no overlapping `Scheduled`/`Completed` appointment for that
+therapist). Double-booking is prevented by locking the therapist's `User` row
+(`SELECT ... FOR UPDATE`) before the overlap check + insert (ADR-011-A) — not by locking
+`Appointment` rows, which would not block a concurrent phantom insert.
+
+**Known gap (CR-032):** the customer must hold an active `TreatmentSeries` for `treatmentTypeId`
+(see Domain Model → Appointments). This is currently enforced only by the client
+(`BookAppointmentModal.tsx`) and not by this endpoint — a direct API call can create an
+appointment for a customer with no active package.
+
+**Response 201:** Created `AppointmentDto`. | **404** customer/treatmentType/therapist not found. | **422** validation failure (bad time range, past start time, `userId` not a Therapist). | **409** availability conflict, with a Hebrew reason.
+
+### PUT /api/v1/appointments/{id}
+
+Reschedules `startTime` / `endTime` / `userId` (therapist). Requires the appointment's author
+(assigned therapist) or a Manager. Blocked for **every** role, including Manager, if the
+appointment is not currently `Scheduled` or its current `startTime` has already passed — there is
+no override. If the therapist changes, both the old and new therapist's `User` rows are locked in
+ascending-GUID order (to avoid deadlocking against a concurrent reschedule doing the reverse swap),
+and the appointment being moved is excluded from its own overlap check.
+
+**Request:** same shape as POST, without `treatmentTypeId` (immutable after creation).
+
+**Response 200:** Updated `AppointmentDto`. | **403** | **404** appointment/therapist not found. | **409** appointment not `Scheduled` / already in the past / availability conflict. | **422** validation failure.
+
+### DELETE /api/v1/appointments/{id}
+
+Cancels (`Scheduled` → `Cancelled`). Requires the appointment's author or a Manager. No hard
+delete; no soft-delete audit trail (out of scope for Phase 011).
+
+**Response 204** | **403** | **404** | **409** appointment not currently `Scheduled`.
+
+## Therapist Availability (read-only)
+
+### GET /api/v1/therapists/availability
+
+Auth: JWT, any authenticated user (not Manager-restricted — the appointment calendar's therapist
+picker must be usable by Therapist-role users too). Returns all `TherapistWorkingHours` /
+`TherapistUnavailableDate` / `TherapistCapability` rows, keyed by real `User.Id`. Read-only —
+there is no write/management API for this data in Phase 011 (deferred); the rows are seed data
+only (see `DbSeeder.cs`).
+
+**Response 200:**
+```json
+{
+  "workingHours": [
+    { "id": "<uuid>", "userId": "<uuid>", "weekday": 0, "startTime": "09:00", "endTime": "17:00" }
+  ],
+  "unavailableDates": [
+    { "id": "<uuid>", "userId": "<uuid>", "date": "2026-08-09" }
+  ],
+  "capabilities": [
+    { "id": "<uuid>", "userId": "<uuid>", "treatmentTypeId": "<uuid>" }
+  ]
+}
+```
+
+`weekday` is `0`=Sunday..`6`=Saturday (matches both the backend `Weekday` enum's declaration order
+and the frontend's `Date.getDay()` convention — no remapping required).
+
+---
+
+## Planned Endpoints (Phase 12+)
+
+| Resource              | Planned |
+| ---------------------- | ------- |
+| Treatment Photos       | Upload + list |
+| Working Hours mgmt API | Per-therapist create/update (currently seed-only, read exposed via `GET /api/v1/therapists/availability`) |
+| Unavailable Dates mgmt API | Per-therapist create/update (currently seed-only) |
+| Therapist Capability mgmt API | Per-therapist create/update (currently seed-only) |

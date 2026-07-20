@@ -25,6 +25,16 @@ const MOCK_SETTINGS = [
   { name: 'calendar_end_hour',         value: '20' },
 ];
 
+const MOCK_APPOINTMENTS: unknown[] = [];
+
+const MOCK_THERAPIST_AVAILABILITY = {
+  workingHours: [],
+  unavailableDates: [],
+  capabilities: [],
+};
+
+const MOCK_THERAPISTS: unknown[] = [];
+
 const MOCK_ME_RESPONSE = {
   id: 'user-test-1',
   fullName: 'מנהלת מבחן',
@@ -56,6 +66,9 @@ vi.stubGlobal(
     if (u.includes('/customers'))      return buildResponse(MOCK_CUSTOMERS);
     if (u.includes('/treatment-types')) return buildResponse(MOCK_TREATMENT_TYPES);
     if (u.includes('/global-settings')) return buildResponse(MOCK_SETTINGS);
+    if (u.includes('/therapists/availability')) return buildResponse(MOCK_THERAPIST_AVAILABILITY);
+    if (u.includes('/therapists'))     return buildResponse(MOCK_THERAPISTS);
+    if (u.includes('/appointments'))   return buildResponse(MOCK_APPOINTMENTS);
     if (u.includes('/users'))          return buildResponse([]);
     // Default fallback: 404
     return buildResponse({ code: 'NOT_FOUND', message: 'Not found' }, 404);

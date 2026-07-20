@@ -46,7 +46,7 @@ export function SummaryRow() {
       <KpiCard
         icon={<Calendar size={15} className="text-clinic-gold" />}
         label="תור הבא"
-        value={next ? formatDateTime(next.appointmentDateTime) : 'אין'}
+        value={next ? formatDateTime(next.startTime) : 'אין'}
       />
       <KpiCard
         icon={<AlertCircle size={15} className={balance > 0 ? 'text-red-400' : 'text-green-500'} />}

@@ -76,7 +76,7 @@ Source: Phase 008 implementation.
 `CustomersContext`, `TreatmentTypesContext`, and `GlobalSettingsContext` all fire async `useEffect` calls on mount which update state. Test components that render these contexts without wrapping assertions in `act()` produce React act() warnings. All 252 tests pass but the warnings add noise. Wrap relevant test helper `renderWithProviders` in `act()` or migrate context tests to use `waitFor()`.
 Priority: Low.
 
-## FU-010: ActiveSeriesTab still calls mock-data treatment recording functions
+## FU-010: ActiveSeriesTab still calls mock-data treatment recording functions — RESOLVED
 
 Source: Phase 010 implementation.
 `ActiveSeriesTab.tsx` timer ("התחל טיימר") and quantity ("סמן טיפול כבוצע") buttons call
@@ -87,7 +87,12 @@ requires CustomerContext to be refactored to call the API and then invalidate/re
 integration" task.
 Priority: High (functional gap vs backend).
 
-## FU-011: TreatmentModal.updateTreatmentNote operates on mock data
+Resolved in a session prior to v0.11.0 (exact date/session not separately logged): both
+`recordTimerTreatment` and `recordQuantityTreatment` in `CustomerContext.tsx` now call
+`treatmentsApi.create(...)` followed by `refreshForCustomer(customerId)`. Confirmed by direct
+code inspection during Phase 011 proposal prep (2026-07-19) — no further action needed.
+
+## FU-011: TreatmentModal.updateTreatmentNote operates on mock data — RESOLVED v0.11.0
 
 Source: Phase 010 implementation.
 `TreatmentModal.tsx` calls `updateTreatmentNote(treatmentId, text)` from CustomerContext,
@@ -98,13 +103,23 @@ should either be removed or converted to a read-only view. The existing Treatmen
 column is writable from the backend at POST time only.
 Priority: Medium.
 
-## FU-012: TreatmentHistoryTab missing delete UI
+Resolved in v0.11.0: added `PUT /api/v1/treatments/{id}` (author-or-manager only, Notes-only
+mutation) and a real editable note UI in `TreatmentModal.tsx` backed by `treatmentsApi.update`.
+See `phases/phase-010/PHASE_SUMMARY.md`, "Maintenance Release — v0.11.0".
+
+## FU-012: TreatmentHistoryTab missing delete UI — RESOLVED
 
 Source: Phase 010 implementation.
 The backend DELETE /treatments/{id} endpoint is implemented and returns 204. The frontend
 TreatmentHistoryTab displays treatments but has no delete button. To be added in Phase 011
 with role-based visibility (author sees delete; other therapist does not).
 Priority: Medium.
+
+Resolved in a session prior to v0.11.0 (exact date/session not separately logged):
+`TreatmentHistoryTab.tsx` now renders a delete button (`Trash2` icon) gated to
+`authorId === currentUserId || isManager`, calling `treatmentsApi.delete` with a confirm
+dialog. Confirmed by direct code inspection during Phase 011 proposal prep (2026-07-19) — no
+further action needed.
 
 ## FU-013: Loading states and toast notifications not yet implemented
 
@@ -205,3 +220,33 @@ actual backend DTO. Left uncorrected here since fixing unrelated doc drift is ou
 CR-031 — only `packageNumber` was added to that same example line.
 Priority: Low (documentation accuracy only; the real API and frontend types are already
 correct/consistent — the frontend maps `seriesId ?? treatmentSeriesId` defensively).
+
+## FU-019: TreatmentDate/PaymentDate/NoteDate "today" comparisons use raw `DateTime.UtcNow`, not Israel local time
+
+Source: found during Phase 011 (Appointments) backend implementation, 2026-07-19/20.
+`TreatmentsController.Create`, `PaymentsController.Create`, and `NotesController.Create`/`Update`
+all derive "today" via `DateOnly.FromDateTime(DateTime.UtcNow)` and reject a supplied date if it's
+later than that. Since the app's actual local timezone is Israel (UTC+2/UTC+3 DST), there's a
+window each day — the hours between local midnight and UTC midnight — where `DateTime.UtcNow`
+is still "yesterday" in UTC while it's already "today" in Israel. In that window, a
+treatment/payment/note dated for the actual current Israel day gets rejected as "in the future"
+(422), even though it isn't.
+This is a day-granularity version of the same class of issue Phase 011 had to solve properly for
+Appointments (which compare at minute granularity, not just day granularity, and so needed a real
+`TimeZoneInfo`-based Israel-local "now" — see `AppointmentsController.GetIsraelLocalNow()` and
+`docs/DATABASE_SCHEMA.md`'s Phase 011 Design Notes for the pattern). Fixing Treatments/Payments/
+Notes the same way is straightforward (reuse or extract the same Israel-local-now helper) but was
+explicitly out of scope for the Phase 011 backend pass — flagged here rather than fixed inline.
+Priority: Low (narrow daily window, day-granularity rejection only, not a data-corruption risk —
+worst case is a legitimate same-day entry briefly rejected with a clear Hebrew validation message,
+correctable by retrying; not silent data corruption like the DateTimeKind bugs fixed in v0.11.0).
+
+Update (2026-07-20, code-review follow-up pass): a minute-granularity instance of this same bug
+class was found and FIXED in this pass — `src/features/customer/selectors.ts`'s
+`previousAppointment`/`nextAppointment` were comparing `Appointment.startTime` (naive Israel-local,
+no `Z`) against `new Date().toISOString()` (UTC-suffixed), misclassifying appointments occurring
+within the Israel/UTC offset window as past/future. Fixed by reusing `appointmentService.ts`'s
+`localNow()` helper (now exported) instead. See `src/features/customer/selectors.test.ts`'s "near
+the UTC/Israel-local boundary" test cases for the regression coverage. The backend
+Treatment/Payment/Note instances cataloged above remain open — this update covers only the
+frontend `selectors.ts` occurrence.

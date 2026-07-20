@@ -13,6 +13,10 @@ public class Appointment
     public AppointmentStatus Status { get; set; } = AppointmentStatus.Scheduled;
     public DateTime CreatedAt { get; set; }
 
+    /// <summary>Snapshotted at creation/reschedule time, matching the Treatment.PerformedByFullName /
+    /// Note.WrittenByFullName / Payment.RecordedByFullName pattern.</summary>
+    public string UserFullName { get; set; } = string.Empty;
+
     public Customer Customer { get; set; } = null!;
     public TreatmentType TreatmentType { get; set; } = null!;
     public User User { get; set; } = null!;

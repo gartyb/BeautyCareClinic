@@ -2,10 +2,13 @@ import { useState } from 'react';
 import { X, CalendarDays } from 'lucide-react';
 import { Appointment } from '../../../types/Appointment';
 import { useCustomers } from '../../../contexts/CustomersContext';
-import { useTherapists } from '../../../contexts/TherapistsContext';
+import { useTherapistData } from '../../../contexts/TherapistDataContext';
 import { useTreatmentTypes } from '../../../contexts/TreatmentTypesContext';
 import { useGlobalSettings } from '../../../contexts/GlobalSettingsContext';
 import { useAppointments } from '../../../contexts/AppointmentsContext';
+import { useAuth } from '../../../contexts/AuthContext';
+import { getDurationMinutes } from '../appointmentService';
+import { ApiRequestError } from '../../../api/apiError';
 import { AppointmentPopover } from '../AppointmentPopover';
 import { RescheduleModal } from '../RescheduleModal';
 import { Toast } from '../../../components/shared/Toast';
@@ -44,28 +47,46 @@ interface AppointmentBlock {
 
 export function CalendarGrid({ selectedDate, appointments }: CalendarGridProps) {
   const { customers } = useCustomers();
-  const { therapists } = useTherapists();
+  const { therapists } = useTherapistData();
   const { treatmentTypes } = useTreatmentTypes();
   const { calendarStartHour, calendarEndHour } = useGlobalSettings();
   const { cancelAppointment } = useAppointments();
+  const { currentUser } = useAuth();
   const [popoverAppt, setPopoverAppt] = useState<Appointment | null>(null);
   const [popoverEl, setPopoverEl] = useState<HTMLElement | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [cancelSubmitting, setCancelSubmitting] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
   const [reschedulingAppt, setReschedulingAppt] = useState<Appointment | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  function confirmCancel(e: React.MouseEvent) {
+  function canManage(appt: Appointment): boolean {
+    return !!currentUser && (appt.userId === currentUser.id || currentUser.role === 'Manager');
+  }
+
+  async function confirmCancel(e: React.MouseEvent) {
     e.stopPropagation();
-    if (cancellingId) {
-      cancelAppointment(cancellingId);
+    if (!cancellingId || cancelSubmitting) return;
+    setCancelSubmitting(true);
+    setCancelError(null);
+    try {
+      await cancelAppointment(cancellingId);
       setToast('התור בוטל');
+      setCancellingId(null);
+    } catch (err: unknown) {
+      const msg = err instanceof ApiRequestError
+        ? err.error.message
+        : err instanceof Error ? err.message : 'שגיאה בביטול התור';
+      setCancelError(msg);
+    } finally {
+      setCancelSubmitting(false);
     }
-    setCancellingId(null);
   }
 
   function abortCancel(e: React.MouseEvent) {
     e.stopPropagation();
     setCancellingId(null);
+    setCancelError(null);
   }
 
   const GRID_START_HOUR = calendarStartHour;
@@ -74,18 +95,18 @@ export function CalendarGrid({ selectedDate, appointments }: CalendarGridProps) 
 
   const dayAppointments = appointments.filter(a => {
     if (a.status === 'Cancelled') return false;
-    return isSameDay(new Date(a.appointmentDateTime), selectedDate);
+    return isSameDay(new Date(a.startTime), selectedDate);
   });
 
-  function getBlocksForTherapist(therapistId: string): AppointmentBlock[] {
+  function getBlocksForTherapist(userId: string): AppointmentBlock[] {
     return dayAppointments
-      .filter(a => a.therapistId === therapistId)
+      .filter(a => a.userId === userId)
       .map(appt => {
-        const apptDate = new Date(appt.appointmentDateTime);
+        const apptDate = new Date(appt.startTime);
         const startMinutes =
           (apptDate.getHours() - GRID_START_HOUR) * 60 + apptDate.getMinutes();
         const slotStart = Math.floor(startMinutes / SLOT_MINUTES);
-        const slotSpan = Math.max(1, Math.ceil(appt.durationMinutes / SLOT_MINUTES));
+        const slotSpan = Math.max(1, Math.ceil(getDurationMinutes(appt) / SLOT_MINUTES));
         return { appointment: appt, slotStart, slotSpan };
       })
       .filter(b => b.slotStart >= 0 && b.slotStart < TOTAL_SLOTS);
@@ -151,6 +172,7 @@ export function CalendarGrid({ selectedDate, appointments }: CalendarGridProps) 
                 >
                   {block && (() => {
                     const isConfirming = cancellingId === block.appointment.id;
+                    const manageable = canManage(block.appointment);
                     return (
                       <div
                         className={`absolute inset-x-0.5 top-0.5 rounded-md border flex flex-col transition-colors z-10 ${
@@ -163,16 +185,21 @@ export function CalendarGrid({ selectedDate, appointments }: CalendarGridProps) 
                         {isConfirming ? (
                           <div className="flex flex-col items-center justify-center h-full gap-2 px-2">
                             <p className="text-xs text-red-600 font-semibold text-center">לבטל את התור?</p>
+                            {cancelError && (
+                              <p className="text-[10px] text-red-600 text-center">{cancelError}</p>
+                            )}
                             <div className="flex gap-2 w-full">
                               <button
                                 onClick={confirmCancel}
-                                className="flex-1 flex items-center justify-center px-2 py-1.5 bg-red-500 text-white rounded-lg text-xs font-semibold hover:bg-red-600 transition-colors"
+                                disabled={cancelSubmitting}
+                                className="flex-1 flex items-center justify-center px-2 py-1.5 bg-red-500 text-white rounded-lg text-xs font-semibold hover:bg-red-600 transition-colors disabled:opacity-50"
                               >
-                                כן, בטל
+                                {cancelSubmitting ? 'מבטל...' : 'כן, בטל'}
                               </button>
                               <button
                                 onClick={abortCancel}
-                                className="flex-1 flex items-center justify-center px-2 py-1.5 border border-clinic-border rounded-lg text-xs font-medium text-clinic-muted hover:bg-white transition-colors"
+                                disabled={cancelSubmitting}
+                                className="flex-1 flex items-center justify-center px-2 py-1.5 border border-clinic-border rounded-lg text-xs font-medium text-clinic-muted hover:bg-white transition-colors disabled:opacity-50"
                               >
                                 לא
                               </button>
@@ -193,23 +220,26 @@ export function CalendarGrid({ selectedDate, appointments }: CalendarGridProps) 
                               )}
                             </div>
 
-                            {/* Action buttons — bottom row */}
-                            <div className="flex gap-1 px-1.5 pb-1.5 pt-1 flex-shrink-0">
-                              <button
-                                onClick={e => { e.stopPropagation(); setReschedulingAppt(block.appointment); setPopoverAppt(null); }}
-                                className="flex flex-1 items-center justify-center gap-1 py-1.5 border border-clinic-gold text-clinic-gold rounded-lg text-xs font-medium hover:bg-clinic-gold hover:text-white transition-colors"
-                              >
-                                <CalendarDays size={13} />
-                                <span>עדכן</span>
-                              </button>
-                              <button
-                                onClick={e => { e.stopPropagation(); setCancellingId(block.appointment.id); setPopoverAppt(null); }}
-                                className="flex flex-1 items-center justify-center gap-1 py-1.5 border border-red-300 text-red-500 rounded-lg text-xs font-medium hover:bg-red-500 hover:text-white transition-colors"
-                              >
-                                <X size={13} />
-                                <span>בטל</span>
-                              </button>
-                            </div>
+                            {/* Action buttons — bottom row. Reschedule/cancel are Author-or-
+                                Manager only (backend 403 otherwise, Phase 011 AC). */}
+                            {manageable && (
+                              <div className="flex gap-1 px-1.5 pb-1.5 pt-1 flex-shrink-0">
+                                <button
+                                  onClick={e => { e.stopPropagation(); setReschedulingAppt(block.appointment); setPopoverAppt(null); }}
+                                  className="flex flex-1 items-center justify-center gap-1 py-1.5 border border-clinic-gold text-clinic-gold rounded-lg text-xs font-medium hover:bg-clinic-gold hover:text-white transition-colors"
+                                >
+                                  <CalendarDays size={13} />
+                                  <span>עדכן</span>
+                                </button>
+                                <button
+                                  onClick={e => { e.stopPropagation(); setCancellingId(block.appointment.id); setCancelError(null); setPopoverAppt(null); }}
+                                  className="flex flex-1 items-center justify-center gap-1 py-1.5 border border-red-300 text-red-500 rounded-lg text-xs font-medium hover:bg-red-500 hover:text-white transition-colors"
+                                >
+                                  <X size={13} />
+                                  <span>בטל</span>
+                                </button>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>

@@ -272,6 +272,15 @@
 - Description: `CustomerOrdersController.Create` fetches each package type with a separate `GetByIdAsync` call per item (N round-trips). Replace with a single `WHERE Id IN (...)` batch lookup.
 - Status: Open
 
+### CR-032 — Server-side enforcement of active-package eligibility for booking
+
+- Type: Bug / Security
+- Priority: High
+- Source: Manual browser testing of Phase 011 booking flow (2026-07-20), confirmed via `lean-chronoscope` MCP
+- Related phase: Phase 011
+- Description: Booking rule — a customer may only be booked for a `TreatmentType` they hold an active `TreatmentSeries` for — is documented in `docs/DOMAIN_MODEL.md` and enforced only client-side in `BookAppointmentModal.tsx` (`filteredTreatmentTypes`). `POST /api/v1/customers/{customerId}/appointments` performs no such check, so a direct API call can create an appointment for a customer with no active package. Add the same eligibility check server-side (422 with a Hebrew reason on violation), consistent with how availability is already enforced server-side.
+- Status: Open
+
 ## Planned
 
 None.

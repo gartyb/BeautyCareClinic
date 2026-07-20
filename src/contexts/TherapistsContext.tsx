@@ -1,13 +1,16 @@
-import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
-import type { User } from '../types/User';
-import { therapists as seedTherapists } from '../data/therapists';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import type { User, UserRole } from '../types/User';
+import { getUsers } from '../api/usersApi';
+import { ApiRequestError } from '../api/apiError';
 import { newId } from '../domain/id';
 import { DomainError } from '../domain/errors';
+import { useAuth } from './AuthContext';
 
 interface TherapistsContextValue {
   therapists: User[];
   isLoading: boolean;
   error: string | null;
+  refresh: () => Promise<void>;
   createTherapist: (fullName: string, email: string, phone: string) => User;
   updateTherapist: (id: string, phone: string, email: string) => void;
   deleteTherapist: (id: string) => void;
@@ -16,10 +19,73 @@ interface TherapistsContextValue {
 const TherapistsContext = createContext<TherapistsContextValue | null>(null);
 
 export function TherapistsProvider({ children }: { children: React.ReactNode }) {
-  const [therapists, setTherapists] = useState<User[]>(
-    seedTherapists.filter(u => u.role === 'Therapist')
-  );
+  const { currentUser } = useAuth();
+  const [therapists, setTherapists] = useState<User[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
+  // Phase 011 Q7 (original): this context sources the full-detail therapist list (with
+  // email/phone) from real Users with Role=Therapist via GET /api/v1/users?role=Therapist
+  // (usersApi.getUsers), replacing the mock `data/therapists.ts` seed array.
+  //
+  // UsersController is [Authorize(Policy="Manager")]-only at the class level for ALL its
+  // endpoints (its UserDto carries email/phone — real PII — for every user), so this fetch 403s
+  // for a Therapist-role current user. That is fine for THIS context's actual consumers: the
+  // Manager-only therapist-management screen (src/features/therapists/*, gated by
+  // Sidebar.tsx's managerOnly flag on "/therapists") is the only place `therapists` from this
+  // context is read.
+  //
+  // Bugfix (post-Phase-011): the Appointments booking/reschedule/calendar therapist picker
+  // (BookAppointmentModal, RescheduleModal, CalendarGrid) — which IS usable by Therapist-role
+  // users (Q7's intent) — no longer sources from this context. It now reads `therapists` from
+  // TherapistDataContext, which is backed by the new narrow, non-Manager-gated
+  // GET /api/v1/therapists (name+id only, no PII). See TherapistDataContext.tsx for the full
+  // reasoning.
+  const fetchTherapists = useCallback(async (isCancelled?: () => boolean) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const dtos = await getUsers('Therapist');
+      if (isCancelled?.()) return;
+      setTherapists(dtos.map(dto => ({
+        id: dto.id,
+        fullName: dto.fullName,
+        email: dto.email,
+        phone: dto.phone,
+        role: dto.role as UserRole,
+      })));
+    } catch (e) {
+      if (isCancelled?.()) return;
+      const msg = e instanceof ApiRequestError ? e.error.message : 'שגיאה בטעינת רשימת המטפלות';
+      setError(msg);
+      setTherapists([]);
+    } finally {
+      if (!isCancelled?.()) setIsLoading(false);
+    }
+  }, []);
+
+  // Auth-gated fetch (same pattern as CustomersContext/TreatmentTypesContext — v0.10.1 fix).
+  // Bugfix (post-Phase-011): also role-gated — GET /api/v1/users?role=Therapist is
+  // [Authorize(Policy="Manager")]-only (see the comment above), so it's guaranteed to 403 for a
+  // Therapist-role current user. Skip the fetch entirely in that case rather than firing a call
+  // that can never succeed.
+  useEffect(() => {
+    if (!currentUser || currentUser.role !== 'Manager') {
+      setIsLoading(false);
+      return;
+    }
+    let cancelled = false;
+    fetchTherapists(() => cancelled);
+    return () => { cancelled = true; };
+  }, [currentUser, fetchTherapists]);
+
+  const refresh = useCallback(() => fetchTherapists(), [fetchTherapists]);
+
+  // createTherapist/updateTherapist/deleteTherapist remain local-state-only mutations (FU-008,
+  // pre-existing, unaffected by this pass — out of scope for Phase 011's Appointments work).
+  // There is no backend write API for Users wired up on the frontend yet; the management screen
+  // (src/features/therapists/*, Manager-only) that calls these keeps behaving exactly as before:
+  // changes appear locally for the session but do not persist server-side.
   const createTherapist = useCallback((fullName: string, email: string, phone: string): User => {
     const fn = fullName.trim();
     const em = email.trim();
@@ -52,8 +118,8 @@ export function TherapistsProvider({ children }: { children: React.ReactNode }) 
   }, []);
 
   const value = useMemo<TherapistsContextValue>(
-    () => ({ therapists, isLoading: false, error: null, createTherapist, updateTherapist, deleteTherapist }),
-    [therapists, createTherapist, updateTherapist, deleteTherapist]
+    () => ({ therapists, isLoading, error, refresh, createTherapist, updateTherapist, deleteTherapist }),
+    [therapists, isLoading, error, refresh, createTherapist, updateTherapist, deleteTherapist]
   );
 
   return (
