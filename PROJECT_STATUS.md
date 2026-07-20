@@ -4,7 +4,7 @@
 
 - Current phase: 013 — Nginx Reverse Proxy + HTTPS Access
 - Phase status: Completed
-- Current branch: security/comprehensive-audit (off main @ 91c17bd — audit reports + live remediation, not yet merged)
+- Current branch: main (merged from security/comprehensive-audit, fast-forward)
 - Latest approved version: v0.14.1
 - Latest approved tag: v0.14.1
 
