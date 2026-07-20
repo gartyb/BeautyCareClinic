@@ -308,6 +308,132 @@
 - Description: aaPanel's nginx has a single HTTPS vhost for `beautycare.conf`, so it also answers for requests where the Host/SNI doesn't match the configured hostname (e.g. the raw IP), falling back to serving the app instead of rejecting the connection. This isn't a bypass of any real access control (HTTPS still encrypts, JWT auth still applies, and the cert-mismatch warning correctly signals something is off) — the sslip.io hostname was never meant as a secrecy boundary, only a way to get a valid cert without buying a domain. But it does mean the app is reachable by anyone scanning the raw IP, guarded only by a browser warning users can click through. Consider adding a minimal `default_server` block that rejects (e.g. 444/close, or a plain error page) connections with a Host/SNI that doesn't match `169-58-26-157.sslip.io`.
 - Status: Open
 
+### CR-036 — SSH hardening: disable password auth + root login
+
+- Type: Security
+- Priority: Critical
+- Source: Comprehensive security audit (2026-07-20) — `security/SERVER-HARDENING-FINDINGS.md`
+- Related phase: security/comprehensive-audit
+- Description: Live server has `PasswordAuthentication yes` and `PermitRootLogin yes` in effective sshd config, confirmed under an active brute-force attack (51,827 failed attempts, 12,687 against `root`). `fail2ban` was installed and enabled same-session as an immediate mitigation, but the root cause (password auth + root login both allowed) remains open. Requires disabling both (`PasswordAuthentication no`, `PermitRootLogin no`) with care to avoid self-lockout (verify key-based access works before changing, keep the Contabo VNC console recovery path documented in `phases/phase-013/PHASE_SUMMARY.md:129` in mind).
+- Status: Open
+
+### CR-037 — Close unnecessary open ports (aaPanel admin panel, unidentified port, dead FTP rules)
+
+- Type: Security
+- Priority: High
+- Source: Comprehensive security audit (2026-07-20) — `security/INFRA-SECURITY-FINDINGS.md`, `security/SERVER-HARDENING-FINDINGS.md`
+- Related phase: security/comprehensive-audit
+- Description: `ufw status` shows aaPanel's admin panel (port 888, full server-control UI) open to the entire internet guarded only by its own login — never addressed by Phase 013 (explicitly out of scope then). Also open: an unidentified aaPanel internal `webserver` process on port 25664 (needs identification before deciding to close/restrict), and dead-but-open FTP rules (20/21/39000:40000) with no live listener. Fix: restrict 888 to a known admin IP/VPN; identify and close/restrict 25664; remove the unused FTP ufw rules unless FTP is an intentional future feature.
+- Status: Open
+
+### CR-038 — Vite dev server exposes full repo source via `/@fs/`, bypassing the `/swagger` auth gate
+
+- Type: Security
+- Priority: Critical
+- Source: Comprehensive security audit (2026-07-20) — `security/SERVER-HARDENING-FINDINGS.md`, `security/E2E-SECURITY-FINDINGS.md` (live-confirmed via browser, unauthenticated)
+- Related phase: security/comprehensive-audit
+- Description: The Vite dev server behind the nginx proxy serves any non-dot file in the repo via `/@fs/<absolute-path>` with **no authentication at all**, completely bypassing the Basic-Auth gate that protects `/swagger`. Confirmed live: `GET https://169-58-26-157.sslip.io/@fs/home/runner/Projects/BeautyCareClinic/backend/BeautyCareClinic.Api/appsettings.Development.json` returns 200 with full file content, unauthenticated. Only placeholder values are exposed today, but any future non-dot file with a real secret (e.g. the already-noted `env.development.local` gitignore gap, CR from the infra audit) would be immediately exposed. Root-cause fix is the production-build migration (CR-034 — a built SPA has no `/@fs/` route at all). Interim band-aid: `location ~ ^/@fs/ { deny all; }` in `beautycare.conf`.
+- Status: Open
+
+### CR-039 — Nginx edge hardening (security headers, dot-file blocking, nginx_status exposure, default-site fallback)
+
+- Type: Security
+- Priority: Medium
+- Source: Comprehensive security audit (2026-07-20) — `security/INFRA-SECURITY-FINDINGS.md`, `security/SERVER-HARDENING-FINDINGS.md`
+- Related phase: security/comprehensive-audit
+- Description: Several nginx-layer gaps at the edge: (a) no security headers (`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, CSP) on the customer-facing SPA path — the backend's `SecurityHeadersMiddleware` never runs on `location /`; (b) `/nginx_status` returns live connection stats to the public internet via a Host-header trick (the `allow 127.0.0.1;` rule lacks a trailing `deny all;`); (c) no `location ~ /\. { deny all; }` in `beautycare.conf` itself (dot-file protection currently relies entirely on Vite's own default behavior, no nginx-level defense-in-depth); (d) mismatched-Host requests on port 80 fall through to aaPanel's own default "website stopped" page (fingerprints aaPanel; the equivalent gap on port 443 is already tracked as CR-035).
+- Status: Open
+
+### CR-040 — No backup mechanism exists for the production Postgres data
+
+- Type: Security / Technical Debt
+- Priority: Critical
+- Source: Comprehensive security audit (2026-07-20) — `security/SERVER-HARDENING-FINDINGS.md`, confirms an item flagged unconfirmed in `privacy/PRIVACY-COMPLIANCE-AMENDMENT13.md`
+- Related phase: security/comprehensive-audit
+- Description: No cron job, systemd timer, aaPanel backup job, or any backup tool is configured anywhere on the server for the `beautycare-postgres-data` volume (real customer PII + financial records). aaPanel's own backup directories (`/www/backup/database`, `/www/backup/site`) exist but are empty — the feature was never activated. A disk failure or accidental data loss would be unrecoverable. Needs a scheduled `pg_dump` (or equivalent) with an off-server, encrypted destination.
+- Status: Open
+
+### CR-041 — No MFA for any authenticated role
+
+- Type: Security / Privacy
+- Priority: High
+- Source: Comprehensive security audit (2026-07-20) — `privacy/PRIVACY-COMPLIANCE-AMENDMENT13.md` (תקנה 9(ב)(1), mandatory at the determined רמה בינונית security level)
+- Related phase: security/comprehensive-audit
+- Description: `POST /api/v1/auth/login` authenticates with email+password only for both Manager and Therapist roles — no second factor anywhere. Mandatory (not optional) once a data store is classified רמה בינונית or above, which this system already is (financial + health-adjacent note data). At minimum, add MFA/OTP for the Manager role.
+- Status: Open
+
+### CR-042 — No audit-logging mechanism (who accessed/modified what, including denied attempts)
+
+- Type: Security / Privacy
+- Priority: High
+- Source: Comprehensive security audit (2026-07-20) — `privacy/PRIVACY-COMPLIANCE-AMENDMENT13.md` (תקנה 10(א)); live-proven alongside CR-029's existing IDOR-class gap via `security/E2E-SECURITY-FINDINGS.md`
+- Related phase: security/comprehensive-audit
+- Description: No `AuditLog` entity/table or logging middleware exists anywhere that records who read/modified which customer/payment/note record, or which access attempts (including 401/403) were denied. Mandatory at the medium security level. This is the natural place to also close CR-029's per-therapist scoping gap — e2e testing this session proved live that any authenticated Therapist can read any customer's full financial history with zero ownership check (two independent therapist accounts both got 200 + real order/balance data for an unrelated customer).
+- Status: Open
+
+### CR-043 — No data-subject deletion/anonymization mechanism (Sec 14)
+
+- Type: Security / Privacy
+- Priority: Critical
+- Source: Comprehensive security audit (2026-07-20) — `privacy/PRIVACY-COMPLIANCE-AMENDMENT13.md`; live-proven via `security/E2E-SECURITY-FINDINGS.md`
+- Related phase: security/comprehensive-audit
+- Description: `DELETE /api/v1/customers/{id}` unconditionally refuses (409) whenever the customer has any order/appointment/treatment/note — the normal case for any real customer — with **no anonymization alternative**. Live-confirmed this session with a throwaway customer. Needs an anonymization-in-place branch (scramble `FullName`/`Phone`/`Email` while preserving FK-linked financial/treatment history for accounting purposes) as the alternative when hard delete is blocked — a data-model and retention-policy decision, not a pure code fix.
+- Status: Open
+
+### CR-044 — No consolidated data-subject access/export endpoint (Sec 13)
+
+- Type: Feature / Privacy
+- Priority: Medium
+- Source: Comprehensive security audit (2026-07-20) — `privacy/PRIVACY-COMPLIANCE-AMENDMENT13.md`
+- Related phase: security/comprehensive-audit
+- Description: No endpoint or admin tool aggregates a customer's full personal-data footprint (core fields + appointments + treatments + notes + orders/payments) into a single response for the עיון (access) right. Needs a product decision on scope (staff-mediated export vs. customer self-service).
+- Status: Open
+
+### CR-045 — No consent/privacy-notice mechanism at customer intake (Sec 11)
+
+- Type: Feature / Privacy
+- Priority: Medium
+- Source: Comprehensive security audit (2026-07-20) — `privacy/PRIVACY-COMPLIANCE-AMENDMENT13.md`
+- Related phase: security/comprehensive-audit
+- Description: `NewCustomerModal`/`POST /customers` collects PII with no consent checkbox, no privacy notice, and no schema field recording that/when notice was given. Needs a product/legal decision on notice content and placement before implementation.
+- Status: Open
+
+### CR-046 — Incident-response runbook + close docs-vs-reality drift on bind-to-loopback
+
+- Type: Technical Debt
+- Priority: Medium
+- Source: Comprehensive security audit (2026-07-20) — `security/SERVER-HARDENING-FINDINGS.md`
+- Related phase: security/comprehensive-audit
+- Description: No general incident-response runbook exists (only a narrow SSH-lockout recovery note in `phases/phase-013/PHASE_SUMMARY.md:129`). Also, `docs/ARCHITECTURE.md` implies Vite/Kestrel are not internet-reachable, but they still bind to `0.0.0.0`/`*` at the OS level (protected only by ufw, a single control) — Phase 013's own non-blocking recommendation to bind them to `127.0.0.1` was never implemented. Fix both: write a general `INCIDENT.md`/`RUNBOOK.md`, and bind Kestrel/Vite explicitly to loopback + update the architecture doc to describe actual bind behavior.
+- Status: Open
+
+### CR-047 — Data retention policy undefined
+
+- Type: Technical Debt / Privacy
+- Priority: Low
+- Source: Comprehensive security audit (2026-07-20) — `privacy/PRIVACY-COMPLIANCE-AMENDMENT13.md` (תקנה 2(ג))
+- Related phase: security/comprehensive-audit
+- Description: No retention period or annual-review mechanism exists for any PII-bearing table (`Customer`, `Note`, `CustomerOrder`, `Appointment`, `Treatment` all persist indefinitely). Needs a business decision on retention period per entity before any code/process implementation.
+- Status: Open
+
+### CR-048 — Postgres data not encrypted at rest
+
+- Type: Security
+- Priority: Low
+- Source: Comprehensive security audit (2026-07-20) — `privacy/PRIVACY-COMPLIANCE-AMENDMENT13.md` (תקנה 12)
+- Related phase: security/comprehensive-audit
+- Description: The `beautycare-postgres-data` volume (real PII + financial records) has no encryption-at-rest. A disk compromise or unauthorized volume copy exposes the DB in cleartext. Needs an infra decision (encrypted host volume, or a managed-disk-encryption alternative) — server-provisioning work, not an application code change.
+- Status: Open
+
+### CR-049 — Customer search query string logged to browser console when `VITE_LOG_API_CALLS` is on
+
+- Type: Bug / Privacy
+- Priority: Low
+- Source: Comprehensive security audit (2026-07-20) — `privacy/PRIVACY-COMPLIANCE-AMENDMENT13.md`
+- Related phase: security/comprehensive-audit
+- Description: `apiClient.ts` logs the full request URL (including the raw customer search term — a name/phone/email fragment) to the browser console whenever `VITE_LOG_API_CALLS` is true (confirmed true by default in `env.development.local`, false in `.env.example`). Fix: log the path only, strip query params before logging; confirm the flag stays off in any shared environment.
+- Status: Open
+
 ## Planned
 
 None.

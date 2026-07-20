@@ -4,7 +4,7 @@
 
 - Current phase: 013 — Nginx Reverse Proxy + HTTPS Access
 - Phase status: Completed
-- Current branch: main (merged from fix/search-active-series-balance, fast-forward)
+- Current branch: security/comprehensive-audit (off main @ 91c17bd — audit reports + live remediation, not yet merged)
 - Latest approved version: v0.14.1
 - Latest approved tag: v0.14.1
 
@@ -31,6 +31,19 @@ All three: code-reviewed clean (no Critical/High; Low findings from fix #1 appli
 review (fix #1 only, the one touching a financial field) also clean. Backend 238/238, frontend
 344/344. User validated in browser and approved. Commit `b618efb`, tag `v0.14.1`, merged to
 `main` (fast-forward, `b618efb`) and pushed to `origin` (branch + tag).
+
+**ביקורת אבטחה מקיפה (2026-07-20), ענף `security/comprehensive-audit`:** לבקשת המשתמשת, בוצעה
+ביקורת אבטחה בשלושה תחומים — תשתית (`infra-audit` + `server-audit`), פרטיות (תיקון 13), ו-E2E
+חי (דרך הדפדפן, עם ניקוי מלא בסוף). ארבעה דוחות נכתבו: `security/INFRA-SECURITY-FINDINGS.md`,
+`security/SERVER-HARDENING-FINDINGS.md`, `privacy/PRIVACY-COMPLIANCE-AMENDMENT13.md`,
+`security/E2E-SECURITY-FINDINGS.md`. 14 CRs חדשים נפתחו (CR-036 עד CR-049).
+
+**שני ממצאים דחופים טופלו מיידית באותה הפעלה** (לפני סיום שאר הביקורת, לבקשת המשתמשת): מתקפת
+brute-force פעילה על SSH (51,827 ניסיונות כושלים) — `fail2ban` הותקן והופעל; וסיסמת ה-Postgres
+האמיתית שהתגלתה חשופה בטקסט גלוי ב-`/var/log/auth.log` — סובבה, אומתה, הבקאנד הופעל מחדש, והלוג
+נוקה. שאר הממצאים (כולל 3 נוספים בחומרה קריטית: חשיפת קוד מקור לא-מאומתת דרך Vite dev server,
+היעדר מוחלט של גיבויים ל-DB, והיעדר מנגנון מחיקת-לקוחה תקין מול תיקון 13) מתועדים ב-CRs לתוכנית
+פעולה עתידית — לא טופלו בהפעלה זו, ממתינים להחלטת המשתמשת על סדר עדיפויות.
 
 Phase 010 הושלם ואושר (v0.10.0). מאז הוטמעו:
 - v0.10.1 — customer/settings/treatment-types/package-types data not loading after first login.
@@ -139,12 +152,31 @@ context-ים א-סינכרוניים נפרדים):
 - CR-033: Raise HSTS max-age after burn-in (Phase 013)
 - CR-034: Production-build migration — frontend build + backend Production env (Phase 013)
 - CR-035: Reject HTTPS requests to the raw server IP / no matching default_server (Phase 013)
+- CR-036: SSH hardening — disable password auth + root login (security audit, Critical)
+- CR-037: Close unnecessary open ports — aaPanel panel 888, port 25664, dead FTP rules (security audit, High)
+- CR-038: Vite dev server exposes full repo source via `/@fs/`, bypasses `/swagger` auth (security audit, Critical)
+- CR-039: Nginx edge hardening — security headers, dot-file blocking, nginx_status, default-site (security audit, Medium)
+- CR-040: No backup mechanism for production Postgres data (security audit, Critical)
+- CR-041: No MFA for any authenticated role (security audit, High)
+- CR-042: No audit-logging mechanism; also closes CR-029's IDOR-class gap (security audit, High)
+- CR-043: No data-subject deletion/anonymization mechanism, Sec 14 (security audit, Critical)
+- CR-044: No consolidated data-subject access/export endpoint, Sec 13 (security audit, Medium)
+- CR-045: No consent/privacy-notice mechanism at customer intake, Sec 11 (security audit, Medium)
+- CR-046: Incident-response runbook + docs-vs-reality drift on bind-to-loopback (security audit, Medium)
+- CR-047: Data retention policy undefined (security audit, Low)
+- CR-048: Postgres data not encrypted at rest (security audit, Low)
+- CR-049: Customer search query logged to console with PII when VITE_LOG_API_CALLS is on (security audit, Low)
 
 ## Known Risks or Accepted Findings
 
 - H2 (Security): JWT stored in localStorage — deferred to Phase 9+ (CR-012, refresh tokens + HttpOnly cookies)
 - M4/M5: Kestrel + Vite bound to 0.0.0.0 in dev — required for current remote-access dev setup
 - Active-package booking eligibility enforced client-side only, not by the API — deferred (CR-032)
+- Comprehensive security audit (2026-07-20, `security/comprehensive-audit` branch) found the system has
+  no per-therapist data scoping (any authenticated Therapist can read any customer's full financial
+  history — CR-042), no MFA (CR-041), no audit logging (CR-042), no backups (CR-040), and no working
+  data-subject deletion path under Amendment 13 (CR-043) — see `privacy/PRIVACY-COMPLIANCE-AMENDMENT13.md`
+  and `security/E2E-SECURITY-FINDINGS.md` for full evidence. Not yet remediated — awaiting prioritization.
 
 ## Next Step
 
