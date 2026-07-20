@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as Tabs from '@radix-ui/react-tabs';
 import { useCustomer } from '../../contexts/CustomerContext';
@@ -36,6 +36,13 @@ export function CustomerCard({ currentUser }: CustomerCardProps) {
   const defaultTab = activeSeries(treatmentSeries).length > 0 ? 'series' : 'history';
   const [activeTab, setActiveTab] = useState(defaultTab);
 
+  // Tracks whether the user has manually picked a tab for the customer currently being viewed.
+  // Once true, the smart-default effect below must stop overriding the tab — this is what
+  // prevents any data refresh (payment, note, order, treatment, etc.) from silently snapping
+  // the user back to Active Series / Treatment History.
+  const userSelectedTabRef = useRef(false);
+  const prevCustomerIdRef = useRef<string | undefined>(undefined);
+
   useEffect(() => {
     if (id) {
       setActiveCustomer(id);
@@ -43,10 +50,28 @@ export function CustomerCard({ currentUser }: CustomerCardProps) {
     setIsLoading(false);
   }, [id, setActiveCustomer]);
 
-  // Update active tab when customer changes and default tab may differ
+  // Reset "user picked a tab" tracking whenever we land on a genuinely different customer.
   useEffect(() => {
+    if (activeCustomer && activeCustomer.id !== prevCustomerIdRef.current) {
+      prevCustomerIdRef.current = activeCustomer.id;
+      userSelectedTabRef.current = false;
+    }
+  }, [activeCustomer]);
+
+  // Auto-apply the smart default tab only while the user hasn't manually chosen one for this
+  // customer yet (handles the async first-load race for treatmentSeries). Do NOT keep overriding
+  // the tab after a manual pick — that's the bug this fixes: any action (payment, note, order,
+  // appointment) refreshes treatmentSeries/activeCustomer and must not silently kick the user
+  // back to Active Series / Treatment History.
+  useEffect(() => {
+    if (userSelectedTabRef.current) return;
     setActiveTab(activeSeries(treatmentSeries).length > 0 ? 'series' : 'history');
   }, [activeCustomer, treatmentSeries]);
+
+  const handleTabChange = (value: string) => {
+    userSelectedTabRef.current = true;
+    setActiveTab(value);
+  };
 
   if (isLoading) {
     return (
@@ -79,7 +104,7 @@ export function CustomerCard({ currentUser }: CustomerCardProps) {
       <QuickActionButtons currentUser={currentUser} customerId={id ?? ''} />
 
       <div className="flex-1 overflow-hidden flex flex-col">
-        <Tabs.Root defaultValue={defaultTab} value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
+        <Tabs.Root defaultValue={defaultTab} value={activeTab} onValueChange={handleTabChange} className="flex-1 flex flex-col overflow-hidden">
           <Tabs.List dir="rtl" className="flex border-b border-clinic-border bg-white px-6 gap-1">
             {tabItems.map(tab => (
               <Tabs.Trigger

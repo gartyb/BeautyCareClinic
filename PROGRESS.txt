@@ -1665,3 +1665,174 @@ user-visible via this phase's real wiring — Medium priority, not fixed, out of
 approved scope).
 
 Not committed, per explicit instruction — awaiting user browser validation and approval.
+
+2026-07-20 Bug Fix — Search results "Active Series" / "Outstanding Balance" columns
+  Branch: fix/search-active-series-balance (from main @ 949aa2e)
+  Root cause: GET /api/v1/customers never returned per-customer aggregates; SearchResults.tsx
+  fell back to Phase-1 mock data (src/data/series.ts, src/data/orders.ts) filtered by real
+  customer GUIDs that never match the mock ids — Active Series always "—", Outstanding Balance
+  always "שולם" even when a real debt existed. Confirmed pre-existing FOLLOWUPS.md FU-007.
+
+  Backend:
+    - CustomerDto extended with ActiveSeriesCount (int), OutstandingBalance (decimal).
+    - ICustomerRepository.GetAggregatesAsync(IEnumerable<Guid>) — new method, one GROUP BY
+      query per metric (no N+1). Active-series definition reused verbatim from
+      TreatmentSeriesRepository.GetActiveByCustomerIdAsync. OutstandingBalance = sum of
+      RemainingBalance (Postgres generated column) across all of a customer's orders.
+    - CustomersController: GetAll/GetById/Update call GetAggregatesAsync; Create hardcodes 0/0m
+      (a brand-new customer has no series/orders yet, no query needed).
+    - docs/API_SPECIFICATION.md: documented the two new response fields.
+
+  Frontend:
+    - src/api/customersApi.ts, src/types/Customer.ts: added activeSeriesCount (number),
+      outstandingBalance (string | number — matches the existing money-field convention used by
+      CustomerOrder.remainingBalance/amountPaid, PackageType.price, Payment.amount; parsed with
+      parseFloat(String(...)) at the point of use, same as OrdersTab.tsx/RecordPaymentModal.tsx).
+    - src/contexts/CustomersContext.tsx: maps both fields through in fetchCustomers/createCustomer.
+    - src/features/search/SearchResults.tsx: now reads customer.activeSeriesCount /
+      customer.outstandingBalance directly instead of filtering the removed mock arrays.
+      nextAppointment/useAppointments() untouched (already real-data-backed).
+    - Deleted src/data/series.ts and src/data/orders.ts (confirmed zero remaining importers via
+      fresh grep before deletion).
+    - src/data/customers.ts, src/features/customer/customerService.ts (buildCustomer): both
+      dead-code-but-still-unit-tested Phase-1 leftovers required the two new required Customer
+      fields to keep compiling; added activeSeriesCount:0/outstandingBalance:0 (matches "brand
+      new customer" semantics).
+    - src/test/setup.ts: global fetch mock's MOCK_CUSTOMERS now includes activeSeriesCount/
+      outstandingBalance per entry (one customer non-zero, rest zero) so every test relying on
+      the shared mock continues to reflect real API shape.
+
+  Tests:
+    - Backend (new): backend/BeautyCareClinic.Tests/Integration/CustomersControllerPostgresTests.cs
+      — real Postgres (Database.MigrateAsync), 4 tests: GetAll/GetById each for a customer with a
+      mixed active/completed/timer-based series set + a partially-paid and a fully-paid order
+      (expects ActiveSeriesCount=2, OutstandingBalance=700), and for a customer with zero
+      series/orders (expects 0/0m, no error).
+    - Frontend: extended src/features/search/SearchScreen.test.tsx with 2 new tests — asserts the
+      "2" active-series badge and "₪450" balance render for a customer that has both, and "—"/
+      "שולם" render for a customer with neither.
+
+  Build/Test results:
+    - Backend: dotnet build BeautyCareClinic.sln — 0 errors. dotnet test (against the running
+      beautycare-postgres container) — 236/236 passing (232 pre-existing + 4 new).
+    - Frontend: npx tsc --noEmit — clean. npm run build — same two pre-existing, unrelated
+      failures as on main before this change (RecordPaymentModal.tsx currentUser unused param —
+      FU-016; vite.config.ts `process` type — FU-001-adjacent tooling gap), no new errors
+      introduced (confirmed via git stash comparison). npx vitest run — 341/341 passing
+      (335 pre-existing + baseline shift + 6 new/updated in SearchScreen.test.tsx... see file
+      diff for exact count; all green, 30/30 test files passed).
+
+  Deferred/out of scope: did not touch RecordPaymentModal.tsx (FU-016) or vite.config.ts
+  `process` typing — both pre-existing on main, unrelated to this bug.
+
+  Not committed, per explicit instruction — awaiting user validation and approval.
+
+2026-07-20 Refinement — third state for Outstanding Balance: "no orders at all" vs "paid off"
+  Branch: fix/search-active-series-balance (same branch, still uncommitted, additive refinement
+  on top of the above bug fix, requested before user validation of that fix).
+
+  Root cause: OutstandingBalance was decimal, defaulted to 0m for customers with zero orders
+  (GetValueOrDefault(id, 0m) in GetAggregatesAsync's final combine step), conflating "no orders
+  at all" with "orders that are all fully paid" — both rendered "שולם" in the UI. The user wants
+  a customer who never bought anything to show a muted "—" instead, reserving "שולם" for real
+  orders fully paid off.
+
+  Fix: OutstandingBalance is now decimal? end-to-end. null = no orders exist for the customer.
+  0m = orders exist, fully paid. >0m = real debt. One-field semantic change, no new field.
+
+  Backend:
+    - CustomerDto.OutstandingBalance: decimal -> decimal?.
+    - ICustomerRepository.GetAggregatesAsync: return tuple's OutstandingBalance is now decimal?;
+      XML doc updated to describe the null/0/positive distinction.
+    - CustomerRepository.GetAggregatesAsync: final combine step now yields null (not 0m) for any
+      customer id absent from the balances dictionary (i.e. zero CustomerOrders rows).
+    - CustomersController: ToDto's GetValueOrDefault fallback and Create's hardcoded DTO both
+      pass null instead of 0m for a customer with no aggregates/no orders yet.
+    - docs/API_SPECIFICATION.md: documented the null/0/positive outstandingBalance semantics and
+      that POST returns outstandingBalance: null for a brand-new customer.
+
+  Frontend:
+    - src/api/customersApi.ts, src/types/Customer.ts: outstandingBalance type widened to
+      `string | number | null`.
+    - src/features/search/SearchResults.tsx: balance computed as
+      `customer.outstandingBalance == null ? null : parseFloat(String(...))`; JSX now checks
+      `balance === null` first, rendering the same muted "—" span used elsewhere in this table,
+      before falling through to the existing red-debt / green-"שולם" branches.
+    - src/features/customer/customerService.ts (buildCustomer): outstandingBalance changed from
+      0 to null for a freshly-built customer (no orders yet — matches backend Create).
+    - src/data/customers.ts: left as-is (plain 0 is still assignable to the widened type; this
+      file is unused Phase-1 mock data with no remaining importers).
+
+  Tests:
+    - Backend: extended CustomersControllerPostgresTests.cs with a third customer
+      (_customerFullyPaid, one fully-paid order, no series) so "has orders, fully paid" (0m) is
+      exercised distinctly from "no orders at all" (_customerWithNoData, null). Renamed the
+      existing zero-aggregate tests to assert Assert.Null(dto.OutstandingBalance) instead of
+      Equal(0m, ...), and added GetAll/GetById_ReturnsZeroBalance_ForCustomerWithFullyPaidOrders.
+    - Frontend: src/test/setup.ts MOCK_CUSTOMERS — cust-3 (אסתר מזרחי) changed from
+      outstandingBalance: 0 to null (no orders at all); cust-2/cust-4/cust-5 keep 0 (has-orders-
+      paid-off is already covered by the existing cust-2 "שולם" test). Added a new SearchScreen
+      test asserting the balance-column cell (cells[2]) for cust-3 renders "—" and not "שולם".
+
+  Build/Test results:
+    - Backend: dotnet build BeautyCareClinic.sln — 0 errors, 0 warnings. dotnet test (Postgres at
+      localhost:5432, beautycare/beautycareclinic) — 238/238 passing (236 prior + 2 new).
+    - Frontend: npx tsc --noEmit — clean. npx vitest run — 342/342 passing (30/30 test files),
+      including the new SearchScreen "no orders at all" test.
+    - Live backend dev process on :5000 restarted after these changes so the running server (the
+      user's browser validation target) serves the updated null-vs-0 semantics.
+
+  Deferred/out of scope: none identified; change stayed within the described field/files.
+
+  Not committed, per explicit instruction — awaiting user validation and approval of the whole
+  bug fix (base fix + this refinement) together.
+
+---
+
+[fix/search-active-series-balance branch — third, independent bug fix]
+
+Bug: On the Customer Card screen, after any action while viewing a customer (recording a
+payment, adding a note, creating an order — anything that goes through CustomerContext's
+`refreshForCustomer`), the UI silently snapped back to the "חבילות פעילות" (Active Series) or
+"היסטוריית טיפולים" (Treatment History) tab, discarding whatever tab the user was actually on
+(e.g. "תורים"/Appointments or "הערות"/Notes).
+
+Root cause: CustomerCard.tsx's CR-007 "smart default tab" effect depended on
+`[activeCustomer, treatmentSeries]` from `useCustomer()`. `refreshForCustomer()` — called by
+every one of addOrder, addPayment, recordTimerTreatment, recordQuantityTreatment,
+refreshTreatments(), refreshNotes() — replaces the underlying `allSeries` state with a new array
+reference for the SAME customer, which re-triggered the effect and unconditionally reset the tab.
+
+Booking an appointment specifically: verified this flows entirely through AppointmentsContext
+(`createAppointment` → `appointmentsApi.create` → `fetchAll` → `setAppointments`, a *new*
+top-level context unrelated to CustomerContext) plus BookAppointmentModal's own local
+`customerActiveSeries` state (fetched directly via `treatmentSeriesApi.listActiveByCustomer`,
+explicitly to avoid relying on CustomerContext's cache — see the comment already in that file).
+Neither touches CustomerContext's `activeCustomer` or `treatmentSeries` references at all, so
+booking an appointment does NOT, by itself, reproduce this exact tab-reset bug via this effect.
+
+Fix (src/features/customer/CustomerCard.tsx): added `userSelectedTabRef` (set true by a new
+`handleTabChange` wired to `Tabs.Root`'s `onValueChange`, replacing the previous direct
+`setActiveTab`) and `prevCustomerIdRef`. A new effect resets `userSelectedTabRef` to false only
+when `activeCustomer.id` genuinely changes (ordered before the smart-default effect so the reset
+is visible in the same render pass). The existing smart-default effect now bails out early if
+`userSelectedTabRef.current` is true, so it still auto-picks 'series'/'history' on first load
+(including the async first-fetch race, unchanged) and on a genuine customer switch, but no longer
+overrides a tab the user manually selected for the customer currently being viewed.
+
+Tests: new src/features/customer/CustomerCard.test.tsx (none existed before). Mocks CustomerContext
+and stubs all child tab components to isolate CustomerCard's own tab-selection logic. Covers:
+  - Manually selecting a different tab, then simulating a same-customer refresh (new
+    `treatmentSeries` array reference + new `activeCustomer` object reference, same id) — asserts
+    the manually-picked tab is NOT overridden.
+  - Manually selecting a tab, then switching to a genuinely different customer id with a different
+    active-series state — asserts the smart default IS (re-)applied for the new customer.
+  Note: Radix Tabs activates a trigger on `mousedown`, not `click` — used `fireEvent.mouseDown`.
+
+Verification: npx vitest run — 31/31 test files, 344/344 tests passing (342 prior + 2 new).
+npx tsc --noEmit — clean. Vite dev server (pid confirmed via `ps aux`, listening on :5174) picked
+up the change via HMR without restart; confirmed via `curl` that the served CustomerCard.tsx
+source includes `userSelectedTabRef`.
+
+Not committed — this is the third, independent fix stacked on this branch (same as the prior two
+search-column fixes), awaiting a single combined user browser validation pass.

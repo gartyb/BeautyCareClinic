@@ -6,6 +6,13 @@ export interface CustomerDto {
   phone: string;
   email?: string;
   createdAt: string;
+  activeSeriesCount: number;
+  // Money field convention (see types/Order.ts): decimals may arrive as a raw JSON number from
+  // the API; parse with parseFloat(String(...)) before arithmetic/display, as done throughout
+  // the codebase for other decimal fields (e.g. OrdersTab.tsx, RecordPaymentModal.tsx).
+  // null means the customer has no orders at all (never bought anything); 0 means the customer
+  // has orders that are all fully paid off.
+  outstandingBalance: string | number | null;
 }
 
 export interface CreateCustomerRequest {

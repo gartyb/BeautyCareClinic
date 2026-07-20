@@ -5,12 +5,15 @@ import { clearToken } from '../api/tokenManager';
 // Default mock responses for the API endpoints used in tests.
 // These correspond to the same seed data that was previously in the mock data files,
 // so existing tests continue working after the API wiring.
+// activeSeriesCount/outstandingBalance mirror the fields GET /api/v1/customers returns since the
+// "Active Series"/"Outstanding Balance" search-results columns bug fix (search-active-series-balance).
+// outstandingBalance: null = no orders at all; 0 = has orders, all fully paid; >0 = real debt.
 const MOCK_CUSTOMERS = [
-  { id: 'cust-1', fullName: 'רחל אברהם', phone: '0501234567', email: 'rachel.avraham@gmail.com', createdAt: '2024-01-15' },
-  { id: 'cust-2', fullName: 'דנה שפירא',  phone: '0529876543', email: 'dana.shapira@gmail.com',  createdAt: '2024-03-10' },
-  { id: 'cust-3', fullName: 'אסתר מזרחי', phone: '0545551234', email: 'esther.mizrahi@gmail.com', createdAt: '2023-09-20' },
-  { id: 'cust-4', fullName: 'יעל גולן',   phone: '0587778899', email: 'yael.golan@gmail.com',   createdAt: '2025-11-01' },
-  { id: 'cust-5', fullName: 'נועה ברק',   phone: '0503334455', email: 'noa.barak@gmail.com',    createdAt: '2024-06-18' },
+  { id: 'cust-1', fullName: 'רחל אברהם', phone: '0501234567', email: 'rachel.avraham@gmail.com', createdAt: '2024-01-15', activeSeriesCount: 2, outstandingBalance: 450 },
+  { id: 'cust-2', fullName: 'דנה שפירא',  phone: '0529876543', email: 'dana.shapira@gmail.com',  createdAt: '2024-03-10', activeSeriesCount: 0, outstandingBalance: 0 },
+  { id: 'cust-3', fullName: 'אסתר מזרחי', phone: '0545551234', email: 'esther.mizrahi@gmail.com', createdAt: '2023-09-20', activeSeriesCount: 0, outstandingBalance: null },
+  { id: 'cust-4', fullName: 'יעל גולן',   phone: '0587778899', email: 'yael.golan@gmail.com',   createdAt: '2025-11-01', activeSeriesCount: 0, outstandingBalance: 0 },
+  { id: 'cust-5', fullName: 'נועה ברק',   phone: '0503334455', email: 'noa.barak@gmail.com',    createdAt: '2024-06-18', activeSeriesCount: 0, outstandingBalance: 0 },
 ];
 
 const MOCK_TREATMENT_TYPES = [

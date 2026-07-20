@@ -45,5 +45,9 @@ export function buildCustomer(
     phone: phone.trim(),
     email: email?.trim() ?? '',
     createdDate: today(),
+    // A brand-new customer definitionally has no series or orders yet (matches the backend's
+    // CustomersController.Create, which returns 0/null without a query).
+    activeSeriesCount: 0,
+    outstandingBalance: null,
   };
 }

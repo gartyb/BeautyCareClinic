@@ -41,7 +41,7 @@ The payment recording and order creation flows are undocumented in the docs fold
 Add `docs/system-flows.md` describing the two happy-path flows and their error cases.
 Priority: Low.
 
-## FU-007: SearchResults.tsx still reads from static data imports
+## FU-007: SearchResults.tsx still reads from static data imports — RESOLVED
 
 Source: Phase 5 implementation.
 `src/features/search/SearchResults.tsx` still reads `treatmentSeries`, `appointments`, and
@@ -51,6 +51,14 @@ will always reflect the seed data, not live state. Should be migrated to read fr
 when CustomerContext is extended to expose cross-customer data or a new aggregate context
 is added.
 Priority: Medium.
+
+Resolved on branch `fix/search-active-series-balance`: `GET /api/v1/customers` now returns
+real per-customer `activeSeriesCount`/`outstandingBalance` aggregates (computed in
+`CustomerRepository.GetAggregatesAsync` and joined in `CustomersController`), and
+`SearchResults.tsx` was updated to read those fields directly from the `CustomerSummary`
+objects it receives (sourced from `CustomersContext`/the API) instead of from the unused
+static `treatmentSeries`/`orders` mock-data files. The "תור הבא" (next appointment) column
+still legitimately reads from `AppointmentsContext`, which was already live.
 
 ## FU-001: Vitest 2.x / Vite 6.x type incompatibility
 

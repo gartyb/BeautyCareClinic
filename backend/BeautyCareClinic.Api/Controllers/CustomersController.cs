@@ -23,7 +23,9 @@ public class CustomersController : ControllerBase
     public async Task<IActionResult> GetAll([FromQuery] string? search)
     {
         var customers = await _repository.GetAllAsync(search);
-        var dtos = customers.Select(c => new CustomerDto(c.Id, c.FullName, c.Phone, c.Email));
+        var customerList = customers.ToList();
+        var aggregates = await _repository.GetAggregatesAsync(customerList.Select(c => c.Id));
+        var dtos = customerList.Select(c => ToDto(c, aggregates));
         return Ok(dtos);
     }
 
@@ -35,7 +37,8 @@ public class CustomersController : ControllerBase
         if (customer == null)
             return NotFound(new ErrorResponse(ErrorCodes.NotFound, "The requested resource was not found.", DateTime.UtcNow, HttpContext.TraceIdentifier));
 
-        return Ok(new CustomerDto(customer.Id, customer.FullName, customer.Phone, customer.Email));
+        var aggregates = await _repository.GetAggregatesAsync(new[] { customer.Id });
+        return Ok(ToDto(customer, aggregates));
     }
 
     /// <summary>POST /api/v1/customers — Both roles.</summary>
@@ -61,7 +64,7 @@ public class CustomersController : ControllerBase
 
         var created = await _repository.CreateAsync(customer);
         return CreatedAtAction(nameof(GetById), new { id = created.Id },
-            new CustomerDto(created.Id, created.FullName, created.Phone, created.Email));
+            new CustomerDto(created.Id, created.FullName, created.Phone, created.Email, 0, null));
     }
 
     /// <summary>PUT /api/v1/customers/{id} — Manager only.</summary>
@@ -87,7 +90,8 @@ public class CustomersController : ControllerBase
         existing.Email    = string.IsNullOrWhiteSpace(request.Email) ? null : request.Email.Trim();
 
         var updated = await _repository.UpdateAsync(existing);
-        return Ok(new CustomerDto(updated.Id, updated.FullName, updated.Phone, updated.Email));
+        var aggregates = await _repository.GetAggregatesAsync(new[] { updated.Id });
+        return Ok(ToDto(updated, aggregates));
     }
 
     /// <summary>DELETE /api/v1/customers/{id} — Manager only.</summary>
@@ -107,6 +111,12 @@ public class CustomersController : ControllerBase
 
         await _repository.DeleteAsync(id);
         return NoContent();
+    }
+
+    private static CustomerDto ToDto(Customer c, IReadOnlyDictionary<Guid, (int ActiveSeriesCount, decimal? OutstandingBalance)> aggregates)
+    {
+        var (activeSeriesCount, outstandingBalance) = aggregates.GetValueOrDefault(c.Id, (0, (decimal?)null));
+        return new CustomerDto(c.Id, c.FullName, c.Phone, c.Email, activeSeriesCount, outstandingBalance);
     }
 
     private static bool IsValidEmail(string email)

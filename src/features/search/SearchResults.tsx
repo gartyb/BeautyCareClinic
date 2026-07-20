@@ -1,9 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { CustomerSummary } from '../../types/Customer';
-import { treatmentSeries } from '../../data/series';
-import { orders } from '../../data/orders';
 import { useAppointments } from '../../contexts/AppointmentsContext';
-import { activeSeries, outstandingBalance, nextAppointment } from '../customer/selectors';
+import { nextAppointment } from '../customer/selectors';
 import { formatDate } from '../../utils/date';
 import { formatPhone } from '../../utils/phone';
 
@@ -45,11 +43,13 @@ export function SearchResults({ results, query }: Props) {
       </thead>
       <tbody>
         {results.map(customer => {
-          const customerSeries = treatmentSeries.filter(s => s.customerId === customer.id);
-          const activeCount = activeSeries(customerSeries).length;
+          const activeCount = customer.activeSeriesCount;
 
-          const customerOrders = orders.filter(o => o.customerId === customer.id);
-          const balance = outstandingBalance(customerOrders);
+          // Money field convention (see types/Order.ts): parse before arithmetic/display.
+          // null means the customer has no orders at all (never bought anything).
+          const balance = customer.outstandingBalance == null
+            ? null
+            : parseFloat(String(customer.outstandingBalance));
 
           const customerAppts = appointments.filter(a => a.customerId === customer.id);
           const next = nextAppointment(customerAppts);
@@ -90,7 +90,9 @@ export function SearchResults({ results, query }: Props) {
 
               {/* יתרת חוב */}
               <td className="px-4 py-3 text-center font-semibold">
-                {balance > 0 ? (
+                {balance === null ? (
+                  <span className="text-clinic-muted">—</span>
+                ) : balance > 0 ? (
                   <span className="text-red-500">₪{balance.toLocaleString('he-IL')}</span>
                 ) : (
                   <span className="text-green-600 text-xs">שולם</span>

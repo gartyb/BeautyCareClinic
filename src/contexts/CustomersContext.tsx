@@ -32,6 +32,8 @@ export function CustomersProvider({ children }: { children: React.ReactNode }) {
         phone: dto.phone,
         email: dto.email ?? '',
         createdDate: dto.createdAt ? dto.createdAt.slice(0, 10) : '',
+        activeSeriesCount: dto.activeSeriesCount,
+        outstandingBalance: dto.outstandingBalance,
       })));
     } catch (e) {
       if (isCancelled?.()) return;
@@ -63,6 +65,8 @@ export function CustomersProvider({ children }: { children: React.ReactNode }) {
       phone: dto.phone,
       email: dto.email ?? '',
       createdDate: dto.createdAt ? dto.createdAt.slice(0, 10) : new Date().toISOString().slice(0, 10),
+      activeSeriesCount: dto.activeSeriesCount,
+      outstandingBalance: dto.outstandingBalance,
     };
     setCustomers(prev => [...prev, newCustomer]);
     return newCustomer;

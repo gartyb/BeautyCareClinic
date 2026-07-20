@@ -74,8 +74,17 @@ Returns all customers. Optional `?search=<term>` filters by name or phone (case-
 **Response 200:** `Customer[]`
 
 ```json
-[{ "id": "<uuid>", "fullName": "שירה לוי", "phone": "052-2345678", "email": "shira@example.com" }]
+[{ "id": "<uuid>", "fullName": "שירה לוי", "phone": "052-2345678", "email": "shira@example.com", "activeSeriesCount": 2, "outstandingBalance": 450.00 }]
 ```
+
+`activeSeriesCount` uses the same active-series definition as `GET /api/v1/customers/{customerId}/treatment-series`
+(a non-timer-based series is active while `completedTreatments < totalTreatments`; a timer-based series is active
+while `usedMinutes < totalMinutes`). `outstandingBalance` is the sum of `remainingBalance` across all of the
+customer's orders: `null` when the customer has no orders at all (never bought anything), `0` when the customer
+has orders that are all fully paid off, and a positive number when a real debt exists. Both fields are computed
+server-side in a single aggregate query (no N+1) and returned on every customer read (`GET` list/by-id) and write
+(`POST`/`PUT`) response. A brand-new customer created via `POST` has `activeSeriesCount: 0` and
+`outstandingBalance: null`.
 
 ### GET /api/v1/customers/{id}
 

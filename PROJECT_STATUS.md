@@ -4,11 +4,34 @@
 
 - Current phase: 013 — Nginx Reverse Proxy + HTTPS Access
 - Phase status: Completed
-- Current branch: main (merged from feature/phase-013-nginx-https-access, fast-forward)
+- Current branch: fix/search-active-series-balance (bug-fix branch off main @ 949aa2e) — Awaiting User Validation
 - Latest approved version: v0.14.0
 - Latest approved tag: v0.14.0
 
 ## Current Activity
+
+**Bug fixes in progress (2026-07-20), bundled on branch `fix/search-active-series-balance`
+(not yet merged, awaiting one combined user browser validation):**
+
+1. "חיפוש לקוח" screen — "סדרות פעילות" column showed no data (and "יתרת חוב" silently showed
+   "שולם" even with a real debt) because `SearchResults.tsx` read unused Phase-1 mock arrays
+   instead of live data. Fixed by extending `GET /api/v1/customers` to return
+   `activeSeriesCount`/`outstandingBalance` per customer (new `ICustomerRepository.
+   GetAggregatesAsync`, no N+1); deleted the now-dead `src/data/series.ts`/`src/data/orders.ts`.
+   Resolves FOLLOWUPS.md FU-007.
+2. Refinement (same area): a customer with **zero orders at all** now shows "-" in "יתרת חוב"
+   (distinct from "שולם", which now means "has orders, fully paid"). `OutstandingBalance` made
+   nullable end-to-end (`null` = no orders, `0` = paid off, `>0` = real debt).
+3. Customer Card — after any action (payment, note, order) the UI silently jumped back to
+   "חבילות פעילות"/"היסטוריית טיפולים", discarding the tab the user was actually on. Fixed in
+   `CustomerCard.tsx` via `userSelectedTabRef`/`prevCustomerIdRef`: the CR-007 smart-default tab
+   logic now only auto-applies until the user manually picks a tab for the customer currently
+   being viewed, and resets correctly on a genuine customer switch.
+
+All three: code-reviewed clean (no Critical/High; Low findings from fix #1 applied). Security
+review (fix #1 only, the one touching a financial field) also clean. Backend 238/238, frontend
+344/344. **User validated in browser and approved.** Proceeding to commit + tag as a patch
+release (v0.14.1) on branch `fix/search-active-series-balance`.
 
 Phase 010 הושלם ואושר (v0.10.0). מאז הוטמעו:
 - v0.10.1 — customer/settings/treatment-types/package-types data not loading after first login.

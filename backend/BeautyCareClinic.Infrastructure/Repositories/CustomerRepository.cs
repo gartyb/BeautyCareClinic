@@ -74,4 +74,29 @@ public class CustomerRepository : ICustomerRepository
             || await _context.Treatments.AnyAsync(t => t.CustomerId == id)
             || await _context.Notes.AnyAsync(n => n.CustomerId == id);
     }
+
+    public async Task<Dictionary<Guid, (int ActiveSeriesCount, decimal? OutstandingBalance)>> GetAggregatesAsync(IEnumerable<Guid> customerIds)
+    {
+        var ids = customerIds.ToList();
+
+        // Same "active series" definition as TreatmentSeriesRepository.GetActiveByCustomerIdAsync.
+        var seriesCounts = await _context.TreatmentSeries
+            .Where(ts => ids.Contains(ts.CustomerId))
+            .Where(ts =>
+                (!ts.OrderItem.PackageType.IsTimerBased && ts.CompletedTreatments < ts.TotalTreatments) ||
+                (ts.OrderItem.PackageType.IsTimerBased && ts.UsedMinutes < ts.TotalMinutes))
+            .GroupBy(ts => ts.CustomerId)
+            .Select(g => new { CustomerId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.CustomerId, x => x.Count);
+
+        var balances = await _context.CustomerOrders
+            .Where(o => ids.Contains(o.CustomerId))
+            .GroupBy(o => o.CustomerId)
+            .Select(g => new { CustomerId = g.Key, Balance = g.Sum(o => o.RemainingBalance) })
+            .ToDictionaryAsync(x => x.CustomerId, x => x.Balance);
+
+        return ids.Distinct().ToDictionary(id => id, id => (
+            seriesCounts.GetValueOrDefault(id, 0),
+            balances.TryGetValue(id, out var bal) ? bal : (decimal?)null));
+    }
 }
