@@ -15,17 +15,17 @@
 | 🔵 nit | 7 |
 
 Top 3 to fix first:
-1. 🔴 `ufw status` (live server) — aaPanel admin panel (port 888, full server-control UI) is reachable from the entire internet, guarded only by its own login — not by the network-boundary the docs claim.
+1. 🔴 `ufw status` (live server) — aaPanel admin panel is reachable from the entire internet — not by the network-boundary the docs claim. **Update 2026-07-26:** the panel's actual port was re-verified as `25664` (not 888 as originally assumed here — see below), and it turns out to carry its own application-level access controls (secret entrance path + known-client fingerprint gate); see the 25664 entry below for the corrected assessment. Port 888's own purpose is now the unconfirmed one.
 2. 🟡 `/www/server/panel/vhost/nginx/beautycare.conf: location /` — no security headers (CSP/X-Frame-Options/X-Content-Type-Options/Referrer-Policy) on the actual customer-facing SPA path; the backend's `SecurityHeadersMiddleware` never runs on this path.
-3. 🟡 `ufw status` (live server) — undocumented open port `25664/tcp`, plus dead-but-open FTP rules (`20`, `21`, `39000:40000`) with no current listener — unused attack surface.
+3. 🟡 `ufw status` (live server) — port 888's purpose is unconfirmed (see below), plus dead-but-open FTP rules (`20`, `21`, `39000:40000`) with no current listener — unused attack surface.
 
 ---
 
 ## Network exposure / ports / proxy — WARN
 
-- 🔴 `docs/ARCHITECTURE.md:96` (documented posture) vs. live `ufw status verbose` — **the documented network posture ("only 22/80/443 externally reachable") does not match the live firewall.** `888/tcp ALLOW IN Anywhere` (+v6) is active, and `ss -tlnp` confirms aaPanel's admin panel is listening on `0.0.0.0:888`. Root cause: Phase 013 explicitly scoped out "aaPanel panel hardening... out of scope, not touched" — but that also means the port was never added to the ufw review, so a full server-admin UI is reachable from the whole internet with no network-layer control, only aaPanel's own login. **Why:** `02-network-and-ports.md §front-proxy/admin-UI exposure`, `§port-map hygiene`. **Fix:** restrict `888/tcp` in ufw to a known admin IP or a VPN/SSH-tunnel-only access pattern (aaPanel supports an IP allowlist for panel access); update `docs/ARCHITECTURE.md`'s Deployment Topology section to reflect the true allowed-port set instead of the aspirational one.
+- 🔴 `docs/ARCHITECTURE.md:96` (documented posture) vs. live `ufw status verbose` — **the documented network posture ("only 22/80/443 externally reachable") does not match the live firewall.** `888/tcp` and `25664/tcp ALLOW IN Anywhere` (+v6) are both active. Root cause: Phase 013 explicitly scoped out "aaPanel panel hardening... out of scope, not touched" — but that also means these ports were never added to the ufw review, so a full server-admin UI is reachable from the whole internet with no network-layer control. **Why:** `02-network-and-ports.md §front-proxy/admin-UI exposure`, `§port-map hygiene`. **Fix:** restrict the panel's port (see below) in ufw to a known admin IP or a VPN/SSH-tunnel-only access pattern; update `docs/ARCHITECTURE.md`'s Deployment Topology section to reflect the true allowed-port set instead of the aspirational one.
 
-- 🟡 `ufw status verbose` (live server, not versioned in repo) — undocumented open port **`25664/tcp`** (`ALLOW IN Anywhere`, IPv4+IPv6), actively listening under process name `webserver` (an aaPanel auxiliary daemon; exact function not confirmed from this vantage point). Not referenced anywhere in `docs/ARCHITECTURE.md`, `docs/TECH_STACK.md`, `CHANGE_REQUESTS.md`, or `PROJECT_STATUS.md`. **Why:** `02-network-and-ports.md §port-map hygiene` (undocumented published port). **Fix:** identify the bound service (`lsof -p <pid>` / aaPanel service inventory) before deciding whether to close or document it. See Low-confidence section — severity may need revising once identified.
+- 🟡 **Re-verified 2026-07-26, directly on the live server** — `data/port.pl` under `/www/server/panel/` confirms **`25664/tcp`** is aaPanel's actual, intentional admin-panel port (the earlier "unidentified `webserver` daemon" note below was correct that a separate nginx-based process owns this port — that process *is* the panel's own front end, not a stray service). It carries two application-level access controls beyond username/password: a secret "security entrance" path (`data/admin_path.pl`) and a known-client fingerprint gate (`check_client_info()` in `class/public/common.py:9091`) that returns an nginx-byte-identical fake 404 to any client whose IP+User-Agent hasn't successfully logged in within the last 30 days — reproduced live against an unrecognized client during this re-verification. **Revised risk: low** (previously 🟡 pending identification — the original suspicion that this port duplicated/exposed the Beauty Clinic app was checked and disproven). Not referenced anywhere in `docs/ARCHITECTURE.md`, `docs/TECH_STACK.md`, or `PROJECT_STATUS.md` — still worth documenting. **Fix:** document the port; optionally restrict its ufw rule to a known admin IP anyway as defense-in-depth (the fingerprint gate is a single control, not a network boundary). Port **`888/tcp`** was originally assumed (in the 🔴 finding above) to be this same admin panel — that assumption is now disproven by `port.pl`. A separate nginx process does listen on 888, but its actual purpose is unconfirmed; see Low-confidence section.
 
 - 🟡 `ufw status verbose` (live server) — ufw allows `20/tcp`, `21/tcp` (FTP) and the passive-mode range `39000:40000/tcp` from anywhere, but `ss -tlnp` shows **no process currently listening** on any of them — dead attack surface, not an active exposure. If any FTP daemon (aaPanel bundles one) is ever installed/re-enabled, it becomes instantly internet-reachable with no further firewall step, and FTP is cleartext by default. **Why:** `02-network-and-ports.md §port-map hygiene`. **Fix:** `ufw delete allow 20`, `21`, `39000:40000` unless FTP is an intentional, currently-used feature — if it is, document it and confirm the service is actually SFTP/FTPS, not plaintext FTP.
 
@@ -62,7 +62,7 @@ Confirmed clean: `.env.example`/`env.example`/`.env.docker.example` contain only
 ---
 
 ## Low-confidence / needs human review
-- ❔ `25664/tcp` (live ufw/ss) — open to the internet under an aaPanel `webserver` process; exact function/sensitivity not confirmed from this vantage point. Recheck with `lsof -p <pid>` or aaPanel's own service inventory before finalizing severity (currently rated 🟡 pending that confirmation — could be 🔴 if it exposes anything sensitive, or downgradable if it's inert).
+- ❔ `888/tcp` (live ufw/ss) — a separate nginx process listens here; originally mis-assumed to be the aaPanel admin panel (see corrected entry above — the real panel port is `25664`, confirmed via `data/port.pl`). Its actual purpose is unconfirmed. Recheck with `lsof -p <pid>` / the process's own config before finalizing severity or deciding to close it.
 - ❔ Postgres container non-root runtime UID — the official `postgres:17` image is documented to drop root internally, but this audit could not run `docker inspect --format '{{.Config.User}}' beautycare-postgres` against the live container to directly confirm (read-only constraint). Recommend a `runtime-verify` pass to close the loop.
 - ❔ TLS 1.2 cipher suite specifics — no `openssl s_client`/`sslyze` scan was run; the missing explicit cipher list is flagged on the reference's general principle, not a confirmed weak-cipher observation.
 
@@ -78,8 +78,8 @@ Contabo box). Not covered here:
 - **Cloud IAM / physical network segmentation** — Contabo VPS-level controls (if any) are infra-ops,
   out of scope.
 - **Blind spots:** aaPanel's own internal security settings (rate limiting, WAF rules if any) were not
-  reviewed — only ufw/nginx/docker-compose were audited. The `25664/tcp` service identity (see
-  Low-confidence above).
+  reviewed — only ufw/nginx/docker-compose were audited. `25664/tcp`'s identity was resolved on
+  2026-07-26 (see above); `888/tcp`'s service identity remains open (see Low-confidence above).
 
 ## Method
 - Auditors (read-only): `infra-auditor` ×4, by category (`network-exposure`, `tls-headers`,

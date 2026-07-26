@@ -153,7 +153,7 @@ context-ים א-סינכרוניים נפרדים):
 - CR-034: Production-build migration — frontend build + backend Production env (Phase 013)
 - CR-035: Reject HTTPS requests to the raw server IP / no matching default_server (Phase 013)
 - CR-036: SSH hardening — disable password auth + root login (security audit, Critical)
-- CR-037: Close unnecessary open ports — aaPanel panel 888, port 25664, dead FTP rules (security audit, High)
+- CR-037: Port 888 purpose unconfirmed, dead FTP rules (security audit, Medium — 25664 re-verified 2026-07-26 as aaPanel's real, properly-protected panel port, downgraded from High)
 - CR-038: Vite dev server exposes full repo source via `/@fs/`, bypasses `/swagger` auth (security audit, Critical)
 - CR-039: Nginx edge hardening — security headers, dot-file blocking, nginx_status, default-site (security audit, Medium)
 - CR-040: No backup mechanism for production Postgres data (security audit, Critical)

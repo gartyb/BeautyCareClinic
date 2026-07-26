@@ -317,13 +317,13 @@
 - Description: Live server has `PasswordAuthentication yes` and `PermitRootLogin yes` in effective sshd config, confirmed under an active brute-force attack (51,827 failed attempts, 12,687 against `root`). `fail2ban` was installed and enabled same-session as an immediate mitigation, but the root cause (password auth + root login both allowed) remains open. Requires disabling both (`PasswordAuthentication no`, `PermitRootLogin no`) with care to avoid self-lockout (verify key-based access works before changing, keep the Contabo VNC console recovery path documented in `phases/phase-013/PHASE_SUMMARY.md:129` in mind).
 - Status: Open
 
-### CR-037 — Close unnecessary open ports (aaPanel admin panel, unidentified port, dead FTP rules)
+### CR-037 — Port 888 purpose unconfirmed; dead FTP rules still open (25664 re-verified, low risk)
 
 - Type: Security
-- Priority: High
-- Source: Comprehensive security audit (2026-07-20) — `security/INFRA-SECURITY-FINDINGS.md`, `security/SERVER-HARDENING-FINDINGS.md`
+- Priority: Medium (downgraded from High after 2026-07-26 re-verification)
+- Source: Comprehensive security audit (2026-07-20) — `security/INFRA-SECURITY-FINDINGS.md`, `security/SERVER-HARDENING-FINDINGS.md`; re-verified 2026-07-26 directly on the live server
 - Related phase: security/comprehensive-audit
-- Description: `ufw status` shows aaPanel's admin panel (port 888, full server-control UI) open to the entire internet guarded only by its own login — never addressed by Phase 013 (explicitly out of scope then). Also open: an unidentified aaPanel internal `webserver` process on port 25664 (needs identification before deciding to close/restrict), and dead-but-open FTP rules (20/21/39000:40000) with no live listener. Fix: restrict 888 to a known admin IP/VPN; identify and close/restrict 25664; remove the unused FTP ufw rules unless FTP is an intentional future feature.
+- Description: Port 25664 was re-investigated directly against the live server (BTPanel source under `/www/server/panel/`) and is now **confirmed** to be aaPanel's actual, intentional admin-panel port (`data/port.pl` = `25664`), not a stray/unidentified process. It is protected by two layers beyond username/password: a secret "security entrance" path (`data/admin_path.pl`) and a known-client fingerprint gate (`check_client_info()`, `class/public/common.py:9091`) that returns an nginx-byte-identical fake 404 to any IP/User-Agent combination without a successful login recorded in the last 30 days — reliably reproduced against unrecognized clients during re-verification. Risk from 25664 alone is now assessed as low; the original assumption that it duplicated/exposed the Beauty Clinic app was checked and disproven. Still open: (a) port 888 was originally assumed to be the aaPanel admin panel — that assumption is now disproven (the real panel port is 25664) — a separate nginx process listens on 888 but its actual purpose is unconfirmed and needs investigation before deciding to close or keep it; (b) dead-but-open FTP ufw rules (20/21/39000:40000) with no live listener. Fix: investigate and close/restrict port 888 if unused; remove the unused FTP ufw rules unless FTP is an intentional future feature; consider restricting 25664's ufw rule to a known admin IP anyway as defense-in-depth (the fingerprint gate is a single control, not a network boundary).
 - Status: Open
 
 ### CR-038 — Vite dev server exposes full repo source via `/@fs/`, bypassing the `/swagger` auth gate
