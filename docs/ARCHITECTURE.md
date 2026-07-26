@@ -34,8 +34,11 @@ Clean Architecture. Dependency direction: outer layers depend on inner layers, n
 
 ## Frontend Structure (Phase 8)
 
+Frontend project root: `frontend/` (sibling to `backend/`; `package.json`, `vite.config.ts`,
+`index.html`, and env files live there — see the "Frontend/Backend Layout" change below).
+
 ```
-src/
+frontend/src/
   api/           HTTP client layer (Phase 8+)
     apiClient.ts   Singleton fetch wrapper with Bearer auth + 401 auto-logout
     apiError.ts    ApiError interface + ApiRequestError class
@@ -96,6 +99,7 @@ The server (Contabo VPS, Ubuntu 24.04) runs aaPanel with its own nginx (`/www/se
 - **Firewall (ufw):** only `22` (SSH), `80`, `443` are externally reachable. The Vite (5174) and Kestrel (5000) ports are no longer directly reachable from outside — verified from a genuinely external client, not from the server itself (same-host tests are misleading here: traffic to the server's own public IP from itself is delivered via loopback and does not reflect real firewall behavior).
 - **Postgres:** container `beautycare-postgres` publishes `127.0.0.1:5432:5432` only (not `0.0.0.0`) — Docker's own iptables rules for published ports bypass ufw's default-deny, so the fix had to be at the Docker layer, not just the firewall. Configuration captured in `docker-compose.yml` (see `.env.docker.example`) so it survives a container recreation.
 - **Frontend/backend remain in dev mode** (`vite` dev server, `dotnet run` with `ASPNETCORE_ENVIRONMENT=Development`) — this phase changed only the network path to reach them, not their runtime mode. A production-build migration is a candidate for a future phase.
+- **Frontend/backend layout:** the frontend project root moved from the repo root into `frontend/` (2026-07-26) — `package.json`, `vite.config.ts`, `index.html`, and Vite's env files now live under `frontend/`, mirroring `backend/`. The Vite dev server must be started with `frontend/` as its working directory (`cd frontend && npm run dev`); all internal paths (proxy target `http://localhost:5000`, port `5174`) are unchanged.
 
 ## State Management
 
